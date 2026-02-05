@@ -1,0 +1,568 @@
+/* ── Base styles for @functionspace/ui components ── */
+
+/* Derived color variables (computed from theme) */
+.fs-chart-container,
+.fs-trade-panel,
+.fs-stats-bar,
+.fs-table-container {
+  --fs-background-dark: color-mix(in srgb, var(--fs-background) 70%, black);
+  --fs-input-bg: color-mix(in srgb, var(--fs-background) 50%, black);
+  --fs-primary-glow: color-mix(in srgb, var(--fs-primary) 20%, transparent);
+  --fs-primary-light: color-mix(in srgb, var(--fs-primary) 80%, white);
+  --fs-header-gradient: color-mix(in srgb, var(--fs-primary) 15%, transparent);
+}
+
+.fs-chart-container {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to bottom right, var(--fs-background), var(--fs-background-dark));
+  border: 1px solid var(--fs-border);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.fs-chart-header {
+  margin-bottom: 1rem;
+}
+
+.fs-chart-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--fs-text);
+  letter-spacing: -0.025em;
+}
+
+.fs-chart-subtitle {
+  color: var(--fs-text-secondary);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.fs-chart-body {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Trade Panel ── */
+
+.fs-trade-panel {
+  background: linear-gradient(to bottom right, var(--fs-background), var(--fs-background-dark));
+  border: 1px solid var(--fs-border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.fs-trade-header {
+  background: linear-gradient(to right, var(--fs-header-gradient), color-mix(in srgb, var(--fs-accent) 10%, transparent));
+  border-bottom: 1px solid var(--fs-border);
+  padding: 0.75rem 1rem;
+}
+
+.fs-trade-header h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--fs-text);
+  letter-spacing: -0.025em;
+  margin: 0;
+}
+
+.fs-trade-header p {
+  color: var(--fs-text-secondary);
+  font-size: 0.75rem;
+  margin: 0;
+}
+
+.fs-trade-form {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  flex: 1;
+}
+
+.fs-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.fs-input-group label {
+  color: var(--fs-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.fs-input-group input {
+  background: var(--fs-input-bg);
+  border: 1px solid var(--fs-border);
+  border-radius: 0.375rem;
+  color: var(--fs-text);
+  font-size: 1.125rem;
+  font-weight: 500;
+  height: 3rem;
+  padding: 0 0.75rem;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.fs-input-group input:focus {
+  border-color: var(--fs-primary);
+  box-shadow: 0 0 0 2px var(--fs-primary-glow);
+}
+
+.fs-input-group input::placeholder {
+  color: var(--fs-text-secondary);
+  opacity: 0.5;
+}
+
+.fs-input-hint {
+  color: var(--fs-text-secondary);
+  font-size: 0.75rem;
+}
+
+/* ── Tab switcher ── */
+
+.fs-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--fs-border);
+}
+
+.fs-tab {
+  flex: 1;
+  padding: 0.625rem 0;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--fs-text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.fs-tab:hover {
+  color: var(--fs-text);
+}
+
+.fs-tab.active {
+  color: var(--fs-primary);
+  border-bottom-color: var(--fs-primary);
+}
+
+/* ── Payout display ── */
+
+.fs-payout-box {
+  background: rgba(3, 7, 18, 0.5);
+  border: 1px solid var(--fs-border);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+
+.fs-payout-label {
+  color: var(--fs-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.fs-payout-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  display: block;
+}
+
+.fs-payout-value.has-value {
+  color: var(--fs-positive);
+}
+
+.fs-payout-value.no-value {
+  color: var(--fs-text-secondary);
+}
+
+.fs-payout-hint {
+  color: var(--fs-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  margin-top: 0.5rem;
+}
+
+/* ── Submit button ── */
+
+.fs-submit-btn {
+  width: 100%;
+  height: 3rem;
+  border: none;
+  border-radius: 0.375rem;
+  background: linear-gradient(to right, color-mix(in srgb, var(--fs-primary) 85%, black), var(--fs-primary));
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px var(--fs-primary-glow);
+  transition: opacity 0.15s;
+}
+
+.fs-submit-btn:hover:not(:disabled) {
+  background: linear-gradient(to right, var(--fs-primary), var(--fs-primary-light));
+}
+
+.fs-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fs-error-box {
+  background: color-mix(in srgb, var(--fs-negative) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fs-negative) 60%, black);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  color: var(--fs-negative);
+  font-size: 0.875rem;
+}
+
+/* ── Market Stats ── */
+
+.fs-stats-bar {
+  background: linear-gradient(to right, var(--fs-background), var(--fs-background-dark));
+  border: 1px solid var(--fs-border);
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.fs-stats-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0.75rem;
+}
+
+.fs-stat-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.5rem;
+}
+
+.fs-stat-item:not(:last-child) {
+  border-right: 1px solid var(--fs-border);
+}
+
+.fs-stat-label {
+  color: var(--fs-text-secondary);
+  font-size: 0.5625rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+  text-align: center;
+}
+
+.fs-stat-value {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  color: var(--fs-text);
+}
+
+.fs-stat-value.status-active {
+  color: var(--fs-positive);
+}
+
+.fs-stat-value.status-resolved {
+  color: var(--fs-negative);
+}
+
+.fs-skeleton {
+  display: inline-block;
+  height: 0.75rem;
+  width: 3rem;
+  background: var(--fs-border);
+  border-radius: 0.25rem;
+  animation: fs-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes fs-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ── Tooltip ── */
+
+.fs-tooltip {
+  background: color-mix(in srgb, var(--fs-surface) 95%, transparent);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--fs-border);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.fs-tooltip-label {
+  color: var(--fs-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.fs-tooltip-row {
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+/* ── Position Table ── */
+
+.fs-table-container {
+  background: linear-gradient(to bottom right, var(--fs-background), var(--fs-background-dark));
+  border: 1px solid var(--fs-border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.fs-table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--fs-border);
+  background: linear-gradient(to right, color-mix(in srgb, var(--fs-primary) 10%, transparent), color-mix(in srgb, var(--fs-accent) 8%, transparent));
+}
+
+.fs-table-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--fs-text);
+  margin: 0;
+}
+
+.fs-table-count {
+  font-size: 0.75rem;
+  color: var(--fs-text-secondary);
+}
+
+.fs-table-wrapper {
+  overflow-x: auto;
+}
+
+.fs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.fs-table th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  color: var(--fs-text-secondary);
+  font-weight: 600;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--fs-border);
+  white-space: nowrap;
+}
+
+.fs-table td {
+  padding: 0.75rem 1rem;
+  color: var(--fs-text);
+  border-bottom: 1px solid rgba(45, 55, 72, 0.5);
+  white-space: nowrap;
+}
+
+.fs-table tbody tr:hover {
+  background: rgba(45, 55, 72, 0.2);
+}
+
+.fs-table tbody tr.fs-row-selected {
+  background: color-mix(in srgb, var(--fs-primary) 15%, transparent);
+  border-left: 3px solid var(--fs-primary);
+}
+
+.fs-table tbody tr.fs-row-selected:hover {
+  background: color-mix(in srgb, var(--fs-primary) 20%, transparent);
+}
+
+.fs-table-id {
+  font-weight: 600;
+  font-family: monospace;
+  font-size: 0.75rem;
+}
+
+.fs-status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.fs-status-badge.open {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--fs-positive);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.fs-status-badge.closed {
+  background: rgba(244, 63, 94, 0.1);
+  color: var(--fs-negative);
+  border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+.fs-pl {
+  font-weight: 600;
+}
+
+.fs-pl.profit {
+  color: var(--fs-positive);
+}
+
+.fs-pl.loss {
+  color: var(--fs-negative);
+}
+
+.fs-sell-btn {
+  padding: 0.375rem 0.875rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(244, 63, 94, 0.1);
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  color: var(--fs-negative);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.fs-sell-btn:hover {
+  background: rgba(244, 63, 94, 0.2);
+  border-color: rgba(244, 63, 94, 0.5);
+}
+
+.fs-selling {
+  color: var(--fs-accent);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.fs-no-action {
+  color: var(--fs-text-secondary);
+  opacity: 0.6;
+  font-size: 0.75rem;
+}
+
+.fs-table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-top: 1px solid var(--fs-border);
+  background: rgba(3, 7, 18, 0.3);
+}
+
+.fs-page-btn {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.25rem;
+  background: var(--fs-surface);
+  border: 1px solid var(--fs-border);
+  color: var(--fs-text);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.fs-page-btn:hover:not(:disabled) {
+  background: var(--fs-border);
+}
+
+.fs-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.fs-page-info {
+  color: var(--fs-text);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.fs-table-loading,
+.fs-table-error,
+.fs-table-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  text-align: center;
+}
+
+.fs-table-loading p,
+.fs-table-empty p {
+  color: var(--fs-text-secondary);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.fs-table-empty-hint {
+  color: var(--fs-text-secondary) !important;
+  opacity: 0.6;
+  font-size: 0.75rem !important;
+  margin-top: 0.25rem !important;
+}
+
+.fs-table-error p {
+  color: var(--fs-negative);
+  font-size: 0.875rem;
+  margin: 0 0 1rem 0;
+}
+
+.fs-retry-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  background: var(--fs-surface);
+  border: 1px solid var(--fs-border);
+  color: var(--fs-text);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.fs-retry-btn:hover {
+  background: var(--fs-border);
+}
+
+.fs-table-sell-error {
+  background: color-mix(in srgb, var(--fs-negative) 15%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--fs-negative) 60%, black);
+  padding: 0.75rem 1.25rem;
+  color: var(--fs-negative);
+  font-size: 0.8125rem;
+}
+
+.fs-spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 2px solid var(--fs-border);
+  border-top-color: var(--fs-primary);
+  border-radius: 50%;
+  animation: fs-spin 0.8s linear infinite;
+  margin-bottom: 0.75rem;
+}
+
+@keyframes fs-spin {
+  to { transform: rotate(360deg); }
+}

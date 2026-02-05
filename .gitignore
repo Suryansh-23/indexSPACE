@@ -1,1 +1,6 @@
-/Docs
+node_modules/
+dist/
+.env
+*.tsbuildinfo
+.vite/
+Docs/
