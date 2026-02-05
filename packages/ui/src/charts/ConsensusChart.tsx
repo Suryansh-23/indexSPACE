@@ -14,10 +14,18 @@ import { FunctionSpaceContext, useMarket, useConsensus } from '@functionspace/re
 import { CHART_COLORS } from '../theme.js';
 import '../styles/base.css';
 
+export interface OverlayCurve {
+  id: string;
+  label: string;
+  curve: Array<{ x: number; y: number }>;
+  color?: string;
+}
+
 export interface ConsensusChartProps {
   marketId: string | number;
   height?: number;
   showStats?: boolean;
+  overlayCurves?: OverlayCurve[];
 }
 
 interface ChartPoint {
@@ -25,17 +33,17 @@ interface ChartPoint {
   consensus: number;
   preview?: number;
   payout?: number;
-  selected?: number;
+  [key: string]: number | undefined;
 }
 
-export function ConsensusChart({ marketId, height = 400, showStats = true }: ConsensusChartProps) {
+export function ConsensusChart({ marketId, height = 400, showStats = true, overlayCurves }: ConsensusChartProps) {
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('ConsensusChart must be used within FunctionSpaceProvider');
 
   const { market } = useMarket(marketId);
   const { consensus, loading, error } = useConsensus(marketId, 100);
 
-  // Build chart data merging consensus, preview belief, and payout
+  // Build chart data merging consensus, preview belief, payout, and overlays
   const chartData = useMemo<ChartPoint[]>(() => {
     if (!consensus) return [];
 
@@ -44,7 +52,7 @@ export function ConsensusChart({ marketId, height = 400, showStats = true }: Con
       consensus: p.y,
     }));
 
-    // Add preview belief overlay
+    // Add preview belief overlay (from trade panel)
     if (ctx.previewBelief && market) {
       const { L, H } = market.config;
       const previewCurve = evaluateDensityCurve(ctx.previewBelief, L, H, points.length);
@@ -53,19 +61,18 @@ export function ConsensusChart({ marketId, height = 400, showStats = true }: Con
       }
     }
 
-    // Add selected position belief overlay
-    if (ctx.selectedPosition?.belief && market) {
-      const { L, H } = market.config;
-      const selectedCurve = evaluateDensityCurve(ctx.selectedPosition.belief, L, H, points.length);
-      for (let i = 0; i < points.length && i < selectedCurve.length; i++) {
-        points[i].selected = selectedCurve[i].y;
+    // Add overlay curves (passed via props)
+    if (overlayCurves && market) {
+      for (const overlay of overlayCurves) {
+        for (let i = 0; i < points.length && i < overlay.curve.length; i++) {
+          points[i][overlay.id] = overlay.curve[i].y;
+        }
       }
     }
 
     // Add payout data (tooltip-only)
     if (ctx.previewPayout?.projections && market) {
       const projections = ctx.previewPayout.projections;
-      // Align payout data to chart x-values via nearest-match
       for (const point of points) {
         let best = projections[0];
         let bestDist = Math.abs(best.outcome - point.x);
@@ -84,9 +91,8 @@ export function ConsensusChart({ marketId, height = 400, showStats = true }: Con
     }
 
     return points;
-  }, [consensus, ctx.previewBelief, ctx.previewPayout, ctx.selectedPosition, market]);
+  }, [consensus, ctx.previewBelief, ctx.previewPayout, overlayCurves, market]);
 
-  
   // Dynamic Y-axis domain for density
   const densityDomain = useMemo<[number, number]>(() => {
     if (!chartData.length) return [0, 0.1];
@@ -94,10 +100,16 @@ export function ConsensusChart({ marketId, height = 400, showStats = true }: Con
     for (const d of chartData) {
       if (d.consensus > max) max = d.consensus;
       if (d.preview !== undefined && d.preview > max) max = d.preview;
-      if (d.selected !== undefined && d.selected > max) max = d.selected;
+      // Check overlay values
+      if (overlayCurves) {
+        for (const overlay of overlayCurves) {
+          const val = d[overlay.id];
+          if (val !== undefined && val > max) max = val;
+        }
+      }
     }
     return [0, max * 1.15];
-  }, [chartData]);
+  }, [chartData, overlayCurves]);
 
   // Payout Y-axis domain
   const payoutDomain = useMemo<[number, number]>(() => {
@@ -111,7 +123,6 @@ export function ConsensusChart({ marketId, height = 400, showStats = true }: Con
 
   const hasPreview = ctx.previewBelief !== null;
   const hasPayout = chartData.some((d) => d.payout !== undefined);
-  const hasSelected = ctx.selectedPosition !== null;
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
@@ -140,10 +151,12 @@ export function ConsensusChart({ marketId, height = 400, showStats = true }: Con
               </p>
             );
           }
-          if (entry.dataKey === 'selected') {
+          // Handle overlay curves
+          const overlay = overlayCurves?.find(o => o.id === entry.dataKey);
+          if (overlay && entry.value !== undefined) {
             return (
-              <p key={i} className="fs-tooltip-row" style={{ color: CHART_COLORS.payout }}>
-                Selected Position: {entry.value?.toFixed(4)}
+              <p key={i} className="fs-tooltip-row" style={{ color: overlay.color || CHART_COLORS.payout }}>
+                {overlay.label}: {entry.value?.toFixed(4)}
               </p>
             );
           }
@@ -192,10 +205,13 @@ export function ConsensusChart({ marketId, height = 400, showStats = true }: Con
                 <stop offset="5%" stopColor={CHART_COLORS.preview} stopOpacity={0.3} />
                 <stop offset="95%" stopColor={CHART_COLORS.preview} stopOpacity={0.0} />
               </linearGradient>
-              <linearGradient id="fsSelectedGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={CHART_COLORS.payout} stopOpacity={0.3} />
-                <stop offset="95%" stopColor={CHART_COLORS.payout} stopOpacity={0.0} />
-              </linearGradient>
+              {/* Dynamic gradients for overlay curves */}
+              {overlayCurves?.map((overlay) => (
+                <linearGradient key={`grad-${overlay.id}`} id={`fsOverlayGrad-${overlay.id}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={overlay.color || CHART_COLORS.payout} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={overlay.color || CHART_COLORS.payout} stopOpacity={0.0} />
+                </linearGradient>
+              ))}
             </defs>
 
             <CartesianGrid strokeDasharray="3 3" stroke="var(--fs-border)" vertical={false} />
@@ -249,7 +265,8 @@ export function ConsensusChart({ marketId, height = 400, showStats = true }: Con
               formatter={(value: string) => {
                 if (value === 'consensus') return <span style={{ color: CHART_COLORS.consensus, fontSize: '0.75rem' }}>Market Consensus</span>;
                 if (value === 'preview') return <span style={{ color: CHART_COLORS.preview, fontSize: '0.75rem' }}>Trade Preview</span>;
-                if (value === 'selected') return <span style={{ color: CHART_COLORS.payout, fontSize: '0.75rem' }}>Selected Position</span>;
+                const overlay = overlayCurves?.find(o => o.id === value);
+                if (overlay) return <span style={{ color: overlay.color || CHART_COLORS.payout, fontSize: '0.75rem' }}>{overlay.label}</span>;
                 return null;
               }}
             />
@@ -298,20 +315,21 @@ export function ConsensusChart({ marketId, height = 400, showStats = true }: Con
               />
             )}
 
-            {/* Selected position area — green */}
-            {hasSelected && (
+            {/* Overlay curves — from props */}
+            {overlayCurves?.map((overlay) => (
               <Area
+                key={overlay.id}
                 yAxisId="left"
                 type="monotone"
-                dataKey="selected"
-                stroke={CHART_COLORS.payout}
+                dataKey={overlay.id}
+                stroke={overlay.color || CHART_COLORS.payout}
                 strokeWidth={2}
                 fillOpacity={1}
-                fill="url(#fsSelectedGrad)"
-                name="selected"
+                fill={`url(#fsOverlayGrad-${overlay.id})`}
+                name={overlay.id}
                 animationDuration={300}
               />
-            )}
+            ))}
           </ComposedChart>
         </ResponsiveContainer>
       </div>

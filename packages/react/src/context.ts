@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import type { FSClient, PayoutCurve, Position } from '@functionspace/core';
+import type { FSClient, PayoutCurve } from '@functionspace/core';
 
 export interface FSContext {
   client: FSClient;
@@ -7,8 +7,6 @@ export interface FSContext {
   setPreviewBelief: (belief: number[] | null) => void;
   previewPayout: PayoutCurve | null;
   setPreviewPayout: (payout: PayoutCurve | null) => void;
-  selectedPosition: Position | null;
-  setSelectedPosition: (position: Position | null) => void;
   invalidate: (marketId: string | number) => void;
   /** Internal: counter that increments on invalidate, hooks watch this */
   invalidationCount: number;

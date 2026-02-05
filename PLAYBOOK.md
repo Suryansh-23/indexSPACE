@@ -258,6 +258,61 @@ onSuccess?.(result);       // Notify parent
 
 ---
 
+## Layer Boundaries (ENFORCED BY TESTS)
+
+| Layer | Can Import From | Cannot Import From |
+|-------|-----------------|-------------------|
+| `core` | npm packages only | `react`, `ui` |
+| `react` | `core`, npm packages | `ui` |
+| `ui` | `react` (hooks only), npm packages | `core` functions* |
+
+*Type imports from core are allowed. Function calls are not.
+
+### Why These Boundaries?
+
+- **Core is framework-agnostic** — Can be used with Vue, Svelte, vanilla JS
+- **React provides data layer** — Hooks handle fetching, caching, invalidation
+- **UI renders data** — Components receive processed data, don't process it
+- **Consumers compose** — Apps wire components together, handle app-specific state
+
+### Two Types of State
+
+| Type | Where It Lives | Example |
+|------|----------------|---------|
+| **SDK state** | Context via hooks | previewBelief, invalidationCount |
+| **App state** | Consumer app | selectedPositionId, filters, UI toggles |
+
+Selection, filtering, sorting = **app concerns**, not SDK concerns.
+
+### Example: Position Selection
+
+```tsx
+// ❌ BAD - SDK manages selection state
+// Context has: selectedPosition: Position | null
+
+// ✅ GOOD - App manages selection, SDK provides callbacks
+function App() {
+  const [selectedId, setSelectedId] = useState(null);
+  const { positions } = usePositions(marketId, username);
+  const { market } = useMarket(marketId);
+
+  const overlayCurves = useMemo(() => {
+    const pos = positions?.find(p => p.positionId === selectedId);
+    if (!pos?.belief || !market) return undefined;
+    return [{ id: 'selected', label: 'Selected', curve: evaluateDensityCurve(...) }];
+  }, [selectedId, positions, market]);
+
+  return (
+    <>
+      <ConsensusChart overlayCurves={overlayCurves} />
+      <PositionTable selectedPositionId={selectedId} onSelectPosition={setSelectedId} />
+    </>
+  );
+}
+```
+
+---
+
 ## File Locations
 
 ```

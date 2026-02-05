@@ -1,6 +1,6 @@
 // Charts
 export { ConsensusChart } from './charts/index.js';
-export type { ConsensusChartProps } from './charts/index.js';
+export type { ConsensusChartProps, OverlayCurve } from './charts/index.js';
 
 // Trading
 export { TradePanel } from './trading/index.js';

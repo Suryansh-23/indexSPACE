@@ -1,6 +1,9 @@
-import { FunctionSpaceProvider } from '@functionspace/react';
+import { useState, useMemo } from 'react';
+import { FunctionSpaceProvider, useMarket, usePositions } from '@functionspace/react';
 import type { FSThemeInput } from '@functionspace/react';
 import { ConsensusChart, TradePanel, MarketStats, PositionTable } from '@functionspace/ui';
+import type { OverlayCurve } from '@functionspace/ui';
+import { evaluateDensityCurve } from '@functionspace/core';
 import { ArticlePage } from './pages/ArticlePage';
 
 const config = {
@@ -12,43 +15,64 @@ const config = {
 const MARKET_ID = import.meta.env.VITE_FS_MARKET_ID;
 
 // ── Theme Options ──
-// Simple preset: "light" or "dark"
 const widgetTheme: FSThemeInput = "dark";
 
-// Full custom theme - complete control over every color
-// const widgetTheme: FSThemeInput = {
-//   preset: 'dark',              // Start from dark or light base
-//   primary: '#ff00ff',          // Magenta - main accent color
-//   accent: '#00ffff',           // Cyan - secondary accent
-//   positive: '#39ff14',         // Neon green - profit/success
-//   negative: '#ff073a',         // Neon red - loss/error
-//   background: '#1a0a2e',       // Deep purple - widget background
-//   surface: '#2d1b4e',          // Lighter purple - cards/panels
-//   text: '#ffffff',             // White - primary text
-//   textSecondary: '#b794f6',    // Lavender - secondary text
-//   border: '#6b21a8',           // Purple - borders
-// };
-
 // ── Layout Settings ──
-const CHART_RATIO = 2.2;  // Chart takes 2 parts
-const PANEL_RATIO = 1;  // Panel takes 1 part (2:1 = ~66%/33%)
+const CHART_RATIO = 2.2;
+const PANEL_RATIO = 1;
+
+// Inner component that uses hooks (must be inside FunctionSpaceProvider)
+function MarketWidgets() {
+  const [selectedPositionId, setSelectedPositionId] = useState<number | null>(null);
+
+  const { market } = useMarket(MARKET_ID);
+  const { positions } = usePositions(MARKET_ID, config.username);
+
+  // Derive overlay curve from selected position
+  const overlayCurves = useMemo((): OverlayCurve[] | undefined => {
+    if (!selectedPositionId || !positions || !market) return undefined;
+    const pos = positions.find(p => p.positionId === selectedPositionId);
+    if (!pos?.belief) return undefined;
+
+    const { L, H } = market.config;
+    const curve = evaluateDensityCurve(pos.belief, L, H, 100);
+
+    return [{
+      id: `position-${selectedPositionId}`,
+      label: `Position #${selectedPositionId}`,
+      curve,
+      color: '#10b981',
+    }];
+  }, [selectedPositionId, positions, market]);
+
+  return (
+    <>
+      <MarketStats marketId={MARKET_ID} />
+
+      <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', marginBottom: '1rem', minHeight: '520px' }}>
+        <div style={{ flex: CHART_RATIO, minWidth: 0 }}>
+          <ConsensusChart marketId={MARKET_ID} height={600} overlayCurves={overlayCurves} />
+        </div>
+        <div style={{ flex: PANEL_RATIO, minWidth: 0 }}>
+          <TradePanel marketId={MARKET_ID} modes={['gaussian', 'plateau']} />
+        </div>
+      </div>
+
+      <PositionTable
+        marketId={MARKET_ID}
+        username={config.username}
+        selectedPositionId={selectedPositionId}
+        onSelectPosition={setSelectedPositionId}
+      />
+    </>
+  );
+}
 
 export default function App() {
   return (
     <ArticlePage>
       <FunctionSpaceProvider config={config} theme={widgetTheme}>
-        <MarketStats marketId={MARKET_ID} />
-
-        <div style={{ display: 'flex', gap: '1rem',marginTop: '1rem', marginBottom: '1rem', minHeight: '520px', }}>
-          <div style={{ flex: CHART_RATIO, minWidth: 0 }}>
-            <ConsensusChart marketId={MARKET_ID} height={600} />
-          </div>
-          <div style={{ flex: PANEL_RATIO, minWidth: 0 }}>
-            <TradePanel marketId={MARKET_ID} modes={['gaussian', 'plateau']}/>
-          </div>
-        </div>
-
-        <PositionTable marketId={MARKET_ID} username={config.username} />
+        <MarketWidgets />
       </FunctionSpaceProvider>
     </ArticlePage>
   );

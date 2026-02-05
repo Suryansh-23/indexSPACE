@@ -9,6 +9,8 @@ export interface PositionTableProps {
   username: string;
   onSell?: (result: SellResult) => void;
   pageSize?: number;
+  selectedPositionId?: number | null;
+  onSelectPosition?: (id: number | null) => void;
 }
 
 const formatCurrency = (value: number | null | undefined): string => {
@@ -24,6 +26,8 @@ export function PositionTable({
   username,
   onSell,
   pageSize = 3,
+  selectedPositionId,
+  onSelectPosition,
 }: PositionTableProps) {
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('PositionTable must be used within FunctionSpaceProvider');
@@ -33,8 +37,6 @@ export function PositionTable({
   const [sellInProgress, setSellInProgress] = useState<Set<string | number>>(new Set());
   const [sellError, setSellError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-
-  const selectedPositionId = ctx.selectedPosition?.positionId;
 
   // Sort positions by ID descending (newest first)
   const sortedPositions = useMemo(() => {
@@ -198,10 +200,11 @@ export function PositionTable({
               const isSelected = selectedPositionId === p.positionId;
 
               const handleRowClick = () => {
+                if (!onSelectPosition) return;
                 if (isSelected) {
-                  ctx.setSelectedPosition(null);
+                  onSelectPosition(null);
                 } else {
-                  ctx.setSelectedPosition(p);
+                  onSelectPosition(p.positionId);
                 }
               };
 
@@ -210,7 +213,7 @@ export function PositionTable({
                   key={String(p.positionId)}
                   className={isSelected ? 'fs-row-selected' : ''}
                   onClick={handleRowClick}
-                  style={{ cursor: 'pointer' }}
+                  style={{ cursor: onSelectPosition ? 'pointer' : 'default' }}
                 >
                   <td className="fs-table-id">{String(p.positionId)}</td>
                   <td>
