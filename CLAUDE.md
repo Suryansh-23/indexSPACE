@@ -27,8 +27,11 @@ demo-app/     # Example implementation showing widget usage
 ## Before Adding Code
 
 **READ `PLAYBOOK.md` FIRST** — It contains:
+- Belief builder architecture (L1/L2 layering, kernel system, Region types)
+- How to add new belief shapes (checklist + decision guide)
+- Trade input widget three-phase pattern (instant preview → debounced payout → submit)
 - Step-by-step guide for adding new widgets
-- CSS variable reference
+- CSS variable reference (including the derived-variables selector gotcha)
 - Hook patterns
 - Export checklists
 
@@ -37,8 +40,10 @@ demo-app/     # Example implementation showing widget usage
 | Rule | Why |
 |------|-----|
 | Use CSS variables for ALL colors | Theming breaks otherwise |
+| ALL belief shapes route through `buildBelief` (L1) | Single normalization path, single point of change |
+| New widget root classes must be added to derived-variables selector in `base.css` (lines 4-7) | Derived vars (`--fs-background-dark` etc.) won't resolve otherwise — breaks silently |
 | Widgets must check `FunctionSpaceContext` | Throws helpful error if provider missing |
-| Hooks return `{ data, loading, error, refetch }` | Consistent API across all hooks |
+| Hooks return `{ <named>, loading, error, refetch }` | Named property matches hook (market, consensus, positions) |
 | Export types separately | `export type { Props }` for proper tree-shaking |
 
 ## File Locations
@@ -51,16 +56,29 @@ demo-app/     # Example implementation showing widget usage
 | Add widget styles | `packages/ui/src/styles/base.css` |
 | Modify theme system | `packages/react/src/FunctionSpaceProvider.tsx` |
 
-## Verification Commands
+## Testing Requirements
+
+**Tests MUST pass before and after any changes.** Run from repo root:
 
 ```bash
-# Run all tests (from repo root)
-npx vitest run
+npx vitest run              # All tests (required)
+cd demo-app && npx vite build   # Build verification (required)
+```
 
-# Build demo app
-cd demo-app && npx vite build
+| Test File | Purpose | Update When... |
+|-----------|---------|----------------|
+| `tests/architecture.test.ts` | Enforces layer boundaries, hook patterns, export completeness | Adding new hooks, components, or changing imports |
+| `tests/hooks.test.tsx` | Verifies hook behavior (loading, error, refetch, context) | Adding or modifying hooks |
+| `tests/stage1.test.ts` | Core math functions | Changing belief builders or curve evaluation |
+| `tests/stage2.test.ts` | API/transaction functions | Changing buy, sell, or query functions |
 
-# Dev server
+**When changing UI components:** Update `architecture.test.ts` if adding new exports or changing prop patterns.
+
+**When adding hooks:** Add corresponding tests to `hooks.test.tsx` following existing patterns.
+
+## Dev Server
+
+```bash
 cd demo-app && npx vite dev
 ```
 
@@ -83,8 +101,11 @@ Available presets: `"light"` | `"dark"`
 
 ## What NOT To Do
 
+- Don't skip running tests — `npx vitest run` must pass before and after changes
 - Don't add colors as hex values in CSS — use `var(--fs-primary)` etc.
 - Don't create new CSS files — add to `base.css`
 - Don't skip loading/error states in widgets
 - Don't forget to export from `index.ts`
-- Don't call API directly in widgets — use or create hooks
+- Don't make API calls directly in widgets — use hooks for data fetching
+- Don't require consumers to wire components together — they should work automatically via context
+- Don't push SDK-level coordination state to consumers — keep it in context

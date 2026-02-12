@@ -83,7 +83,7 @@ export function TradePanel({ marketId, modes = ['gaussian', 'plateau'], onBuy }:
       const [lo, hi] = rangeValues;
       if (lo >= hi) return null;
       if (lo < L || hi > H) return null;
-      return buildPlateau(lo, hi, K, L, H);
+      return buildPlateau(lo, hi, K, L, H, 1);
     }
   }, [market, activeMode, prediction, confidence, rangeValues, getStdDevFromConfidence]);
 

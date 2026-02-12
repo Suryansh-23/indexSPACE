@@ -10,9 +10,10 @@ export interface SliderProps {
   onChange: (value: number) => void;
   step?: number;
   disabled?: boolean;
+  showTrack?: boolean;
 }
 
-export function Slider({ min, max, value, onChange, step, disabled }: SliderProps) {
+export function Slider({ min, max, value, onChange, step, disabled, showTrack = true }: SliderProps) {
   return (
     <RCSlider
       min={min}
@@ -21,6 +22,7 @@ export function Slider({ min, max, value, onChange, step, disabled }: SliderProp
       onChange={(v) => onChange(v as number)}
       step={step}
       disabled={disabled}
+      styles={!showTrack ? { track: { background: 'transparent' } } : undefined}
     />
   );
 }

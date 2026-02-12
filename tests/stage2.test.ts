@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { FSClient } from '../packages/core/src/client.js';
 import { buildGaussian, buildPlateau, buildBelief } from '../packages/core/src/math/builders.js';
-import { evaluateDensity, evaluateDensityCurve, computeStatistics } from '../packages/core/src/math/bernstein.js';
+import { evaluateDensityPiecewise, evaluateDensityCurve, computeStatistics } from '../packages/core/src/math/density.js';
 import { queryMarketState, getConsensusCurve, queryConsensusSummary, queryDensityAt } from '../packages/core/src/queries/market.js';
-import { queryPositionState } from '../packages/core/src/queries/positions.js';
+import { queryPositionState, queryMarketPositions } from '../packages/core/src/queries/positions.js';
+import { positionsToTradeEntries, queryTradeHistory } from '../packages/core/src/queries/trades.js';
 import { buy } from '../packages/core/src/transactions/buy.js';
 import { sell } from '../packages/core/src/transactions/sell.js';
 import { projectSell } from '../packages/core/src/projections/projectSell.js';
@@ -67,11 +68,11 @@ describe('Math: buildBelief', () => {
   });
 });
 
-describe('Math: evaluateDensity', () => {
+describe('Math: evaluateDensityPiecewise', () => {
   it('density at center of Gaussian is highest', () => {
     const v = buildGaussian(60, 9, K, L, H);
-    const atCenter = evaluateDensity(v, 60, L, H);
-    const atEdge = evaluateDensity(v, 20, L, H);
+    const atCenter = evaluateDensityPiecewise(v, 60, L, H);
+    const atEdge = evaluateDensityPiecewise(v, 20, L, H);
     expect(atCenter).toBeGreaterThan(atEdge);
     expect(atCenter).toBeGreaterThan(0);
   });
@@ -97,6 +98,79 @@ describe('Math: computeStatistics', () => {
     expect(stats.variance).toBeGreaterThan(0);
     expect(stats.stdDev).toBeGreaterThan(0);
     expect(stats.stdDev).toBeCloseTo(Math.sqrt(stats.variance), 5);
+  });
+});
+
+// ── Trade History transform tests (no backend) ──
+
+describe('positionsToTradeEntries', () => {
+  it('creates a buy entry for each position', () => {
+    const positions: any[] = [
+      { positionId: 1, createdAt: '2025-01-15T14:00:00.000Z', prediction: 52.5, collateral: 100, owner: 'alice', status: 'open', soldPrice: null, closedAt: null },
+      { positionId: 2, createdAt: '2025-01-15T15:00:00.000Z', prediction: 60.0, collateral: 50, owner: 'bob', status: 'open', soldPrice: null, closedAt: null },
+    ];
+    const entries = positionsToTradeEntries(positions);
+    expect(entries).toHaveLength(2);
+    expect(entries.every(e => e.side === 'buy')).toBe(true);
+  });
+
+  it('creates both buy and sell entries for sold positions', () => {
+    const positions: any[] = [
+      { positionId: 1, createdAt: '2025-01-15T14:00:00.000Z', prediction: 52.5, collateral: 100, owner: 'alice', status: 'sold', soldPrice: 112.5, closedAt: '2025-01-15T16:00:00.000Z' },
+    ];
+    const entries = positionsToTradeEntries(positions);
+    expect(entries).toHaveLength(2);
+    expect(entries[0].side).toBe('sell'); // Most recent first
+    expect(entries[1].side).toBe('buy');
+    expect(entries[0].amount).toBe(112.5);
+    expect(entries[1].amount).toBe(100);
+  });
+
+  it('sorts by timestamp descending', () => {
+    const positions: any[] = [
+      { positionId: 1, createdAt: '2025-01-15T10:00:00.000Z', prediction: 50, collateral: 10, owner: 'a', status: 'open', soldPrice: null, closedAt: null },
+      { positionId: 2, createdAt: '2025-01-15T14:00:00.000Z', prediction: 60, collateral: 20, owner: 'b', status: 'open', soldPrice: null, closedAt: null },
+      { positionId: 3, createdAt: '2025-01-15T12:00:00.000Z', prediction: 55, collateral: 15, owner: 'c', status: 'open', soldPrice: null, closedAt: null },
+    ];
+    const entries = positionsToTradeEntries(positions);
+    expect(entries[0].timestamp > entries[1].timestamp).toBe(true);
+    expect(entries[1].timestamp > entries[2].timestamp).toBe(true);
+  });
+
+  it('respects limit option', () => {
+    const positions: any[] = Array.from({ length: 20 }, (_, i) => ({
+      positionId: i, createdAt: `2025-01-${String(i + 1).padStart(2, '0')}T12:00:00.000Z`,
+      prediction: 50, collateral: 10, owner: 'user', status: 'open', soldPrice: null, closedAt: null,
+    }));
+    const entries = positionsToTradeEntries(positions, { limit: 5 });
+    expect(entries).toHaveLength(5);
+  });
+
+  it('handles null prediction gracefully', () => {
+    const positions: any[] = [
+      { positionId: 1, createdAt: '2025-01-15T14:00:00.000Z', prediction: null, collateral: 100, owner: 'alice', status: 'open', soldPrice: null, closedAt: null },
+    ];
+    const entries = positionsToTradeEntries(positions);
+    expect(entries[0].prediction).toBeNull();
+  });
+
+  it('handles null/missing timestamps with "--" fallback', () => {
+    const positions: any[] = [
+      { positionId: 1, createdAt: null, prediction: 50, collateral: 100, owner: 'alice', status: 'open', soldPrice: null, closedAt: null },
+    ];
+    const entries = positionsToTradeEntries(positions);
+    expect(entries[0].timestamp).toBe('--');
+  });
+
+  it('returns unique IDs for buy and sell of same position', () => {
+    const positions: any[] = [
+      { positionId: 1, createdAt: '2025-01-15T14:00:00.000Z', prediction: 52.5, collateral: 100, owner: 'alice', status: 'sold', soldPrice: 120, closedAt: '2025-01-15T16:00:00.000Z' },
+    ];
+    const entries = positionsToTradeEntries(positions);
+    const ids = entries.map(e => e.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toContain('1_open');
+    expect(ids).toContain('1_close');
   });
 });
 
@@ -280,9 +354,9 @@ describe('Cross-validation: local stats vs backend data', () => {
     const market = await queryMarketState(client, MARKET_ID);
     const curve = await getConsensusCurve(client, MARKET_ID, 50);
 
-    // Pick a few points from the curve and compare against direct evaluateDensity
+    // Pick a few points from the curve and compare against direct evaluateDensityPiecewise
     for (const point of [curve.points[10], curve.points[25], curve.points[40]]) {
-      const directDensity = evaluateDensity(
+      const directDensity = evaluateDensityPiecewise(
         market.consensus, point.x, market.config.L, market.config.H,
       );
       expect(directDensity).toBeCloseTo(point.y, 5);
@@ -313,4 +387,47 @@ describe('Cross-validation: local stats vs backend data', () => {
     // Clean up
     await sell(client, buyResult.positionId, MARKET_ID);
   }, 30000);
+});
+
+describe('API: queryMarketPositions', () => {
+  it('returns an array of Position objects', async () => {
+    const client = makeClient();
+    const positions = await queryMarketPositions(client, MARKET_ID);
+    expect(Array.isArray(positions)).toBe(true);
+    if (positions.length > 0) {
+      expect(positions[0]).toHaveProperty('positionId');
+      expect(positions[0]).toHaveProperty('owner');
+      expect(positions[0]).toHaveProperty('collateral');
+      expect(positions[0]).toHaveProperty('status');
+      expect(positions[0]).toHaveProperty('createdAt');
+    }
+  });
+});
+
+describe('API: queryTradeHistory', () => {
+  it('returns trade entries sorted by timestamp descending', async () => {
+    const client = makeClient();
+    const trades = await queryTradeHistory(client, MARKET_ID);
+    expect(Array.isArray(trades)).toBe(true);
+    if (trades.length > 1) {
+      // Verify descending order (most recent first)
+      for (let i = 0; i < trades.length - 1; i++) {
+        if (trades[i].timestamp !== '--' && trades[i + 1].timestamp !== '--') {
+          expect(trades[i].timestamp >= trades[i + 1].timestamp).toBe(true);
+        }
+      }
+    }
+    if (trades.length > 0) {
+      expect(trades[0]).toHaveProperty('id');
+      expect(trades[0]).toHaveProperty('side');
+      expect(trades[0]).toHaveProperty('amount');
+      expect(trades[0]).toHaveProperty('username');
+    }
+  });
+
+  it('respects limit option', async () => {
+    const client = makeClient();
+    const trades = await queryTradeHistory(client, MARKET_ID, { limit: 3 });
+    expect(trades.length).toBeLessThanOrEqual(3);
+  });
 });

@@ -98,18 +98,18 @@ describe('SDK Architecture', () => {
   });
 
   describe('Context Shape', () => {
-    it('context does not store full domain objects', () => {
+    it('context stores coordination state for component sync', () => {
       const contextFile = fs.readFileSync(
         path.join(__dirname, '../packages/react/src/context.ts'),
         'utf-8'
       );
 
-      // Should not have Position, MarketState, etc. as state types
-      expect(contextFile).not.toMatch(/:\s*Position\s*[|;]/);
-      expect(contextFile).not.toMatch(/:\s*MarketState\s*[|;]/);
+      // Should have selectedPosition for automatic chart/table coordination
+      expect(contextFile).toMatch(/selectedPosition.*Position/);
+      expect(contextFile).toMatch(/setSelectedPosition/);
     });
 
-    it('context stores minimal state types', () => {
+    it('context stores preview state for trade visualization', () => {
       const contextFile = fs.readFileSync(
         path.join(__dirname, '../packages/react/src/context.ts'),
         'utf-8'
@@ -119,6 +119,17 @@ describe('SDK Architecture', () => {
       expect(contextFile).toMatch(/previewBelief:\s*number\[\]/);
       // Invalidation count should be number
       expect(contextFile).toMatch(/invalidationCount:\s*number/);
+    });
+
+    it('context does not store market data (use hooks instead)', () => {
+      const contextFile = fs.readFileSync(
+        path.join(__dirname, '../packages/react/src/context.ts'),
+        'utf-8'
+      );
+
+      // Market data should be fetched via hooks, not stored in context
+      expect(contextFile).not.toMatch(/:\s*MarketState\s*[|;]/);
+      expect(contextFile).not.toMatch(/markets:/);
     });
   });
 
@@ -133,6 +144,8 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('useMarket');
       expect(indexContent).toContain('useConsensus');
       expect(indexContent).toContain('usePositions');
+      expect(indexContent).toContain('useTradeHistory');
+      expect(indexContent).toContain('useBucketDistribution');
     });
 
     it('all components are exported from ui package index', () => {
@@ -144,8 +157,11 @@ describe('SDK Architecture', () => {
       // Check key components
       expect(indexContent).toContain('ConsensusChart');
       expect(indexContent).toContain('TradePanel');
+      expect(indexContent).toContain('ShapeCutter');
+      expect(indexContent).toContain('BinaryPanel');
       expect(indexContent).toContain('PositionTable');
       expect(indexContent).toContain('MarketStats');
+      expect(indexContent).toContain('TimeSales');
     });
 
     it('OverlayCurve type is exported from ui package', () => {
@@ -155,6 +171,25 @@ describe('SDK Architecture', () => {
       );
 
       expect(indexContent).toContain('OverlayCurve');
+    });
+
+    it('ChartView type is exported from ui package', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/ui/src/index.ts'),
+        'utf-8'
+      );
+
+      expect(indexContent).toContain('ChartView');
+    });
+
+    it('calculateBucketDistribution and BucketData are exported from core', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/core/src/index.ts'),
+        'utf-8'
+      );
+
+      expect(indexContent).toContain('calculateBucketDistribution');
+      expect(indexContent).toContain('BucketData');
     });
   });
 
@@ -166,6 +201,16 @@ describe('SDK Architecture', () => {
       );
 
       expect(chartFile).toContain('overlayCurves');
+    });
+
+    it('ConsensusChart accepts views prop', () => {
+      const chartFile = fs.readFileSync(
+        path.join(__dirname, '../packages/ui/src/charts/ConsensusChart.tsx'),
+        'utf-8'
+      );
+
+      expect(chartFile).toContain('views');
+      expect(chartFile).toContain('ChartView');
     });
 
     it('PositionTable accepts selection callback props', () => {

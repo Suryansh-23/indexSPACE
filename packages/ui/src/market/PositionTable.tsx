@@ -197,14 +197,19 @@ export function PositionTable({
               const profitLoss = getProfitLoss(p);
               const isOpen = p.status === 'open';
               const isSelling = sellInProgress.has(p.positionId);
-              const isSelected = selectedPositionId === p.positionId;
+
+              // Default to context, allow override via props
+              const effectiveSelectedId = selectedPositionId ?? ctx.selectedPosition?.positionId ?? null;
+              const isSelected = effectiveSelectedId === p.positionId;
 
               const handleRowClick = () => {
-                if (!onSelectPosition) return;
-                if (isSelected) {
-                  onSelectPosition(null);
+                const newSelection = isSelected ? null : p;
+                if (onSelectPosition) {
+                  // Consumer provided custom handler
+                  onSelectPosition(isSelected ? null : p.positionId);
                 } else {
-                  onSelectPosition(p.positionId);
+                  // Default: update context for automatic component coordination
+                  ctx.setSelectedPosition(newSelection);
                 }
               };
 
@@ -213,7 +218,7 @@ export function PositionTable({
                   key={String(p.positionId)}
                   className={isSelected ? 'fs-row-selected' : ''}
                   onClick={handleRowClick}
-                  style={{ cursor: onSelectPosition ? 'pointer' : 'default' }}
+                  style={{ cursor: 'pointer' }}
                 >
                   <td className="fs-table-id">{String(p.positionId)}</td>
                   <td>

@@ -10,11 +10,14 @@ vi.mock('@functionspace/core', () => ({
   })),
   queryMarketState: vi.fn(),
   getConsensusCurve: vi.fn(),
+  queryMarketPositions: vi.fn(),
+  queryTradeHistory: vi.fn(),
   mapPosition: vi.fn((p) => p),
+  calculateBucketDistribution: vi.fn(),
 }));
 
-import { FunctionSpaceProvider, useMarket, useConsensus, usePositions } from '../packages/react/src';
-import { queryMarketState, getConsensusCurve, FSClient } from '@functionspace/core';
+import { FunctionSpaceProvider, useMarket, useConsensus, usePositions, useTradeHistory, useBucketDistribution } from '../packages/react/src';
+import { queryMarketState, getConsensusCurve, queryMarketPositions, queryTradeHistory, calculateBucketDistribution, FSClient } from '@functionspace/core';
 
 const mockConfig = {
   baseUrl: 'https://test.api.com',
@@ -197,19 +200,11 @@ describe('usePositions hook', () => {
   });
 
   it('returns filtered positions for the specified user', async () => {
-    const mockClientGet = vi.fn().mockResolvedValue({
-      positions: [
-        { positionId: 1, owner: 'testuser', belief: [0.5] },
-        { positionId: 2, owner: 'otheruser', belief: [0.3] },
-        { positionId: 3, owner: 'testuser', belief: [0.7] },
-      ],
-    });
-
-    // Update the mock to return a client with our get function
-    vi.mocked(FSClient).mockImplementation(() => ({
-      authenticate: vi.fn().mockResolvedValue(undefined),
-      get: mockClientGet,
-    }) as any);
+    vi.mocked(queryMarketPositions).mockResolvedValue([
+      { positionId: 1, owner: 'testuser', belief: [0.5] },
+      { positionId: 2, owner: 'otheruser', belief: [0.3] },
+      { positionId: 3, owner: 'testuser', belief: [0.7] },
+    ] as any);
 
     const { result } = renderHook(() => usePositions('1', 'testuser'), {
       wrapper: createWrapper(),
@@ -225,10 +220,7 @@ describe('usePositions hook', () => {
   });
 
   it('returns error on fetch failure', async () => {
-    vi.mocked(FSClient).mockImplementation(() => ({
-      authenticate: vi.fn().mockResolvedValue(undefined),
-      get: vi.fn().mockRejectedValue(new Error('API error')),
-    }) as any);
+    vi.mocked(queryMarketPositions).mockRejectedValue(new Error('API error'));
 
     const { result } = renderHook(() => usePositions('1', 'testuser'), {
       wrapper: createWrapper(),
@@ -248,6 +240,8 @@ describe('Hook Return Shape', () => {
     vi.clearAllMocks();
     vi.mocked(queryMarketState).mockResolvedValue({ config: {} });
     vi.mocked(getConsensusCurve).mockResolvedValue({ points: [] });
+    vi.mocked(queryMarketPositions).mockResolvedValue([]);
+    vi.mocked(queryTradeHistory).mockResolvedValue([]);
     vi.mocked(FSClient).mockImplementation(() => ({
       authenticate: vi.fn().mockResolvedValue(undefined),
       get: vi.fn().mockResolvedValue({ positions: [] }),
@@ -290,6 +284,153 @@ describe('Hook Return Shape', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     expect(result.current).toHaveProperty('positions');
+    expect(result.current).toHaveProperty('loading');
+    expect(result.current).toHaveProperty('error');
+    expect(result.current).toHaveProperty('refetch');
+    expect(typeof result.current.refetch).toBe('function');
+  });
+
+  it('useTradeHistory returns { trades, loading, error, refetch }', async () => {
+    const { result } = renderHook(() => useTradeHistory('1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current).toHaveProperty('trades');
+    expect(result.current).toHaveProperty('loading');
+    expect(result.current).toHaveProperty('error');
+    expect(result.current).toHaveProperty('refetch');
+    expect(typeof result.current.refetch).toBe('function');
+  });
+});
+
+describe('useTradeHistory hook', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('throws error when used outside provider', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect(() => {
+      renderHook(() => useTradeHistory('1'));
+    }).toThrow('useTradeHistory must be used within FunctionSpaceProvider');
+
+    spy.mockRestore();
+  });
+
+  it('returns trade entries after successful fetch', async () => {
+    const mockTrades = [
+      { id: '1_open', timestamp: '2025-01-15 14:00:00', side: 'buy', prediction: 52.5, amount: 100, username: 'alice', positionId: '1' },
+      { id: '2_open', timestamp: '2025-01-15 13:00:00', side: 'buy', prediction: 60.0, amount: 50, username: 'bob', positionId: '2' },
+    ];
+    vi.mocked(queryTradeHistory).mockResolvedValue(mockTrades as any);
+
+    const { result } = renderHook(() => useTradeHistory('1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.trades).toEqual(mockTrades);
+    expect(result.current.error).toBe(null);
+  });
+
+  it('returns error on fetch failure', async () => {
+    vi.mocked(queryTradeHistory).mockRejectedValue(new Error('Network error'));
+
+    const { result } = renderHook(() => useTradeHistory('1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.trades).toBe(null);
+    expect(result.current.error?.message).toBe('Network error');
+  });
+
+  it('passes limit option to queryTradeHistory', async () => {
+    vi.mocked(queryTradeHistory).mockResolvedValue([]);
+
+    renderHook(() => useTradeHistory('market-1', { limit: 50 }), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(queryTradeHistory).toHaveBeenCalled();
+    });
+
+    expect(queryTradeHistory).toHaveBeenCalledWith(
+      expect.anything(),
+      'market-1',
+      { limit: 50 },
+    );
+  });
+});
+
+describe('useBucketDistribution hook', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('throws error when used outside provider', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect(() => {
+      renderHook(() => useBucketDistribution('1'));
+    }).toThrow('useBucketDistribution must be used within FunctionSpaceProvider');
+
+    spy.mockRestore();
+  });
+
+  it('returns bucket data after consensus loads', async () => {
+    const mockConsensus = {
+      points: [{ x: 0, y: 0.1 }, { x: 50, y: 0.5 }, { x: 100, y: 0.1 }],
+      config: { K: 60, L: 0, H: 100 },
+    };
+    const mockMarket = {
+      config: { K: 60, L: 0, H: 100 },
+      title: 'Test',
+      decimals: 0,
+    };
+    const mockBuckets = [
+      { range: '0-50', min: 0, max: 50, probability: 0.6, percentage: 60 },
+      { range: '50-100', min: 50, max: 100, probability: 0.4, percentage: 40 },
+    ];
+
+    vi.mocked(queryMarketState).mockResolvedValue(mockMarket as any);
+    vi.mocked(getConsensusCurve).mockResolvedValue(mockConsensus as any);
+    vi.mocked(calculateBucketDistribution).mockReturnValue(mockBuckets);
+
+    const { result } = renderHook(() => useBucketDistribution('1', 2), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.buckets).toEqual(mockBuckets);
+    expect(result.current.error).toBe(null);
+  });
+
+  it('returns { buckets, loading, error, refetch }', async () => {
+    vi.mocked(queryMarketState).mockResolvedValue({ config: { L: 0, H: 100 }, decimals: 0 } as any);
+    vi.mocked(getConsensusCurve).mockResolvedValue({ points: [] } as any);
+    vi.mocked(calculateBucketDistribution).mockReturnValue([]);
+
+    const { result } = renderHook(() => useBucketDistribution('1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current).toHaveProperty('buckets');
     expect(result.current).toHaveProperty('loading');
     expect(result.current).toHaveProperty('error');
     expect(result.current).toHaveProperty('refetch');

@@ -10,9 +10,10 @@ export interface RangeSliderProps {
   onChange: (values: [number, number]) => void;
   step?: number;
   disabled?: boolean;
+  showTrack?: boolean;
 }
 
-export function RangeSlider({ min, max, values, onChange, step, disabled }: RangeSliderProps) {
+export function RangeSlider({ min, max, values, onChange, step, disabled, showTrack = true }: RangeSliderProps) {
   return (
     <RCSlider
       range
@@ -22,6 +23,7 @@ export function RangeSlider({ min, max, values, onChange, step, disabled }: Rang
       onChange={(v) => onChange(v as [number, number])}
       step={step}
       disabled={disabled}
+      styles={!showTrack ? { track: { background: 'transparent' } } : undefined}
     />
   );
 }

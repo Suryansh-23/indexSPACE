@@ -1,6 +1,6 @@
 import type { FSClient } from '../client.js';
 import type { MarketState, ConsensusSummary, ConsensusCurve } from '../types.js';
-import { evaluateDensity, evaluateDensityCurve, computeStatistics } from '../math/bernstein.js';
+import { evaluateDensityPiecewise, evaluateDensityCurve, computeStatistics } from '../math/density.js';
 
 /**
  * Returns complete market state.
@@ -87,7 +87,7 @@ export async function queryDensityAt(
   x: number,
 ): Promise<{ x: number; density: number }> {
   const market = await queryMarketState(client, marketId);
-  const density = evaluateDensity(
+  const density = evaluateDensityPiecewise(
     market.consensus,
     x,
     market.config.L,

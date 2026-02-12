@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { FSClient } from '@functionspace/core';
-import type { PayoutCurve } from '@functionspace/core';
+import type { PayoutCurve, Position } from '@functionspace/core';
 import { FunctionSpaceContext } from './context.js';
 
 // ── Theme Types ──
@@ -80,6 +80,7 @@ export function FunctionSpaceProvider({ config, theme, children }: FunctionSpace
   const [previewBelief, setPreviewBelief] = useState<number[] | null>(null);
   const [previewPayout, setPreviewPayout] = useState<PayoutCurve | null>(null);
   const [invalidationCount, setInvalidationCount] = useState(0);
+  const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
 
   // Create client once
   if (!clientRef.current) {
@@ -122,7 +123,9 @@ export function FunctionSpaceProvider({ config, theme, children }: FunctionSpace
     setPreviewPayout,
     invalidate,
     invalidationCount,
-  }), [previewBelief, previewPayout, invalidate, invalidationCount]);
+    selectedPosition,
+    setSelectedPosition,
+  }), [previewBelief, previewPayout, invalidate, invalidationCount, selectedPosition]);
 
   if (authError) {
     return <div style={{ color: 'red', padding: '1rem' }}>Authentication failed: {authError.message}</div>;
