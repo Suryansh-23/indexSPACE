@@ -4,8 +4,8 @@ import ReactDOM from 'react-dom/client';
 // ── Swap layout by changing this import ──
 // import App from './App_TradePanel';
 import App from './App_ShapeCutter';
-// import App from './App_ShapeCutterPositions';
-// import App from './App_Both';
+// import App from './App_ShapeCutterPositions';  Cluttered remove
+// import App from './App_Both';  Cluttered remove
 // import App from './App_BinaryPanel';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
