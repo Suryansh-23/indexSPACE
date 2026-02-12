@@ -54,8 +54,21 @@ export interface Position {
   prediction: number;
   stdDev: number;
   createdAt: string;
+  closedAt: string | null;
   soldPrice: number | null;
   settlementPayout: number | null;
+}
+
+// ── Trade History Types ──
+
+export interface TradeEntry {
+  id: string;
+  timestamp: string;
+  side: 'buy' | 'sell';
+  prediction: number | null;
+  amount: number;
+  username: string;
+  positionId: string;
 }
 
 // ── Trading Types ──
@@ -86,6 +99,16 @@ export interface PayoutCurve {
   maxPayout: number;
   maxPayoutOutcome: number;
   inputCollateral: number;
+}
+
+// ── Distribution Types ──
+
+export interface BucketData {
+  range: string;
+  min: number;
+  max: number;
+  probability: number;
+  percentage: number;
 }
 
 // ── Builder Types ──

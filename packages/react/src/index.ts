@@ -5,3 +5,5 @@ export type { FunctionSpaceProviderProps, FSTheme, FSThemeInput, ThemePreset } f
 export { useMarket } from './useMarket.js';
 export { useConsensus } from './useConsensus.js';
 export { usePositions } from './usePositions.js';
+export { useTradeHistory } from './useTradeHistory.js';
+export { useBucketDistribution } from './useBucketDistribution.js';

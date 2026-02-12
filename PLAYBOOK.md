@@ -104,6 +104,29 @@ export type { MyWidgetProps } from './{category}/index.js';
 | `--fs-text-secondary` | Muted/secondary text |
 | `--fs-border` | Borders and dividers |
 
+### Theme Props → CSS Variables
+
+When passing custom colors to `FunctionSpaceProvider`, these theme props become CSS variables:
+
+| Theme Prop | CSS Variable |
+|------------|--------------|
+| `primary` | `--fs-primary` |
+| `accent` | `--fs-accent` |
+| `positive` | `--fs-positive` |
+| `negative` | `--fs-negative` |
+| `background` | `--fs-background` |
+| `surface` | `--fs-surface` |
+| `text` | `--fs-text` |
+| `textSecondary` | `--fs-text-secondary` |
+| `border` | `--fs-border` |
+
+Example:
+```tsx
+<FunctionSpaceProvider theme={{ preset: "dark", primary: "#ff6b6b" }}>
+  {/* --fs-primary is now #ff6b6b, other vars from dark preset */}
+</FunctionSpaceProvider>
+```
+
 ### Derived Variables (set in base.css)
 
 ```css
@@ -113,6 +136,23 @@ export type { MyWidgetProps } from './{category}/index.js';
 --fs-primary-light      /* Hover states */
 --fs-header-gradient    /* Header accent gradients */
 ```
+
+**CRITICAL:** These derived variables are computed via a shared CSS selector at the top of `base.css` (lines 4-7). When adding a new widget that uses gradient backgrounds, input fields, or any derived variable, you **MUST** add its root class to this selector:
+
+```css
+/* base.css — shared derived-variables selector */
+.fs-chart-container,
+.fs-trade-panel,
+.fs-shape-cutter,        /* ← example: add new widget roots here */
+.fs-stats-bar,
+.fs-table-container {
+  --fs-background-dark: color-mix(in srgb, var(--fs-background) 70%, black);
+  --fs-input-bg: ...
+  /* etc */
+}
+```
+
+Without this, the widget's `var(--fs-background-dark)` etc. will resolve to nothing and all gradient backgrounds / input styling will break silently.
 
 ### Never Hardcode Colors
 
@@ -134,6 +174,16 @@ export type { MyWidgetProps } from './{category}/index.js';
 | `useConsensus(marketId, points?)` | `{ consensus, loading, error, refetch }` | Probability density curves |
 | `usePositions(marketId, username)` | `{ positions, loading, error, refetch }` | User's open/closed positions |
 
+### Server State vs Preview State
+
+| Type | Source | Example | Updates |
+|------|--------|---------|---------|
+| **Server State** | Hooks | Market data, positions, consensus | On refetch, after invalidation |
+| **Preview State** | Context | previewBelief, previewPayout | Immediately on user input |
+| **Coordination State** | Context | selectedPosition | On user action |
+
+**Rule:** Data from the API → use hooks. Ephemeral UI state for coordination → use context.
+
 ---
 
 ## Context API
@@ -145,22 +195,182 @@ const ctx = useContext(FunctionSpaceContext);
 ctx.client              // FSClient instance
 ctx.previewBelief       // Current trade preview (number[] | null)
 ctx.previewPayout       // Current payout preview (PayoutCurve | null)
+ctx.selectedPosition    // Currently selected position (Position | null)
 ctx.invalidationCount   // Cache bust counter
 
 // Write
-ctx.setPreviewBelief(belief)   // Update preview visualization
-ctx.setPreviewPayout(payout)   // Update payout projection
-ctx.invalidate(marketId)       // Trigger data refetch after mutations
+ctx.setPreviewBelief(belief)        // Update preview visualization
+ctx.setPreviewPayout(payout)        // Update payout projection
+ctx.setSelectedPosition(position)   // Select position (chart/table sync)
+ctx.invalidate(marketId)            // Trigger data refetch after mutations
 ```
+
+---
+
+## Market Config Parameters
+
+Every market has a `config` object with three core parameters used throughout the SDK:
+
+| Parameter | Meaning | Example |
+|-----------|---------|---------|
+| `K` | Polynomial degree — determines belief vector resolution (K+1 elements) | 20 |
+| `L` | Lower bound of the market outcome range | 0 |
+| `H` | Upper bound of the market outcome range | 100 |
+
+These are accessed via `market.config.K`, `market.config.L`, `market.config.H` from the `useMarket` hook.
+
+---
+
+## Belief Builder Architecture
+
+The belief construction system lives in `packages/core/src/math/builders.ts` and uses a strict two-layer architecture. Understanding this is essential before adding new shapes or modifying trade inputs.
+
+### L1 — `buildBelief(regions, K, L, H)` → `BeliefVector`
+
+The **universal constructor**. ALL belief vector creation MUST route through this function. It:
+1. Takes an array of `Region` objects
+2. Generates a raw kernel for each region (`pointKernel` for PointRegion, `rangeKernel` for RangeRegion)
+3. Combines them with weights
+4. Normalizes the result (private `normalize()` function — guarantees output sums to 1)
+
+```
+buildBelief(regions, K, L, H)
+  for each region:
+    if type === 'point' → pointKernel(region, K, L, H)  → raw K+1 array
+    if type === 'range' → rangeKernel(region, K, L, H)  → raw K+1 array
+    combined[k] += raw[k] * weight
+  return normalize(combined)
+```
+
+Both kernel functions accept the full `Region` object (not individual scalars), following the same pattern.
+
+**`normalize` is private and stays private.** It is called exclusively by `buildBelief`. Since every shape goes through `buildBelief`, there is exactly one normalization code path — no duplication. Never export it, never duplicate it.
+
+### L2 — Convenience builders
+
+Thin wrappers that construct the correct `Region` array and delegate to `buildBelief`. They contain **zero math** — only shape semantics (what "gaussian" or "dip" means in terms of regions).
+
+| L2 Function | What it passes to `buildBelief` |
+|-------------|--------------------------------|
+| `buildGaussian(center, spread, K, L, H)` | `[{ type: 'point', center, spread }]` |
+| `buildPlateau(low, high, K, L, H, sharpness?)` | `[{ type: 'range', low, high, sharpness }]` |
+| `buildDip(center, spread, K, L, H)` | `[{ type: 'point', center, spread: spread*1.5, inverted: true }]` |
+| `buildLeftSkew(center, spread, K, L, H, skewAmount?)` | `[{ type: 'point', center, spread, skew: -skewAmount }]` |
+| `buildRightSkew(center, spread, K, L, H, skewAmount?)` | `[{ type: 'point', center, spread, skew: skewAmount }]` |
+
+### Region Types
+
+```typescript
+type Region = PointRegion | RangeRegion;
+
+interface PointRegion {
+  type: 'point';
+  center: number;    // Center of the gaussian kernel (in market outcome space)
+  spread: number;    // Standard deviation (in market outcome space)
+  weight?: number;   // Relative weight when combining multiple regions (default 1)
+  skew?: number;     // Asymmetry: -1 = wider left tail, 1 = wider right tail, 0/undefined = symmetric
+  inverted?: boolean; // true = dip shape (high at edges, low at center)
+}
+
+interface RangeRegion {
+  type: 'range';
+  low: number;       // Start of flat-top region
+  high: number;      // End of flat-top region
+  weight?: number;   // Relative weight (default 1)
+  sharpness?: number; // Edge sharpness: 0 = smooth cosine taper (default), 1 = hard cliff edges
+}
+```
+
+**`skew` details:** `|skew|` controls intensity (0 = symmetric, 1 = full asymmetry). Sign controls direction. At the kernel level, two multipliers interpolate based on `|skew|`: the wider side scales `1 + 2.0 * intensity` (up to 3x), the narrower side scales `1 - 0.7 * intensity` (down to 0.3x). Each side of center uses a different effective spread.
+
+**`sharpness` details:** Interpolates two parameters in `rangeKernel`:
+- Taper width: `(2/K) * (1 - sharpness)` — at 0, cosine taper over 2 coefficient bins; at 1, no taper (hard step).
+- EPS (out-of-range floor): `0.001 - sharpness * 0.0009` — at 0, floor is 0.001; at 1, floor is 0.0001.
+
+When `sharpness = 1`, the coefficient vector has a hard step function at the range boundaries. The actual visual sharpness on the chart depends on the rendering mode (see "Rendering Modes" below).
+
+### When to Create a New L2 vs Call L1 Directly
+
+| Scenario | What to do | Example |
+|----------|-----------|---------|
+| Simple shape with one region | Create L2 if it will be reused | `buildGaussian`, `buildDip` |
+| Shape that's just existing L2 with different params | Call existing L2 with modified params — **no new function** | Spike = `buildGaussian(center, spread * 0.2, K, L, H)` |
+| Shape with multiple regions | Call `buildBelief` directly from the widget | Bimodal = two PointRegions with different centers/weights |
+| Shape that is a special case of existing L2 | Call existing L2 with boundary params | Uniform = `buildPlateau(L, H, K, L, H)` |
+
+**Rule of thumb:** Create a new L2 only when the shape has unique Region parameters that encode a distinct shape concept (like inversion or skew). If it's just "same builder, different numbers," let the widget pass different numbers.
+
+### End-to-End Belief Flow
+
+```
+Widget (e.g. TradePanel, ShapeCutter)
+  → L2 builder or buildBelief directly
+    → pointKernel / rangeKernel (private, internal)
+      → normalize (private, internal)
+        → BeliefVector (number[], K+1 elements, sums to 1)
+
+BeliefVector → ctx.setPreviewBelief(belief)     [instant, on every input change]
+            → ConsensusChart reads ctx.previewBelief
+              → evaluateDensityCurve(belief, L, H, numPoints)  [piecewise-linear interpolation]
+                → rendered as dashed yellow area on chart (type="linear")
+
+BeliefVector + collateral → projectPayoutCurve(client, marketId, belief, collateral)  [debounced 500ms]
+                          → ctx.setPreviewPayout(payoutCurve)
+                            → ConsensusChart shows payout in tooltip
+
+BeliefVector + collateral + prediction → buy(client, marketId, belief, collateral, { prediction })
+                                       → ctx.invalidate(marketId)  [refreshes all hooks]
+```
+
+### Density Evaluation
+
+All density rendering uses piecewise-linear interpolation via a single function:
+
+**`evaluateDensityCurve(coefficients, L, H, numPoints)` — Multi-point curve for charting**
+
+- Maps each output point to a position in the coefficient array (`u * K`)
+- Linearly interpolates between the two nearest coefficients
+- Applies density scaling `(K+1)/(H-L)` for correct PDF normalization
+- Preserves sharp transitions faithfully (plateaus have cliff edges, spikes have narrow peaks)
+- Used by `ConsensusChart` for previews, consensus, and selected position curves
+
+**`evaluateDensityPiecewise(coefficients, x, L, H)` — Single-point evaluation**
+
+Same math as `evaluateDensityCurve` but for one x value. Used internally by `computeStatistics` and `queryDensityAt`.
+
+**Invariants:**
+- Coefficients are non-negative (guaranteed by kernel functions)
+- Coefficients sum to 1 (guaranteed by `normalize` in `buildBelief`)
+- Density scaling is `(K+1)/(H-L)`
+- Preview and consensus use the same evaluation — what the user sees before submitting matches what they see after
+
+---
+
+### ConsensusChart Y-Axis Scaling
+
+The chart's left Y-axis dynamically scales to accommodate both the consensus curve and any preview/overlay curves. To prevent a very tall preview (e.g., high-confidence spike) from squashing the consensus to an invisible flat line, the preview's influence on the Y-axis domain is **capped at 4x the consensus peak**:
+
+```
+cappedOverlay = min(overlayMax, consensusMax * 4)
+yMax = max(consensusMax, cappedOverlay) * 1.15
+```
+
+Peaks beyond 4x are clipped visually but remain in the tooltip data. This ensures the consensus curve is always readable.
 
 ---
 
 ## Core Functions (from @functionspace/core)
 
 ### Math/Belief Building
-- `buildGaussian(center, spread, K, L, H)` → belief vector
-- `buildPlateau(low, high, K, L, H)` → belief vector
-- `evaluateDensityCurve(belief, L, H, numPoints)` → chart points
+- `buildBelief(regions, K, L, H)` → belief vector (L1 — universal constructor, see above)
+- `buildGaussian(center, spread, K, L, H)` → belief vector (L2)
+- `buildPlateau(low, high, K, L, H, sharpness?)` → belief vector (L2)
+- `buildDip(center, spread, K, L, H)` → belief vector (L2)
+- `buildLeftSkew(center, spread, K, L, H, skewAmount?)` → belief vector (L2)
+- `buildRightSkew(center, spread, K, L, H, skewAmount?)` → belief vector (L2)
+- `evaluateDensityCurve(belief, L, H, numPoints)` → chart points (piecewise-linear interpolation)
+- `evaluateDensityPiecewise(coefficients, x, L, H)` → density at single point
+- `computeStatistics(coefficients, L, H)` → `{ mean, median, mode, variance, stdDev }`
 
 ### Transactions
 - `buy(client, marketId, belief, collateral)` → BuyResult
@@ -225,36 +435,235 @@ onSuccess?.(result);       // Notify parent
 
 ## Existing Widget Reference
 
-| Widget | Lines | Purpose | Key Pattern |
-|--------|-------|---------|-------------|
-| `MarketStats` | 56 | Stats display | Minimal, read-only |
-| `ConsensusChart` | 313 | Visualization | Recharts, memoization |
-| `TradePanel` | 265 | Form input | Debouncing, preview sync |
-| `PositionTable` | 262 | Data table | Pagination, actions |
+| Widget | Purpose | Key Pattern |
+|--------|---------|-------------|
+| `MarketStats` | Stats display | Minimal, read-only |
+| `ConsensusChart` | Visualization | Recharts, evaluateDensityCurve for all curve rendering |
+| `TradePanel` | Form input | Debouncing, preview sync, three-phase pattern |
+| `ShapeCutter` | Shape-based trade input | Shape definitions, two-column layout, skew/confidence sliders |
+| `PositionTable` | Data table | Pagination, actions, context coordination |
 
 ---
 
 ## SDK Expansion Checklist
 
 ### Adding a New Widget
-- [ ] Component file in `packages/ui/src/`
+- [ ] Component file in `packages/ui/src/{category}/`
 - [ ] Props interface exported
 - [ ] Uses theme CSS variables (no hardcoded colors)
 - [ ] Styles added to `base.css`
-- [ ] Exported from `packages/ui/src/index.ts`
+- [ ] Exported from category and root `index.ts`
 - [ ] Error and loading states handled
+- [ ] **Run `npx vitest run` — all tests pass**
+- [ ] **Update `architecture.test.ts` if new exports or prop patterns**
 
 ### Adding a New Hook
 - [ ] Hook file in `packages/react/src/`
 - [ ] Uses `FunctionSpaceContext` for client access
-- [ ] Returns `{ data, loading, error, refetch }` pattern
+- [ ] Returns `{ <named>, loading, error, refetch }` pattern (named property matches hook purpose)
 - [ ] Reacts to `ctx.invalidationCount` for cache busting
 - [ ] Exported from `packages/react/src/index.ts`
+- [ ] **Add tests to `hooks.test.tsx` (context check, loading, success, error)**
+- [ ] **Run `npx vitest run` — all tests pass**
+
+### Adding a New Belief Shape
+
+Before creating anything, decide the correct approach (see "When to Create a New L2" in the Belief Builder Architecture section):
+
+**If the shape needs new Region parameters (e.g., a new kernel behavior):**
+- [ ] Extend `PointRegion` or `RangeRegion` with optional fields — do NOT create new region types
+- [ ] Update the corresponding kernel function (`pointKernel` or `rangeKernel`) in `builders.ts` to handle new fields
+- [ ] Ensure existing callers without the new fields produce identical output (backward compatible)
+
+**If the shape needs a new L2 builder:**
+- [ ] Add L2 function to `builders.ts` — one line of logic constructing a Region array and passing to `buildBelief`
+- [ ] Export from `packages/core/src/index.ts`
+- [ ] Add tests to `tests/shapes.test.ts` — valid vector (K+1 elements, all >= 0, sums to ~1) + shape-specific assertions
+
+**If the shape is just existing builder with different params:**
+- [ ] No new function needed — widget passes different params to existing L2 or calls `buildBelief` directly
+- [ ] Document the parameter mapping in the widget code (e.g., `spike = buildGaussian with spread * 0.2`)
+
+**For any new shape:**
+- [ ] Add shape metadata to `SHAPE_DEFINITIONS` in `packages/core/src/shapes/definitions.ts` (id, name, description, parameters, svgPath)
+- [ ] Add routing case in the trade input widget's `buildCurrentBelief` switch
+- [ ] Add prediction calculation in the widget's `getPrediction` function
+- [ ] **Run `npx vitest run` — all tests pass, no regressions on existing shapes**
 
 ### Adding a New Core Function
 - [ ] Function in appropriate `packages/core/src/` module
 - [ ] TypeScript types defined in `types.ts`
 - [ ] Exported from `packages/core/src/index.ts`
+- [ ] **Add tests to `stage1.test.ts` (math) or `stage2.test.ts` (API)**
+- [ ] **Run `npx vitest run` — all tests pass**
+
+### Modifying Existing Components
+- [ ] **Run `npx vitest run` before making changes**
+- [ ] Make changes following existing patterns
+- [ ] Update tests if prop interfaces or behavior changed
+- [ ] **Run `npx vitest run` after changes — all tests pass**
+- [ ] **Run `cd demo-app && npx vite build` — build succeeds**
+
+---
+
+## SDK Design Philosophy
+
+### Simple by Default, Flexible When Needed
+
+UI components work together automatically via shared context. Consumers just place components — no wiring required.
+
+**Simple consumer (90% of use cases):**
+```tsx
+<FunctionSpaceProvider config={config}>
+  <ConsensusChart marketId={ID} />
+  <PositionTable marketId={ID} username={user} />
+</FunctionSpaceProvider>
+// Click row → curve appears on chart. No code needed.
+```
+
+**Advanced consumer (override defaults when needed):**
+```tsx
+<PositionTable
+  selectedPositionId={myCustomId}        // Override selection
+  onSelectPosition={myCustomHandler}     // Override behavior
+/>
+<ConsensusChart
+  overlayCurves={[myCustomOverlay]}      // Add custom data
+/>
+```
+
+### Component Swappability
+
+Components are interchangeable because they share a context contract:
+- Any chart that reads `ctx.selectedPosition` works
+- Any table that writes `ctx.setSelectedPosition` works
+- Swap imports freely — behavior stays consistent
+
+### Trade Input Variants
+
+Multiple trade input variants (TradePanel, QuickBuy, SliderTrade, etc.) can exist, but **only one should be mounted at a time**.
+
+**Why:** All trade inputs write to the same context fields (`previewBelief`, `previewPayout`). Multiple simultaneous writers would race and overwrite each other.
+
+**Type Contract:** All trade input variants MUST output the same belief format:
+```typescript
+// All variants write Bernstein coefficient arrays
+ctx.setPreviewBelief(belief: number[] | null)
+ctx.setPreviewPayout(payout: PayoutCurve | null)
+```
+
+**Consumer Pattern:**
+```tsx
+// Only one trade input mounted at a time
+const [inputType, setInputType] = useState<'panel' | 'quick' | 'slider'>('panel');
+
+<FunctionSpaceProvider config={config}>
+  {/* Charts - mount as many as needed (readers) */}
+  <ConsensusChart marketId={ID} />
+  <PayoutChart marketId={ID} />
+
+  {/* Trade input - only one active (writer) */}
+  {inputType === 'panel' && <TradePanel marketId={ID} />}
+  {inputType === 'quick' && <QuickBuy marketId={ID} />}
+  {inputType === 'slider' && <SliderTrade marketId={ID} />}
+</FunctionSpaceProvider>
+```
+
+**Cleanup Requirement:** Trade inputs MUST clear context on unmount:
+```typescript
+useEffect(() => {
+  return () => {
+    ctx.setPreviewBelief(null);
+    ctx.setPreviewPayout(null);
+  };
+}, []);
+```
+
+### Trade Input Three-Phase Pattern
+
+Every trade input widget follows this exact pattern (see `TradePanel.tsx` as reference):
+
+**Phase 1 — Instant preview (no debounce):**
+Build the belief vector on every parameter change and write it to context immediately. The chart updates in real-time.
+```typescript
+const buildCurrentBelief = useCallback(() => {
+  if (!market) return null;
+  const { K, L, H } = market.config;
+  // Call appropriate builder based on current inputs
+  return buildGaussian(prediction, stdDev, K, L, H);
+}, [market, prediction, stdDev, /* other deps */]);
+
+useEffect(() => {
+  const belief = buildCurrentBelief();
+  ctx.setPreviewBelief(belief);
+  if (!belief) { setPotentialPayout(null); ctx.setPreviewPayout(null); }
+}, [buildCurrentBelief]);
+```
+
+**Phase 2 — Debounced payout projection (500ms):**
+Project the payout curve via API. Debounced because this hits the server.
+```typescript
+useEffect(() => {
+  if (debounceRef.current) clearTimeout(debounceRef.current);
+  const belief = buildCurrentBelief();
+  const collateral = parseFloat(amount);
+  if (!belief || isNaN(collateral) || collateral <= 0) { setPotentialPayout(null); return; }
+  debounceRef.current = setTimeout(async () => {
+    const result = await projectPayoutCurve(ctx.client, marketId, belief, collateral);
+    if (!mountedRef.current) return;
+    setPotentialPayout(result.maxPayout);
+    ctx.setPreviewPayout(result);
+  }, 500);
+  return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+}, [buildCurrentBelief, amount, market, marketId]);
+```
+
+**Phase 3 — Trade submission:**
+```typescript
+const result = await buy(ctx.client, marketId, belief, collateral, { prediction });
+resetToDefaults();
+ctx.setPreviewBelief(null);
+ctx.setPreviewPayout(null);
+onBuy?.(result);
+ctx.invalidate(marketId);
+```
+
+### Confidence → Spread Conversion
+
+Trade input widgets that offer a "confidence" slider (0-100%) convert it to a `spread` value for the builders. This is a UI concern, not a core math concern — each trade input widget owns its own conversion formula:
+
+```typescript
+const getSpreadFromConfidence = useCallback((conf: number): number => {
+  if (!market) return 4.0;
+  const { L, H } = market.config;
+  const range = H - L;
+  const minSigma = range * 0.01;   // 1% of range (high confidence = narrow)
+  const maxSigma = range * 0.20;   // 20% of range (low confidence = wide)
+  return maxSigma - ((conf / 100) * (maxSigma - minSigma));
+}, [market]);
+```
+
+This formula is intentionally owned by each widget — different trade inputs may wish to tune the mapping differently. It is NOT in core because it maps a slider value (UI) to a math parameter.
+
+### What Goes in Context vs Consumer App
+
+| In SDK Context | In Consumer App |
+|----------------|-----------------|
+| `selectedPosition` (enables chart/table sync) | Custom multi-select logic |
+| `previewBelief` (enables trade preview) | Filters, sorts, search |
+| `invalidationCount` (cache busting) | UI preferences |
+
+**Rule:** If multiple SDK components need to coordinate, it goes in context.
+
+### Layer Boundaries
+
+| Layer | Can Do | Cannot Do |
+|-------|--------|-----------|
+| `core` | Pure functions, API client, types | Import React |
+| `react` | Hooks, context, state coordination | Import from ui |
+| `ui` | Read/write context, call pure core functions, render | Make API calls directly |
+
+**UI components CAN call pure core functions** like `evaluateDensityCurve` and `evaluateDensityPiecewise`. They CANNOT make API calls — use hooks for that.
 
 ---
 
@@ -282,11 +691,18 @@ packages/
     │   └── ConsensusChart.tsx
     ├── trading/          # User input/actions
     │   ├── index.ts
-    │   └── TradePanel.tsx
+    │   ├── TradePanel.tsx
+    │   └── ShapeCutter.tsx
     └── market/           # Read-only market info
         ├── index.ts
         ├── MarketStats.tsx
         └── PositionTable.tsx
+
+tests/
+├── architecture.test.ts  # Layer boundaries, hook patterns, exports
+├── hooks.test.tsx        # React hook unit tests (jsdom)
+├── stage1.test.ts        # Core math functions
+└── stage2.test.ts        # API/transaction functions
 ```
 
 ## UI Component Categories

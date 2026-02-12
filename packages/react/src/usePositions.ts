@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useContext } from 'react';
-import { mapPosition } from '@functionspace/core';
+import { queryMarketPositions } from '@functionspace/core';
 import type { Position } from '@functionspace/core';
 import { FunctionSpaceContext } from './context.js';
 
@@ -15,10 +15,7 @@ export function usePositions(marketId: string | number, username: string) {
     setLoading(true);
     setError(null);
     try {
-      const data = await ctx.client.get<any>('/api/market/positions', {
-        market_id: String(marketId),
-      });
-      const all: Position[] = (data.positions || []).map(mapPosition);
+      const all = await queryMarketPositions(ctx.client, marketId);
       const filtered = all.filter((p) => p.owner === username);
       setPositions(filtered);
     } catch (err) {

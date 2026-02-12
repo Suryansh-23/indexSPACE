@@ -12,6 +12,8 @@ export type {
   BeliefVector,
   GaussianParams,
   PlateauParams,
+  BucketData,
+  TradeEntry,
   FSConfig,
 } from './types.js';
 
@@ -19,13 +21,19 @@ export type {
 export { FSClient } from './client.js';
 
 // Math
-export { evaluateDensity, evaluateDensityCurve, computeStatistics } from './math/bernstein.js';
-export { buildGaussian, buildPlateau, buildBelief } from './math/builders.js';
+export { evaluateDensityPiecewise, evaluateDensityCurve, computeStatistics } from './math/density.js';
+export { buildGaussian, buildPlateau, buildBelief, buildDip, buildLeftSkew, buildRightSkew } from './math/builders.js';
 export type { Region, PointRegion, RangeRegion } from './math/builders.js';
+export { calculateBucketDistribution } from './math/distribution.js';
+
+// Shapes
+export { SHAPE_DEFINITIONS } from './shapes/index.js';
+export type { ShapeId, ShapeDefinition } from './shapes/index.js';
 
 // Queries
 export { queryMarketState, getConsensusCurve, queryConsensusSummary, queryDensityAt } from './queries/market.js';
-export { queryPositionState, mapPosition } from './queries/positions.js';
+export { queryPositionState, queryMarketPositions, mapPosition } from './queries/positions.js';
+export { positionsToTradeEntries, queryTradeHistory } from './queries/trades.js';
 
 // Transactions
 export { buy } from './transactions/buy.js';

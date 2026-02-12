@@ -1,2 +1,7 @@
 export { TradePanel } from './TradePanel.js';
 export type { TradePanelProps } from './TradePanel.js';
+export { ShapeCutter } from './ShapeCutter.js';
+export type { ShapeCutterProps } from './ShapeCutter.js';
+export { BinaryPanel } from './BinaryPanel.js';
+export type { BinaryPanelProps, XPointMode } from './BinaryPanel.js';
+export type { TradeInputBaseProps } from './types.js';

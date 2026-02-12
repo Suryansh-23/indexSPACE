@@ -7,11 +7,12 @@ export interface FSContext {
   setPreviewBelief: (belief: number[] | null) => void;
   previewPayout: PayoutCurve | null;
   setPreviewPayout: (payout: PayoutCurve | null) => void;
-  selectedPosition: Position | null;
-  setSelectedPosition: (position: Position | null) => void;
   invalidate: (marketId: string | number) => void;
   /** Internal: counter that increments on invalidate, hooks watch this */
   invalidationCount: number;
+  /** Selected position for component coordination (chart/table sync) */
+  selectedPosition: Position | null;
+  setSelectedPosition: (pos: Position | null) => void;
 }
 
 export const FunctionSpaceContext = createContext<FSContext | null>(null);

@@ -9,6 +9,8 @@ export interface PositionTableProps {
   username: string;
   onSell?: (result: SellResult) => void;
   pageSize?: number;
+  selectedPositionId?: number | null;
+  onSelectPosition?: (id: number | null) => void;
 }
 
 const formatCurrency = (value: number | null | undefined): string => {
@@ -24,6 +26,8 @@ export function PositionTable({
   username,
   onSell,
   pageSize = 3,
+  selectedPositionId,
+  onSelectPosition,
 }: PositionTableProps) {
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('PositionTable must be used within FunctionSpaceProvider');
@@ -33,8 +37,6 @@ export function PositionTable({
   const [sellInProgress, setSellInProgress] = useState<Set<string | number>>(new Set());
   const [sellError, setSellError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-
-  const selectedPositionId = ctx.selectedPosition?.positionId;
 
   // Sort positions by ID descending (newest first)
   const sortedPositions = useMemo(() => {
@@ -195,13 +197,19 @@ export function PositionTable({
               const profitLoss = getProfitLoss(p);
               const isOpen = p.status === 'open';
               const isSelling = sellInProgress.has(p.positionId);
-              const isSelected = selectedPositionId === p.positionId;
+
+              // Default to context, allow override via props
+              const effectiveSelectedId = selectedPositionId ?? ctx.selectedPosition?.positionId ?? null;
+              const isSelected = effectiveSelectedId === p.positionId;
 
               const handleRowClick = () => {
-                if (isSelected) {
-                  ctx.setSelectedPosition(null);
+                const newSelection = isSelected ? null : p;
+                if (onSelectPosition) {
+                  // Consumer provided custom handler
+                  onSelectPosition(isSelected ? null : p.positionId);
                 } else {
-                  ctx.setSelectedPosition(p);
+                  // Default: update context for automatic component coordination
+                  ctx.setSelectedPosition(newSelection);
                 }
               };
 

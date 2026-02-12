@@ -79,8 +79,8 @@ export function FunctionSpaceProvider({ config, theme, children }: FunctionSpace
   const [authenticated, setAuthenticated] = useState(false);
   const [previewBelief, setPreviewBelief] = useState<number[] | null>(null);
   const [previewPayout, setPreviewPayout] = useState<PayoutCurve | null>(null);
-  const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
   const [invalidationCount, setInvalidationCount] = useState(0);
+  const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
 
   // Create client once
   if (!clientRef.current) {
@@ -121,11 +121,11 @@ export function FunctionSpaceProvider({ config, theme, children }: FunctionSpace
     setPreviewBelief,
     previewPayout,
     setPreviewPayout,
-    selectedPosition,
-    setSelectedPosition,
     invalidate,
     invalidationCount,
-  }), [previewBelief, previewPayout, selectedPosition, invalidate, invalidationCount]);
+    selectedPosition,
+    setSelectedPosition,
+  }), [previewBelief, previewPayout, invalidate, invalidationCount, selectedPosition]);
 
   if (authError) {
     return <div style={{ color: 'red', padding: '1rem' }}>Authentication failed: {authError.message}</div>;
