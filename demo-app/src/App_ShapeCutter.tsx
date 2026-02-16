@@ -1,5 +1,5 @@
 import { FunctionSpaceProvider } from '@functionspace/react';
-import { ConsensusChart, ShapeCutter, MarketStats, PositionTable, TimeSales } from '@functionspace/ui';
+import { MarketCharts, DistributionChart, ShapeCutter, MarketStats, PositionTable, TimeSales } from '@functionspace/ui';
 import { ArticlePage } from './pages/ArticlePage';
 import { config, MARKET_ID, widgetTheme } from './App';
 
@@ -11,7 +11,7 @@ export default function App_ShapeCutter() {
         <MarketStats marketId={MARKET_ID} />
 
         <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
-          <ConsensusChart marketId={MARKET_ID} height={350} views={['consensus', 'distribution']} />
+          <MarketCharts marketId={MARKET_ID} height={350} views={['consensus', 'distribution', 'timeline']} />
         </div>
 
         <div style={{ marginBottom: '1rem' }}>
@@ -24,7 +24,7 @@ export default function App_ShapeCutter() {
         </div>
 
         <div style={{ marginTop: '1rem' }}>
-          <ConsensusChart marketId={MARKET_ID} height={350} views={['distribution']} />
+          <MarketCharts marketId={MARKET_ID} height={350} views={['distribution']} />
         </div>
       </FunctionSpaceProvider>
     </ArticlePage>

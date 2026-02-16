@@ -146,6 +146,8 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('usePositions');
       expect(indexContent).toContain('useTradeHistory');
       expect(indexContent).toContain('useBucketDistribution');
+      expect(indexContent).toContain('useMarketHistory');
+      expect(indexContent).toContain('useDistributionState');
     });
 
     it('all components are exported from ui package index', () => {
@@ -156,12 +158,17 @@ describe('SDK Architecture', () => {
 
       // Check key components
       expect(indexContent).toContain('ConsensusChart');
+      expect(indexContent).toContain('DistributionChart');
+      expect(indexContent).toContain('TimelineChart');
+      expect(indexContent).toContain('MarketCharts');
       expect(indexContent).toContain('TradePanel');
       expect(indexContent).toContain('ShapeCutter');
       expect(indexContent).toContain('BinaryPanel');
       expect(indexContent).toContain('PositionTable');
       expect(indexContent).toContain('MarketStats');
       expect(indexContent).toContain('TimeSales');
+      expect(indexContent).toContain('BucketRangeSelector');
+      expect(indexContent).toContain('BucketTradePanel');
     });
 
     it('OverlayCurve type is exported from ui package', () => {
@@ -191,6 +198,21 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('calculateBucketDistribution');
       expect(indexContent).toContain('BucketData');
     });
+
+    it('timeline core functions are exported from core', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/core/src/index.ts'),
+        'utf-8'
+      );
+
+      expect(indexContent).toContain('queryMarketHistory');
+      expect(indexContent).toContain('computePercentiles');
+      expect(indexContent).toContain('transformHistoryToFanChart');
+      expect(indexContent).toContain('MarketSnapshot');
+      expect(indexContent).toContain('MarketHistory');
+      expect(indexContent).toContain('PercentileSet');
+      expect(indexContent).toContain('FanChartPoint');
+    });
   });
 
   describe('Component Props Patterns', () => {
@@ -203,14 +225,42 @@ describe('SDK Architecture', () => {
       expect(chartFile).toContain('overlayCurves');
     });
 
-    it('ConsensusChart accepts views prop', () => {
+    it('MarketCharts accepts views prop', () => {
       const chartFile = fs.readFileSync(
-        path.join(__dirname, '../packages/ui/src/charts/ConsensusChart.tsx'),
+        path.join(__dirname, '../packages/ui/src/charts/MarketCharts.tsx'),
         'utf-8'
       );
 
       expect(chartFile).toContain('views');
       expect(chartFile).toContain('ChartView');
+    });
+
+    it('DistributionChart accepts defaultBucketCount prop', () => {
+      const chartFile = fs.readFileSync(
+        path.join(__dirname, '../packages/ui/src/charts/DistributionChart.tsx'),
+        'utf-8'
+      );
+
+      expect(chartFile).toContain('defaultBucketCount');
+    });
+
+    it('MarketCharts accepts overlayCurves and defaultBucketCount props', () => {
+      const chartFile = fs.readFileSync(
+        path.join(__dirname, '../packages/ui/src/charts/MarketCharts.tsx'),
+        'utf-8'
+      );
+
+      expect(chartFile).toContain('overlayCurves');
+      expect(chartFile).toContain('defaultBucketCount');
+    });
+
+    it('TimelineChart accepts marketId prop', () => {
+      const chartFile = fs.readFileSync(
+        path.join(__dirname, '../packages/ui/src/charts/TimelineChart.tsx'),
+        'utf-8'
+      );
+
+      expect(chartFile).toContain('marketId');
     });
 
     it('PositionTable accepts selection callback props', () => {
@@ -221,6 +271,54 @@ describe('SDK Architecture', () => {
 
       expect(tableFile).toContain('selectedPositionId');
       expect(tableFile).toContain('onSelectPosition');
+    });
+
+    it('DistributionChart accepts distributionState prop', () => {
+      const chartFile = fs.readFileSync(
+        path.join(__dirname, '../packages/ui/src/charts/DistributionChart.tsx'),
+        'utf-8'
+      );
+
+      expect(chartFile).toContain('distributionState');
+    });
+
+    it('MarketCharts accepts distributionState prop', () => {
+      const chartFile = fs.readFileSync(
+        path.join(__dirname, '../packages/ui/src/charts/MarketCharts.tsx'),
+        'utf-8'
+      );
+
+      expect(chartFile).toContain('distributionState');
+    });
+
+    it('BucketRangeSelector accepts marketId and distributionState props', () => {
+      const file = fs.readFileSync(
+        path.join(__dirname, '../packages/ui/src/trading/BucketRangeSelector.tsx'),
+        'utf-8'
+      );
+
+      expect(file).toContain('marketId');
+      expect(file).toContain('distributionState');
+    });
+
+    it('buildRange and RangeInput are exported from core', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/core/src/index.ts'),
+        'utf-8'
+      );
+
+      expect(indexContent).toContain('buildRange');
+      expect(indexContent).toContain('RangeInput');
+    });
+
+    it('DistributionState type is exported from react package', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/react/src/index.ts'),
+        'utf-8'
+      );
+
+      expect(indexContent).toContain('DistributionState');
+      expect(indexContent).toContain('DistributionStateConfig');
     });
   });
 });

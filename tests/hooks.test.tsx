@@ -12,12 +12,14 @@ vi.mock('@functionspace/core', () => ({
   getConsensusCurve: vi.fn(),
   queryMarketPositions: vi.fn(),
   queryTradeHistory: vi.fn(),
+  queryMarketHistory: vi.fn(),
   mapPosition: vi.fn((p) => p),
   calculateBucketDistribution: vi.fn(),
+  computePercentiles: vi.fn(),
 }));
 
-import { FunctionSpaceProvider, useMarket, useConsensus, usePositions, useTradeHistory, useBucketDistribution } from '../packages/react/src';
-import { queryMarketState, getConsensusCurve, queryMarketPositions, queryTradeHistory, calculateBucketDistribution, FSClient } from '@functionspace/core';
+import { FunctionSpaceProvider, useMarket, useConsensus, usePositions, useTradeHistory, useBucketDistribution, useMarketHistory, useDistributionState } from '../packages/react/src';
+import { queryMarketState, getConsensusCurve, queryMarketPositions, queryTradeHistory, queryMarketHistory, calculateBucketDistribution, computePercentiles, FSClient } from '@functionspace/core';
 
 const mockConfig = {
   baseUrl: 'https://test.api.com',
@@ -435,5 +437,361 @@ describe('useBucketDistribution hook', () => {
     expect(result.current).toHaveProperty('error');
     expect(result.current).toHaveProperty('refetch');
     expect(typeof result.current.refetch).toBe('function');
+  });
+});
+
+describe('useMarketHistory hook', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('throws error when used outside provider', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect(() => {
+      renderHook(() => useMarketHistory('1'));
+    }).toThrow('useMarketHistory must be used within FunctionSpaceProvider');
+
+    spy.mockRestore();
+  });
+
+  it('returns history data after successful fetch', async () => {
+    const mockHistory = {
+      marketId: 1,
+      totalSnapshots: 2,
+      snapshots: [
+        { snapshotId: 1, tradeId: 1, side: 'buy', positionId: '1', alphaVector: [1, 1], totalDeposits: 10, totalWithdrawals: 0, totalVolume: 10, currentPool: 10, numOpenPositions: 1, createdAt: '2025-01-15T14:00:00Z' },
+        { snapshotId: 2, tradeId: 2, side: 'buy', positionId: '2', alphaVector: [1, 2], totalDeposits: 20, totalWithdrawals: 0, totalVolume: 20, currentPool: 20, numOpenPositions: 2, createdAt: '2025-01-15T15:00:00Z' },
+      ],
+    };
+    vi.mocked(queryMarketHistory).mockResolvedValue(mockHistory as any);
+
+    const { result } = renderHook(() => useMarketHistory('1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.history).toEqual(mockHistory);
+    expect(result.current.error).toBe(null);
+  });
+
+  it('returns error on fetch failure', async () => {
+    vi.mocked(queryMarketHistory).mockRejectedValue(new Error('Network error'));
+
+    const { result } = renderHook(() => useMarketHistory('1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.history).toBe(null);
+    expect(result.current.error?.message).toBe('Network error');
+  });
+
+  it('passes limit option to queryMarketHistory', async () => {
+    vi.mocked(queryMarketHistory).mockResolvedValue({ marketId: 1, totalSnapshots: 0, snapshots: [] } as any);
+
+    renderHook(() => useMarketHistory('market-1', { limit: 100 }), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(queryMarketHistory).toHaveBeenCalled();
+    });
+
+    expect(queryMarketHistory).toHaveBeenCalledWith(
+      expect.anything(),
+      'market-1',
+      100,
+    );
+  });
+
+  it('returns { history, loading, error, refetch }', async () => {
+    vi.mocked(queryMarketHistory).mockResolvedValue({ marketId: 1, totalSnapshots: 0, snapshots: [] } as any);
+
+    const { result } = renderHook(() => useMarketHistory('1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current).toHaveProperty('history');
+    expect(result.current).toHaveProperty('loading');
+    expect(result.current).toHaveProperty('error');
+    expect(result.current).toHaveProperty('refetch');
+    expect(typeof result.current.refetch).toBe('function');
+  });
+});
+
+describe('useDistributionState hook', () => {
+  const mockMarket = {
+    config: { K: 60, L: 0, H: 100, P0: 1, mu: 1, epsAlpha: 0.01, tau: 1, gamma: 1, lambdaS: 0, lambdaD: 0 },
+    consensus: [0.5, 0.5],
+    title: 'Test Market',
+    decimals: 0,
+    alpha: [1, 1],
+    totalMass: 2,
+    poolBalance: 100,
+    participantCount: 1,
+    totalVolume: 100,
+    positionsOpen: 1,
+    xAxisUnits: 'USD',
+    resolutionState: 'open' as const,
+    resolvedOutcome: null,
+  };
+
+  const mockConsensus = {
+    points: [{ x: 0, y: 0.1 }, { x: 50, y: 0.5 }, { x: 100, y: 0.1 }],
+    config: mockMarket.config,
+  };
+
+  const mockBuckets = [
+    { range: '0-8', min: 0, max: 8.33, probability: 0.05, percentage: 5 },
+    { range: '8-17', min: 8.33, max: 16.67, probability: 0.08, percentage: 8 },
+  ];
+
+  const mockPercentiles = {
+    p2_5: 10,
+    p12_5: 20,
+    p25: 30,
+    p37_5: 40,
+    p50: 50,
+    p62_5: 60,
+    p75: 70,
+    p87_5: 80,
+    p97_5: 90,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('throws error when used outside provider', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect(() => {
+      renderHook(() => useDistributionState('1'));
+    }).toThrow('useDistributionState must be used within FunctionSpaceProvider');
+
+    spy.mockRestore();
+  });
+
+  it('returns loading=true while data is fetching', async () => {
+    vi.mocked(queryMarketState).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(getConsensusCurve).mockImplementation(() => new Promise(() => {}));
+
+    const { result } = renderHook(() => useDistributionState('1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(true);
+    });
+    expect(result.current.market).toBe(null);
+    expect(result.current.buckets).toBe(null);
+    expect(result.current.percentiles).toBe(null);
+  });
+
+  it('returns bucket data after market and consensus load', async () => {
+    vi.mocked(queryMarketState).mockResolvedValue(mockMarket as any);
+    vi.mocked(getConsensusCurve).mockResolvedValue(mockConsensus as any);
+    vi.mocked(calculateBucketDistribution).mockReturnValue(mockBuckets);
+    vi.mocked(computePercentiles).mockReturnValue(mockPercentiles);
+
+    const { result } = renderHook(() => useDistributionState('1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.buckets).toEqual(mockBuckets);
+    expect(result.current.error).toBe(null);
+    expect(calculateBucketDistribution).toHaveBeenCalledWith(
+      mockConsensus.points,
+      0,    // L
+      100,  // H
+      12,   // default bucketCount
+      0,    // decimals
+    );
+  });
+
+  it('computes percentiles from market consensus coefficients', async () => {
+    vi.mocked(queryMarketState).mockResolvedValue(mockMarket as any);
+    vi.mocked(getConsensusCurve).mockResolvedValue(mockConsensus as any);
+    vi.mocked(calculateBucketDistribution).mockReturnValue(mockBuckets);
+    vi.mocked(computePercentiles).mockReturnValue(mockPercentiles);
+
+    const { result } = renderHook(() => useDistributionState('1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.percentiles).toEqual(mockPercentiles);
+    expect(computePercentiles).toHaveBeenCalledWith(
+      mockMarket.consensus,
+      0,    // L
+      100,  // H
+    );
+  });
+
+  it('setBucketCount updates bucket computation', async () => {
+    vi.mocked(queryMarketState).mockResolvedValue(mockMarket as any);
+    vi.mocked(getConsensusCurve).mockResolvedValue(mockConsensus as any);
+    vi.mocked(calculateBucketDistribution).mockReturnValue(mockBuckets);
+    vi.mocked(computePercentiles).mockReturnValue(mockPercentiles);
+
+    const { result } = renderHook(() => useDistributionState('1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    // Initial call with default 12 buckets
+    expect(calculateBucketDistribution).toHaveBeenCalledWith(
+      expect.anything(), 0, 100, 12, 0,
+    );
+
+    // Change bucket count
+    act(() => {
+      result.current.setBucketCount(20);
+    });
+
+    expect(result.current.bucketCount).toBe(20);
+    expect(calculateBucketDistribution).toHaveBeenCalledWith(
+      expect.anything(), 0, 100, 20, 0,
+    );
+  });
+
+  it('clamps bucket count to [2, 50]', async () => {
+    vi.mocked(queryMarketState).mockResolvedValue(mockMarket as any);
+    vi.mocked(getConsensusCurve).mockResolvedValue(mockConsensus as any);
+    vi.mocked(calculateBucketDistribution).mockReturnValue([]);
+    vi.mocked(computePercentiles).mockReturnValue(mockPercentiles);
+
+    const { result } = renderHook(() => useDistributionState('1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    act(() => {
+      result.current.setBucketCount(0);
+    });
+    expect(result.current.bucketCount).toBe(2);
+
+    act(() => {
+      result.current.setBucketCount(100);
+    });
+    expect(result.current.bucketCount).toBe(50);
+  });
+
+  it('getBucketsForRange computes buckets over a narrowed range', async () => {
+    const narrowedBuckets = [
+      { range: '10-30', min: 10, max: 30, probability: 0.3, percentage: 30 },
+      { range: '30-50', min: 30, max: 50, probability: 0.4, percentage: 40 },
+    ];
+
+    vi.mocked(queryMarketState).mockResolvedValue(mockMarket as any);
+    vi.mocked(getConsensusCurve).mockResolvedValue(mockConsensus as any);
+    vi.mocked(calculateBucketDistribution)
+      .mockReturnValueOnce(mockBuckets)  // initial full-range
+      .mockReturnValue(narrowedBuckets); // narrowed range call
+    vi.mocked(computePercentiles).mockReturnValue(mockPercentiles);
+
+    const { result } = renderHook(() => useDistributionState('1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    const narrowed = result.current.getBucketsForRange(10, 50);
+    expect(narrowed).toEqual(narrowedBuckets);
+    expect(calculateBucketDistribution).toHaveBeenCalledWith(
+      mockConsensus.points,
+      10,   // narrowed min
+      50,   // narrowed max
+      12,   // current bucketCount
+      0,    // decimals
+    );
+  });
+
+  it('accepts custom defaultBucketCount via config', async () => {
+    vi.mocked(queryMarketState).mockResolvedValue(mockMarket as any);
+    vi.mocked(getConsensusCurve).mockResolvedValue(mockConsensus as any);
+    vi.mocked(calculateBucketDistribution).mockReturnValue([]);
+    vi.mocked(computePercentiles).mockReturnValue(mockPercentiles);
+
+    const { result } = renderHook(
+      () => useDistributionState('1', { defaultBucketCount: 8 }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.bucketCount).toBe(8);
+    expect(calculateBucketDistribution).toHaveBeenCalledWith(
+      expect.anything(), 0, 100, 8, 0,
+    );
+  });
+
+  it('returns error on fetch failure', async () => {
+    vi.mocked(queryMarketState).mockRejectedValue(new Error('Network error'));
+    vi.mocked(getConsensusCurve).mockRejectedValue(new Error('Network error'));
+
+    const { result } = renderHook(() => useDistributionState('1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.error?.message).toBe('Network error');
+    expect(result.current.buckets).toBe(null);
+    expect(result.current.percentiles).toBe(null);
+  });
+
+  it('returns correct shape { market, loading, error, refetch, bucketCount, setBucketCount, buckets, percentiles, getBucketsForRange }', async () => {
+    vi.mocked(queryMarketState).mockResolvedValue(mockMarket as any);
+    vi.mocked(getConsensusCurve).mockResolvedValue(mockConsensus as any);
+    vi.mocked(calculateBucketDistribution).mockReturnValue([]);
+    vi.mocked(computePercentiles).mockReturnValue(mockPercentiles);
+
+    const { result } = renderHook(() => useDistributionState('1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current).toHaveProperty('market');
+    expect(result.current).toHaveProperty('loading');
+    expect(result.current).toHaveProperty('error');
+    expect(result.current).toHaveProperty('refetch');
+    expect(result.current).toHaveProperty('bucketCount');
+    expect(result.current).toHaveProperty('setBucketCount');
+    expect(result.current).toHaveProperty('buckets');
+    expect(result.current).toHaveProperty('percentiles');
+    expect(result.current).toHaveProperty('getBucketsForRange');
+    expect(typeof result.current.refetch).toBe('function');
+    expect(typeof result.current.setBucketCount).toBe('function');
+    expect(typeof result.current.getBucketsForRange).toBe('function');
   });
 });

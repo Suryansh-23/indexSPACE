@@ -164,6 +164,15 @@ Without this, the widget's `var(--fs-background-dark)` etc. will resolve to noth
 .my-element { color: var(--fs-primary); }
 ```
 
+### Recharts Color Constants (theme.ts)
+
+Recharts `fill`/`stroke` props require concrete color values (CSS variables don't work). These are defined as JS constants in `packages/ui/src/theme.ts`:
+
+- `CHART_COLORS` — consensus line, overlay, grid, etc.
+- `FAN_BAND_COLORS` — mean line + 4 graduated band fills (band25 darkest → band95 lightest)
+
+When adding new chart colors, add them to the appropriate constant in `theme.ts` rather than inlining hex values in components.
+
 ---
 
 ## Available Hooks
@@ -173,6 +182,7 @@ Without this, the widget's `var(--fs-background-dark)` etc. will resolve to noth
 | `useMarket(marketId)` | `{ market, loading, error, refetch }` | Market metadata, config, state |
 | `useConsensus(marketId, points?)` | `{ consensus, loading, error, refetch }` | Probability density curves |
 | `usePositions(marketId, username)` | `{ positions, loading, error, refetch }` | User's open/closed positions |
+| `useMarketHistory(marketId, options?)` | `{ history, loading, error, refetch }` | Alpha vector snapshots over time (timeline fan chart) |
 
 ### Server State vs Preview State
 
@@ -310,7 +320,7 @@ Widget (e.g. TradePanel, ShapeCutter)
         → BeliefVector (number[], K+1 elements, sums to 1)
 
 BeliefVector → ctx.setPreviewBelief(belief)     [instant, on every input change]
-            → ConsensusChart reads ctx.previewBelief
+            → ConsensusChart / MarketCharts reads ctx.previewBelief
               → evaluateDensityCurve(belief, L, H, numPoints)  [piecewise-linear interpolation]
                 → rendered as dashed yellow area on chart (type="linear")
 
@@ -346,7 +356,7 @@ Same math as `evaluateDensityCurve` but for one x value. Used internally by `com
 
 ---
 
-### ConsensusChart Y-Axis Scaling
+### Consensus PDF Y-Axis Scaling
 
 The chart's left Y-axis dynamically scales to accommodate both the consensus curve and any preview/overlay curves. To prevent a very tall preview (e.g., high-confidence spike) from squashing the consensus to an invisible flat line, the preview's influence on the Y-axis domain is **capped at 4x the consensus peak**:
 
@@ -371,6 +381,11 @@ Peaks beyond 4x are clipped visually but remain in the tooltip data. This ensure
 - `evaluateDensityCurve(belief, L, H, numPoints)` → chart points (piecewise-linear interpolation)
 - `evaluateDensityPiecewise(coefficients, x, L, H)` → density at single point
 - `computeStatistics(coefficients, L, H)` → `{ mean, median, mode, variance, stdDev }`
+- `computePercentiles(coefficients, L, H)` → `PercentileSet` (9 percentiles via CDF integration)
+
+### History/Fan Chart
+- `queryMarketHistory(client, marketId, limit?, offset?)` → `MarketHistory` (wraps `GET /api/market/history`)
+- `transformHistoryToFanChart(snapshots, L, H, maxPoints?)` → `FanChartPoint[]` (downsample + percentile extraction)
 
 ### Transactions
 - `buy(client, marketId, belief, collateral)` → BuyResult
@@ -392,6 +407,8 @@ Examples:
 - `.fs-input-group` - Form input wrapper
 - `.fs-submit-btn` - Action button
 - `.fs-status-badge.open` - Status with modifier
+- `.fs-chart-fan-legend` - Fan chart legend row
+- `.fs-chart-time-filter-btn` - Time filter pill button
 
 ---
 
@@ -438,7 +455,12 @@ onSuccess?.(result);       // Notify parent
 | Widget | Purpose | Key Pattern |
 |--------|---------|-------------|
 | `MarketStats` | Stats display | Minimal, read-only |
-| `ConsensusChart` | Visualization | Recharts, evaluateDensityCurve for all curve rendering |
+| `ConsensusChart` | Consensus PDF visualization | Standalone chart, reads context for overlays |
+| `DistributionChart` | Distribution bar chart | Standalone chart with bucket slider |
+| `TimelineChart` | Fan chart (percentile bands over time) | Standalone chart, fetches own history data (see note below) |
+| `MarketCharts` | Tabbed chart wrapper | Combines ConsensusChart + DistributionChart + TimelineChart with tab switching |
+
+**TimelineChart data-fetching pattern:** Unlike Consensus/Distribution (which receive shared `market` + `consensus` data as props from `MarketCharts`), `TimelineChartContent` calls `useMarketHistory` internally. This avoids fetching history data when the timeline tab isn't active. The `timeFilter` state is lifted to `MarketCharts` so it persists across tab switches.
 | `TradePanel` | Form input | Debouncing, preview sync, three-phase pattern |
 | `ShapeCutter` | Shape-based trade input | Shape definitions, two-column layout, skew/confidence sliders |
 | `PositionTable` | Data table | Pagination, actions, context coordination |
@@ -675,7 +697,10 @@ packages/
 │   ├── index.ts          # All exports
 │   ├── types.ts          # Type definitions
 │   ├── math/builders.ts  # Belief vector math
-│   ├── queries/          # Read operations
+│   ├── math/density.ts   # Density evaluation, statistics, percentiles
+│   ├── math/fanChart.ts  # History → FanChartPoint[] transform
+│   ├── queries/market.ts # Market state queries
+│   ├── queries/history.ts # Market history queries (GET /api/market/history)
 │   └── transactions/     # Write operations
 ├── react/src/
 │   ├── index.ts          # All exports
@@ -688,7 +713,11 @@ packages/
     ├── styles/base.css   # All widget styles
     ├── charts/           # Data visualizations
     │   ├── index.ts
-    │   └── ConsensusChart.tsx
+    │   ├── types.ts
+    │   ├── ConsensusChart.tsx
+    │   ├── DistributionChart.tsx
+    │   ├── TimelineChart.tsx
+    │   └── MarketCharts.tsx
     ├── trading/          # User input/actions
     │   ├── index.ts
     │   ├── TradePanel.tsx

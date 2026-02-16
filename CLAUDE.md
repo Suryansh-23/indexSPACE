@@ -43,8 +43,9 @@ demo-app/     # Example implementation showing widget usage
 | ALL belief shapes route through `buildBelief` (L1) | Single normalization path, single point of change |
 | New widget root classes must be added to derived-variables selector in `base.css` (lines 4-7) | Derived vars (`--fs-background-dark` etc.) won't resolve otherwise — breaks silently |
 | Widgets must check `FunctionSpaceContext` | Throws helpful error if provider missing |
-| Hooks return `{ <named>, loading, error, refetch }` | Named property matches hook (market, consensus, positions) |
+| Hooks return `{ <named>, loading, error, refetch }` | Named property matches hook (market, consensus, positions, history) |
 | Export types separately | `export type { Props }` for proper tree-shaking |
+| Chart content components can fetch their own data | TimelineChartContent calls `useMarketHistory` internally — avoids wasteful fetches when tab is hidden |
 
 ## File Locations
 

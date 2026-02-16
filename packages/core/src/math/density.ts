@@ -1,4 +1,4 @@
-import type { ConsensusSummary } from '../types.js';
+import type { ConsensusSummary, PercentileSet } from '../types.js';
 
 /**
  * Evaluate the density PDF at a single point via piecewise-linear interpolation.
@@ -113,4 +113,46 @@ export function computeStatistics(
   }
 
   return { mean, median, mode, variance, stdDev };
+}
+
+/**
+ * Compute 9 percentiles from a coefficient vector via CDF integration.
+ * Walks a 500-point grid from L to H, accumulates probability mass,
+ * and records x-value when each threshold is crossed.
+ */
+export function computePercentiles(
+  coefficients: number[],
+  L: number,
+  H: number,
+): PercentileSet {
+  const thresholds = [0.025, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 0.975];
+  const results = new Array<number>(thresholds.length).fill(H);
+
+  const numPoints = 500;
+  const dx = (H - L) / numPoints;
+  let cumulative = 0;
+  let thresholdIdx = 0;
+
+  for (let i = 0; i < numPoints && thresholdIdx < thresholds.length; i++) {
+    const x = L + dx * (i + 0.5);
+    const d = evaluateDensityPiecewise(coefficients, x, L, H);
+    cumulative += d * dx;
+
+    while (thresholdIdx < thresholds.length && cumulative >= thresholds[thresholdIdx]) {
+      results[thresholdIdx] = Math.max(L, Math.min(H, x));
+      thresholdIdx++;
+    }
+  }
+
+  return {
+    p2_5: results[0],
+    p12_5: results[1],
+    p25: results[2],
+    p37_5: results[3],
+    p50: results[4],
+    p62_5: results[5],
+    p75: results[6],
+    p87_5: results[7],
+    p97_5: results[8],
+  };
 }

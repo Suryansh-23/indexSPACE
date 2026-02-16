@@ -1,10 +1,10 @@
 // Charts
-export { ConsensusChart } from './charts/index.js';
-export type { ConsensusChartProps, OverlayCurve, ChartView } from './charts/index.js';
+export { MarketCharts, ConsensusChart, DistributionChart, TimelineChart } from './charts/index.js';
+export type { MarketChartsProps, ConsensusChartProps, DistributionChartProps, TimelineChartProps, OverlayCurve, ChartView } from './charts/index.js';
 
 // Trading
-export { TradePanel, ShapeCutter, BinaryPanel } from './trading/index.js';
-export type { TradePanelProps, ShapeCutterProps, BinaryPanelProps, XPointMode, TradeInputBaseProps } from './trading/index.js';
+export { TradePanel, ShapeCutter, BinaryPanel, BucketRangeSelector, BucketTradePanel } from './trading/index.js';
+export type { TradePanelProps, ShapeCutterProps, BinaryPanelProps, BucketRangeSelectorProps, BucketTradePanelProps, XPointMode, TradeInputBaseProps } from './trading/index.js';
 
 // Market
 export { MarketStats, PositionTable, TimeSales } from './market/index.js';

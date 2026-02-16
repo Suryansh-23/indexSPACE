@@ -7,3 +7,6 @@ export { useConsensus } from './useConsensus.js';
 export { usePositions } from './usePositions.js';
 export { useTradeHistory } from './useTradeHistory.js';
 export { useBucketDistribution } from './useBucketDistribution.js';
+export { useMarketHistory } from './useMarketHistory.js';
+export { useDistributionState } from './useDistributionState.js';
+export type { DistributionState, DistributionStateConfig } from './useDistributionState.js';

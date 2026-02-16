@@ -9,7 +9,7 @@ const POSITIONS_RATIO = 3;
 // Chart full width, ShapeCutter (70%) + PositionTable (30%) below
 export default function App_ShapeCutterPositions() {
   return (
-    <ArticlePage>
+    <ArticlePage widgetWidth="120%">
       <FunctionSpaceProvider config={config} theme={widgetTheme}>
         <MarketStats marketId={MARKET_ID} />
 

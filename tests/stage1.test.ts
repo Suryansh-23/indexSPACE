@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { FSClient } from '../packages/core/src/client.js';
 import { calculateBucketDistribution } from '../packages/core/src/math/distribution.js';
+import { computePercentiles } from '../packages/core/src/math/density.js';
+import { transformHistoryToFanChart } from '../packages/core/src/math/fanChart.js';
+import type { MarketSnapshot } from '../packages/core/src/types.js';
 import type {
   MarketConfig,
   MarketState,
@@ -183,5 +186,143 @@ describe('calculateBucketDistribution', () => {
     const maxBucket = result.reduce((max, b) => b.percentage > max.percentage ? b : max, result[0]);
     expect(maxBucket.min).toBeLessThanOrEqual(50);
     expect(maxBucket.max).toBeGreaterThanOrEqual(45);
+  });
+});
+
+describe('computePercentiles', () => {
+  it('returns evenly spaced percentiles for uniform coefficients', () => {
+    // Uniform: all coefficients equal → flat density
+    const K = 60;
+    const uniform = new Array(K + 1).fill(1 / (K + 1));
+    const p = computePercentiles(uniform, 0, 100);
+    // p50 should be near 50
+    expect(p.p50).toBeCloseTo(50, 0);
+    // p25 should be near 25
+    expect(p.p25).toBeCloseTo(25, 0);
+    // p75 should be near 75
+    expect(p.p75).toBeCloseTo(75, 0);
+  });
+
+  it('returns tight inner bands for peaked distribution', () => {
+    // Peaked at center: Gaussian-like
+    const K = 60;
+    const peaked = new Array(K + 1).fill(0);
+    for (let i = 0; i <= K; i++) {
+      const u = i / K;
+      peaked[i] = Math.exp(-Math.pow((u - 0.5) * 10, 2));
+    }
+    const sum = peaked.reduce((a: number, b: number) => a + b, 0);
+    const normalized = peaked.map((v: number) => v / sum);
+    const p = computePercentiles(normalized, 0, 100);
+    // Inner bands (25) should be much tighter than outer bands (95)
+    const innerWidth = p.p62_5 - p.p37_5;
+    const outerWidth = p.p97_5 - p.p2_5;
+    expect(innerWidth).toBeLessThan(outerWidth);
+  });
+
+  it('produces monotonically ordered percentiles', () => {
+    const K = 60;
+    const uniform = new Array(K + 1).fill(1 / (K + 1));
+    const p = computePercentiles(uniform, 0, 100);
+    expect(p.p2_5).toBeLessThanOrEqual(p.p12_5);
+    expect(p.p12_5).toBeLessThanOrEqual(p.p25);
+    expect(p.p25).toBeLessThanOrEqual(p.p37_5);
+    expect(p.p37_5).toBeLessThanOrEqual(p.p50);
+    expect(p.p50).toBeLessThanOrEqual(p.p62_5);
+    expect(p.p62_5).toBeLessThanOrEqual(p.p75);
+    expect(p.p75).toBeLessThanOrEqual(p.p87_5);
+    expect(p.p87_5).toBeLessThanOrEqual(p.p97_5);
+  });
+
+  it('all values within [L, H]', () => {
+    const K = 60;
+    const uniform = new Array(K + 1).fill(1 / (K + 1));
+    const p = computePercentiles(uniform, 10, 90);
+    const values = [p.p2_5, p.p12_5, p.p25, p.p37_5, p.p50, p.p62_5, p.p75, p.p87_5, p.p97_5];
+    for (const v of values) {
+      expect(v).toBeGreaterThanOrEqual(10);
+      expect(v).toBeLessThanOrEqual(90);
+    }
+  });
+});
+
+describe('transformHistoryToFanChart', () => {
+  function makeSnapshot(overrides: Partial<MarketSnapshot> = {}): MarketSnapshot {
+    return {
+      snapshotId: 1,
+      tradeId: 1,
+      side: 'buy',
+      positionId: '1',
+      alphaVector: new Array(61).fill(1),
+      totalDeposits: 10,
+      totalWithdrawals: 0,
+      totalVolume: 10,
+      currentPool: 10,
+      numOpenPositions: 1,
+      createdAt: '2025-01-15T14:00:00Z',
+      ...overrides,
+    };
+  }
+
+  it('returns empty for empty input', () => {
+    expect(transformHistoryToFanChart([], 0, 100)).toEqual([]);
+  });
+
+  it('returns single point for single snapshot', () => {
+    const result = transformHistoryToFanChart([makeSnapshot()], 0, 100);
+    expect(result).toHaveLength(1);
+    expect(result[0].percentiles).toBeDefined();
+    expect(result[0].mean).toBeDefined();
+  });
+
+  it('downsamples >200 snapshots to exactly 200', () => {
+    const snaps = Array.from({ length: 300 }, (_, i) =>
+      makeSnapshot({
+        snapshotId: i,
+        tradeId: i,
+        createdAt: new Date(2025, 0, 1, 0, i).toISOString(),
+      })
+    );
+    const result = transformHistoryToFanChart(snaps, 0, 100, 200);
+    expect(result).toHaveLength(200);
+  });
+
+  it('preserves first and last after downsampling', () => {
+    const snaps = Array.from({ length: 300 }, (_, i) =>
+      makeSnapshot({
+        snapshotId: i,
+        tradeId: i,
+        createdAt: new Date(2025, 0, 1, 0, i).toISOString(),
+      })
+    );
+    const result = transformHistoryToFanChart(snaps, 0, 100, 200);
+    // First point matches first snapshot
+    expect(result[0].createdAt).toBe(snaps[0].createdAt);
+    // Last point matches last snapshot
+    expect(result[result.length - 1].createdAt).toBe(snaps[snaps.length - 1].createdAt);
+  });
+
+  it('timestamps are monotonically increasing', () => {
+    const snaps = Array.from({ length: 10 }, (_, i) =>
+      makeSnapshot({
+        snapshotId: i,
+        tradeId: i,
+        createdAt: new Date(2025, 0, 1, i).toISOString(),
+      })
+    );
+    const result = transformHistoryToFanChart(snaps, 0, 100);
+    for (let i = 1; i < result.length; i++) {
+      expect(result[i].timestamp).toBeGreaterThanOrEqual(result[i - 1].timestamp);
+    }
+  });
+
+  it('filters out snapshots with all-zero alpha', () => {
+    const snaps = [
+      makeSnapshot({ snapshotId: 1, alphaVector: new Array(61).fill(1) }),
+      makeSnapshot({ snapshotId: 2, alphaVector: new Array(61).fill(0) }), // bad
+      makeSnapshot({ snapshotId: 3, alphaVector: new Array(61).fill(2) }),
+    ];
+    const result = transformHistoryToFanChart(snaps, 0, 100);
+    expect(result).toHaveLength(2);
   });
 });

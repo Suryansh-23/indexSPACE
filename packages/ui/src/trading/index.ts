@@ -4,4 +4,8 @@ export { ShapeCutter } from './ShapeCutter.js';
 export type { ShapeCutterProps } from './ShapeCutter.js';
 export { BinaryPanel } from './BinaryPanel.js';
 export type { BinaryPanelProps, XPointMode } from './BinaryPanel.js';
+export { BucketRangeSelector } from './BucketRangeSelector.js';
+export type { BucketRangeSelectorProps } from './BucketRangeSelector.js';
+export { BucketTradePanel } from './BucketTradePanel.js';
+export type { BucketTradePanelProps } from './BucketTradePanel.js';
 export type { TradeInputBaseProps } from './types.js';

@@ -4,6 +4,7 @@ import { buildGaussian, buildPlateau, buildBelief } from '../packages/core/src/m
 import { evaluateDensityPiecewise, evaluateDensityCurve, computeStatistics } from '../packages/core/src/math/density.js';
 import { queryMarketState, getConsensusCurve, queryConsensusSummary, queryDensityAt } from '../packages/core/src/queries/market.js';
 import { queryPositionState, queryMarketPositions } from '../packages/core/src/queries/positions.js';
+import { queryMarketHistory } from '../packages/core/src/queries/history.js';
 import { positionsToTradeEntries, queryTradeHistory } from '../packages/core/src/queries/trades.js';
 import { buy } from '../packages/core/src/transactions/buy.js';
 import { sell } from '../packages/core/src/transactions/sell.js';
@@ -429,5 +430,28 @@ describe('API: queryTradeHistory', () => {
     const client = makeClient();
     const trades = await queryTradeHistory(client, MARKET_ID, { limit: 3 });
     expect(trades.length).toBeLessThanOrEqual(3);
+  });
+});
+
+describe('API: queryMarketHistory', () => {
+  it('returns MarketHistory with snapshots array', async () => {
+    const client = makeClient();
+    const history = await queryMarketHistory(client, MARKET_ID);
+    expect(history.marketId).toBeDefined();
+    expect(history.totalSnapshots).toBeDefined();
+    expect(Array.isArray(history.snapshots)).toBe(true);
+    if (history.snapshots.length > 0) {
+      expect(history.snapshots[0]).toHaveProperty('snapshotId');
+      expect(history.snapshots[0]).toHaveProperty('tradeId');
+      expect(history.snapshots[0]).toHaveProperty('alphaVector');
+      expect(Array.isArray(history.snapshots[0].alphaVector)).toBe(true);
+      expect(history.snapshots[0]).toHaveProperty('createdAt');
+    }
+  });
+
+  it('respects limit parameter', async () => {
+    const client = makeClient();
+    const history = await queryMarketHistory(client, MARKET_ID, 5);
+    expect(history.snapshots.length).toBeLessThanOrEqual(5);
   });
 });
