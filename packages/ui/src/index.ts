@@ -8,7 +8,7 @@ export type { TradePanelProps, ShapeCutterProps, BinaryPanelProps, BucketRangeSe
 
 // Market
 export { MarketStats, PositionTable, TimeSales } from './market/index.js';
-export type { MarketStatsProps, PositionTableProps, TimeSalesProps } from './market/index.js';
+export type { MarketStatsProps, PositionTableProps, PositionTabId, TimeSalesProps } from './market/index.js';
 
 // Theme
 export { CHART_COLORS } from './theme.js';

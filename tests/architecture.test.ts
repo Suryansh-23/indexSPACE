@@ -189,6 +189,15 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('ChartView');
     });
 
+    it('PositionTabId type is exported from ui package', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/ui/src/index.ts'),
+        'utf-8'
+      );
+
+      expect(indexContent).toContain('PositionTabId');
+    });
+
     it('calculateBucketDistribution and BucketData are exported from core', () => {
       const indexContent = fs.readFileSync(
         path.join(__dirname, '../packages/core/src/index.ts'),
@@ -263,7 +272,7 @@ describe('SDK Architecture', () => {
       expect(chartFile).toContain('marketId');
     });
 
-    it('PositionTable accepts selection callback props', () => {
+    it('PositionTable accepts selection callback props and tabs prop', () => {
       const tableFile = fs.readFileSync(
         path.join(__dirname, '../packages/ui/src/market/PositionTable.tsx'),
         'utf-8'
@@ -271,6 +280,8 @@ describe('SDK Architecture', () => {
 
       expect(tableFile).toContain('selectedPositionId');
       expect(tableFile).toContain('onSelectPosition');
+      expect(tableFile).toContain('tabs');
+      expect(tableFile).toContain('PositionTabId');
     });
 
     it('DistributionChart accepts distributionState prop', () => {

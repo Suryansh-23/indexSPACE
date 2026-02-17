@@ -235,6 +235,25 @@ describe('usePositions hook', () => {
     expect(result.current.positions).toBe(null);
     expect(result.current.error?.message).toBe('API error');
   });
+
+  it('returns all positions when username is omitted', async () => {
+    vi.mocked(queryMarketPositions).mockResolvedValue([
+      { positionId: 1, owner: 'testuser', belief: [0.5] },
+      { positionId: 2, owner: 'otheruser', belief: [0.3] },
+      { positionId: 3, owner: 'testuser', belief: [0.7] },
+    ] as any);
+
+    const { result } = renderHook(() => usePositions('1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    // Should return ALL positions (no filter applied)
+    expect(result.current.positions).toHaveLength(3);
+  });
 });
 
 describe('Hook Return Shape', () => {

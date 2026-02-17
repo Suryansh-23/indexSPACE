@@ -824,6 +824,15 @@
 
 .fs-table-wrapper {
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 30rem;
+}
+
+.fs-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--fs-background-dark);
+  z-index: 1;
 }
 
 .fs-table {
@@ -935,9 +944,9 @@
 .fs-table-pagination {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.75rem;
+  padding: 0.75rem 1rem;
   border-top: 1px solid var(--fs-border);
   background: rgba(3, 7, 18, 0.3);
 }
@@ -1021,6 +1030,49 @@
   padding: 0.75rem 1.25rem;
   color: var(--fs-negative);
   font-size: 0.8125rem;
+}
+
+/* ── Position Table Tabs ── */
+
+.fs-table-tabs {
+  display: flex;
+  gap: 1.5rem;
+  padding: 0 1rem;
+  border-bottom: 1px solid var(--fs-border);
+}
+
+.fs-table-tab {
+  padding: 0.75rem 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--fs-text-secondary);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.fs-table-tab:hover {
+  color: var(--fs-text);
+}
+
+.fs-table-tab.active {
+  color: var(--fs-primary);
+  border-bottom-color: var(--fs-primary);
+}
+
+/* Owner highlight for Market Positions tab */
+
+.fs-owner-you {
+  color: var(--fs-primary);
+  font-weight: 500;
+}
+
+.fs-owner-tag {
+  font-size: 0.75rem;
+  margin-left: 0.25rem;
+  color: var(--fs-primary);
 }
 
 .fs-spinner {

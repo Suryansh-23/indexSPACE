@@ -3,7 +3,7 @@ import { queryMarketPositions } from '@functionspace/core';
 import type { Position } from '@functionspace/core';
 import { FunctionSpaceContext } from './context.js';
 
-export function usePositions(marketId: string | number, username: string) {
+export function usePositions(marketId: string | number, username?: string) {
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('usePositions must be used within FunctionSpaceProvider');
 
@@ -16,7 +16,7 @@ export function usePositions(marketId: string | number, username: string) {
     setError(null);
     try {
       const all = await queryMarketPositions(ctx.client, marketId);
-      const filtered = all.filter((p) => p.owner === username);
+      const filtered = username ? all.filter((p) => p.owner === username) : all;
       setPositions(filtered);
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));

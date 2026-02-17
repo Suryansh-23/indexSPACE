@@ -50,7 +50,7 @@ export interface Position {
   collateral: number;
   claims: number;
   owner: string;
-  status: 'open' | 'sold' | 'settled';
+  status: 'open' | 'sold' | 'settled' | 'closed';
   prediction: number;
   stdDev: number;
   createdAt: string;
