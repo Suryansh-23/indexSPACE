@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildGaussian,
+  buildRange,
   buildPlateau,
   buildBelief,
   buildDip,
@@ -8,7 +9,7 @@ import {
   buildRightSkew,
   SHAPE_DEFINITIONS,
 } from '../packages/core/src/index.js';
-import type { ShapeId, ShapeDefinition, BeliefVector, Region } from '../packages/core/src/index.js';
+import type { ShapeId, ShapeDefinition, BeliefVector, Region, RangeInput } from '../packages/core/src/index.js';
 
 // Shared test parameters matching a realistic market config
 const K = 50;   // polynomial degree → 51 elements
@@ -245,6 +246,106 @@ describe('Uniform shape', () => {
     for (const v of belief) {
       expect(v).toBeCloseTo(expected, 2);
     }
+  });
+});
+
+// ── buildRange (L2 multi-range) ──
+
+describe('buildRange', () => {
+  it('single-range produces same output as buildPlateau', () => {
+    const viaRange = buildRange(80, 120, K, L, H, 0.5);
+    const viaPlateau = buildPlateau(80, 120, K, L, H, 0.5);
+    expect(viaRange).toEqual(viaPlateau);
+  });
+
+  it('single-range with explicit sharpness=1 produces same as buildPlateau sharpness=1', () => {
+    const viaRange = buildRange(80, 120, K, L, H, 1);
+    const viaPlateau = buildPlateau(80, 120, K, L, H, 1);
+    expect(viaRange).toEqual(viaPlateau);
+  });
+
+  it('multi-range: 2 non-contiguous ranges produce valid belief', () => {
+    const belief = buildRange([
+      { low: 60, high: 80 },
+      { low: 120, high: 140 },
+    ], K, L, H);
+    assertValidBelief(belief, 'multi-range-2');
+  });
+
+  it('multi-range: 3 non-contiguous ranges produce valid belief', () => {
+    const belief = buildRange([
+      { low: 55, high: 70 },
+      { low: 90, high: 110 },
+      { low: 130, high: 145 },
+    ], K, L, H);
+    assertValidBelief(belief, 'multi-range-3');
+  });
+
+  it('multi-range: each range has elevated probability in its region', () => {
+    const belief = buildRange([
+      { low: 60, high: 80, sharpness: 1 },
+      { low: 120, high: 140, sharpness: 1 },
+    ], K, L, H);
+    // Indices for range midpoints
+    const mid1 = Math.round(((70 - L) / (H - L)) * K);   // ~10
+    const mid2 = Math.round(((130 - L) / (H - L)) * K);  // ~40
+    const gap = Math.round(((100 - L) / (H - L)) * K);    // ~25 (between ranges)
+    // Both ranges should be elevated relative to the gap
+    expect(belief[mid1]).toBeGreaterThan(belief[gap]);
+    expect(belief[mid2]).toBeGreaterThan(belief[gap]);
+  });
+
+  it('multi-range: adjacent ranges have no gap at the boundary', () => {
+    // Two ranges that share a boundary
+    const belief = buildRange([
+      { low: 80, high: 100, sharpness: 1 },
+      { low: 100, high: 120, sharpness: 1 },
+    ], K, L, H);
+    assertValidBelief(belief, 'adjacent');
+    // The boundary at x=100 (index 25) should have significant probability,
+    // not a dip to near-zero
+    const boundaryIdx = Math.round(((100 - L) / (H - L)) * K);
+    const insideIdx = Math.round(((90 - L) / (H - L)) * K);
+    // Boundary should be at least 50% of interior value (no gap)
+    expect(belief[boundaryIdx]).toBeGreaterThan(belief[insideIdx] * 0.5);
+  });
+
+  it('multi-range: weight parameter adjusts relative contribution', () => {
+    const belief = buildRange([
+      { low: 60, high: 80, weight: 3, sharpness: 1 },
+      { low: 120, high: 140, weight: 1, sharpness: 1 },
+    ], K, L, H);
+    const mid1 = Math.round(((70 - L) / (H - L)) * K);
+    const mid2 = Math.round(((130 - L) / (H - L)) * K);
+    // First range has 3x weight → higher probability
+    expect(belief[mid1]).toBeGreaterThan(belief[mid2]);
+  });
+
+  it('multi-range: sharpness per-range is respected', () => {
+    const sharp = buildRange([
+      { low: 80, high: 120, sharpness: 1 },
+    ], K, L, H);
+    const smooth = buildRange([
+      { low: 80, high: 120, sharpness: 0 },
+    ], K, L, H);
+    assertValidBelief(sharp, 'sharp');
+    assertValidBelief(smooth, 'smooth');
+    // Just outside the range: smooth has taper, sharp drops to EPS
+    // Use a point 1 bucket-width outside the range boundary
+    const justOutside = Math.round(((78 - L) / (H - L)) * K);  // ~14, just below low=80
+    expect(sharp[justOutside]).toBeLessThan(smooth[justOutside]);
+  });
+
+  it('matches buildBelief with equivalent RangeRegion array', () => {
+    const viaL2 = buildRange([
+      { low: 60, high: 80, sharpness: 1 },
+      { low: 120, high: 140, sharpness: 0.5 },
+    ], K, L, H);
+    const viaL1 = buildBelief([
+      { type: 'range', low: 60, high: 80, sharpness: 1 },
+      { type: 'range', low: 120, high: 140, sharpness: 0.5 },
+    ], K, L, H);
+    expect(viaL2).toEqual(viaL1);
   });
 });
 

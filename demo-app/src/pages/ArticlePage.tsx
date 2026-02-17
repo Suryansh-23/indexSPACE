@@ -6,10 +6,21 @@ import '../styles/article.css';
 
 interface ArticlePageProps {
   children?: React.ReactNode;
+  widgetWidth?: string;
 }
 
-export function ArticlePage({ children }: ArticlePageProps) {
+export function ArticlePage({ children, widgetWidth }: ArticlePageProps) {
   const hasWidget = Boolean(children);
+
+  const widgetStyle: React.CSSProperties | undefined = widgetWidth
+    ? {
+        width: widgetWidth,
+        maxWidth: '100vw',
+        position: 'relative',
+        left: '50%',
+        transform: 'translateX(-50%)',
+      }
+    : undefined;
 
   return (
     <div className="article-page">
@@ -18,7 +29,7 @@ export function ArticlePage({ children }: ArticlePageProps) {
         <ArticleBody />
         {hasWidget && (
           <>
-            <section className="article-widget-section">
+            <section className="article-widget-section" style={widgetStyle}>
               <h2 className="article-section-heading">What Does the Market Think?</h2>
               <p className="article-widget-intro">
                 See what the crowd believes — and add your own forecast.

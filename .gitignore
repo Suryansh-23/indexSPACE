@@ -4,3 +4,5 @@ dist/
 *.tsbuildinfo
 .vite/
 Docs/
+CLAUDE.md
+PLAYBOOK.md

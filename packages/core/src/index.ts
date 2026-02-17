@@ -15,16 +15,21 @@ export type {
   BucketData,
   TradeEntry,
   FSConfig,
+  MarketSnapshot,
+  MarketHistory,
+  PercentileSet,
+  FanChartPoint,
 } from './types.js';
 
 // Client
 export { FSClient } from './client.js';
 
 // Math
-export { evaluateDensityPiecewise, evaluateDensityCurve, computeStatistics } from './math/density.js';
-export { buildGaussian, buildPlateau, buildBelief, buildDip, buildLeftSkew, buildRightSkew } from './math/builders.js';
-export type { Region, PointRegion, RangeRegion } from './math/builders.js';
+export { evaluateDensityPiecewise, evaluateDensityCurve, computeStatistics, computePercentiles } from './math/density.js';
+export { buildGaussian, buildRange, buildPlateau, buildBelief, buildDip, buildLeftSkew, buildRightSkew } from './math/builders.js';
+export type { Region, PointRegion, RangeRegion, RangeInput } from './math/builders.js';
 export { calculateBucketDistribution } from './math/distribution.js';
+export { transformHistoryToFanChart } from './math/fanChart.js';
 
 // Shapes
 export { SHAPE_DEFINITIONS } from './shapes/index.js';
@@ -34,6 +39,7 @@ export type { ShapeId, ShapeDefinition } from './shapes/index.js';
 export { queryMarketState, getConsensusCurve, queryConsensusSummary, queryDensityAt } from './queries/market.js';
 export { queryPositionState, queryMarketPositions, mapPosition } from './queries/positions.js';
 export { positionsToTradeEntries, queryTradeHistory } from './queries/trades.js';
+export { queryMarketHistory } from './queries/history.js';
 
 // Transactions
 export { buy } from './transactions/buy.js';

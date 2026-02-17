@@ -50,7 +50,7 @@ export interface Position {
   collateral: number;
   claims: number;
   owner: string;
-  status: 'open' | 'sold' | 'settled';
+  status: 'open' | 'sold' | 'settled' | 'closed';
   prediction: number;
   stdDev: number;
   createdAt: string;
@@ -125,6 +125,50 @@ export interface PlateauParams {
   low: number;
   high: number;
   bounds?: [number, number];
+}
+
+// ── History Types ──
+
+export interface MarketSnapshot {
+  snapshotId: number;
+  tradeId: number;
+  side: 'buy' | 'sell';
+  positionId: string;
+  alphaVector: number[];
+  totalDeposits: number;
+  totalWithdrawals: number;
+  totalVolume: number;
+  currentPool: number;
+  numOpenPositions: number;
+  createdAt: string;  // ISO 8601
+}
+
+export interface MarketHistory {
+  marketId: number;
+  totalSnapshots: number;
+  snapshots: MarketSnapshot[];
+}
+
+export interface PercentileSet {
+  p2_5: number;
+  p12_5: number;
+  p25: number;
+  p37_5: number;
+  p50: number;
+  p62_5: number;
+  p75: number;
+  p87_5: number;
+  p97_5: number;
+}
+
+export interface FanChartPoint {
+  timestamp: number;       // epoch ms
+  createdAt: string;
+  tradeId: number;
+  mean: number;
+  mode: number;
+  stdDev: number;
+  percentiles: PercentileSet;
 }
 
 // ── Client Types ──

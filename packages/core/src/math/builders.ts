@@ -149,9 +149,51 @@ export function buildGaussian(
   return buildBelief([{ type: 'point', center, spread }], K, L, H);
 }
 
+// ── Range input type (for multi-range L2 convenience) ──
+
+export interface RangeInput {
+  low: number;
+  high: number;
+  weight?: number;
+  sharpness?: number;
+}
+
 /**
- * L2: Plateau (flat range) builder.
- * Resolves through buildBelief with a single RangeRegion.
+ * L2: Range belief builder. Supports single or multiple outcome ranges.
+ * Each range becomes a RangeRegion with configurable sharpness (0 = smooth taper, 1 = hard cliff).
+ * Multiple ranges are composed into one belief vector — e.g., three non-contiguous
+ * bucket selections become three plateau regions in a single normalized vector.
+ * Resolves through buildBelief with RangeRegion[].
+ */
+export function buildRange(low: number, high: number, K: number, L: number, H: number, sharpness?: number): BeliefVector;
+export function buildRange(ranges: RangeInput[], K: number, L: number, H: number): BeliefVector;
+export function buildRange(
+  lowOrRanges: number | RangeInput[],
+  highOrK: number,
+  KOrL: number,
+  LOrH: number,
+  HOrUndefined?: number,
+  sharpness?: number,
+): BeliefVector {
+  if (Array.isArray(lowOrRanges)) {
+    const regions: RangeRegion[] = lowOrRanges.map((r) => ({
+      type: 'range' as const,
+      low: r.low,
+      high: r.high,
+      weight: r.weight,
+      sharpness: r.sharpness,
+    }));
+    return buildBelief(regions, highOrK, KOrL, LOrH);
+  }
+  return buildBelief(
+    [{ type: 'range', low: lowOrRanges, high: highOrK, sharpness: sharpness ?? 0.5 }],
+    KOrL, LOrH, HOrUndefined!,
+  );
+}
+
+/**
+ * @deprecated Use buildRange instead.
+ * L2: Plateau (flat range) builder. Alias for buildRange with single-range signature.
  */
 export function buildPlateau(
   low: number,
@@ -161,7 +203,7 @@ export function buildPlateau(
   H: number,
   sharpness: number = 0.5,
 ): BeliefVector {
-  return buildBelief([{ type: 'range', low, high, sharpness }], K, L, H);
+  return buildRange(low, high, K, L, H, sharpness);
 }
 
 /**

@@ -1,5 +1,5 @@
 import { FunctionSpaceProvider } from '@functionspace/react';
-import { ConsensusChart, BinaryPanel, MarketStats, PositionTable } from '@functionspace/ui';
+import { MarketCharts, BinaryPanel, MarketStats, PositionTable } from '@functionspace/ui';
 import { ArticlePage } from './pages/ArticlePage';
 import { config, MARKET_ID, widgetTheme } from './App';
 
@@ -12,7 +12,7 @@ export default function App_BinaryPanel() {
         <MarketStats marketId={MARKET_ID} />
 
         <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
-          <ConsensusChart
+          <MarketCharts
             marketId={MARKET_ID}
             height={400}
             views={['consensus', 'distribution']}
