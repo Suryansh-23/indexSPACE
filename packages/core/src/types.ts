@@ -171,10 +171,33 @@ export interface FanChartPoint {
   percentiles: PercentileSet;
 }
 
+// ── Auth Types ──
+
+export interface UserProfile {
+  userId: number;
+  username: string;
+  walletValue: number;
+  role: 'trader' | 'creator' | 'admin';
+}
+
+export interface AuthResult {
+  user: UserProfile;
+  token: string;
+}
+
+export interface SignupResult {
+  user: UserProfile;
+}
+
+export interface SignupOptions {
+  accessCode?: string;
+}
+
 // ── Client Types ──
 
 export interface FSConfig {
   baseUrl: string;
-  username: string;
-  password: string;
+  username?: string;
+  password?: string;
+  autoAuthenticate?: boolean;
 }

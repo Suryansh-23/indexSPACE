@@ -4,6 +4,7 @@ export const config = {
   baseUrl: import.meta.env.VITE_FS_BASE_URL,
   username: import.meta.env.VITE_FS_USERNAME,
   password: import.meta.env.VITE_FS_PASSWORD,
+  autoAuthenticate: import.meta.env.VITE_FS_AUTO_AUTH !== 'false',
 };
 
 export const MARKET_ID = import.meta.env.VITE_FS_MARKET_ID;

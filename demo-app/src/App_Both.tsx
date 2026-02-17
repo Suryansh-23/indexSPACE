@@ -1,5 +1,5 @@
 import { FunctionSpaceProvider } from '@functionspace/react';
-import { ConsensusChart, TradePanel, ShapeCutter, MarketStats, PositionTable } from '@functionspace/ui';
+import { ConsensusChart, TradePanel, ShapeCutter, MarketStats, PositionTable, AuthWidget } from '@functionspace/ui';
 import { ArticlePage } from './pages/ArticlePage';
 import { config, MARKET_ID, widgetTheme } from './App';
 
@@ -11,7 +11,10 @@ export default function App_Both() {
   return (
     <ArticlePage>
       <FunctionSpaceProvider config={config} theme={widgetTheme}>
-        <MarketStats marketId={MARKET_ID} />
+        <AuthWidget />
+        <div style={{ marginTop: '1rem' }}>
+          <MarketStats marketId={MARKET_ID} />
+        </div>
 
         <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', marginBottom: '1rem', minHeight: '520px' }}>
           <div style={{ flex: CHART_RATIO, minWidth: 0 }}>

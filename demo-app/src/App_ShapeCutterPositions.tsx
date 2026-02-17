@@ -1,5 +1,5 @@
 import { FunctionSpaceProvider } from '@functionspace/react';
-import { ConsensusChart, ShapeCutter, MarketStats, PositionTable } from '@functionspace/ui';
+import { ConsensusChart, ShapeCutter, MarketStats, PositionTable, AuthWidget } from '@functionspace/ui';
 import { ArticlePage } from './pages/ArticlePage';
 import { config, MARKET_ID, widgetTheme } from './App';
 
@@ -11,7 +11,10 @@ export default function App_ShapeCutterPositions() {
   return (
     <ArticlePage widgetWidth="120%">
       <FunctionSpaceProvider config={config} theme={widgetTheme}>
-        <MarketStats marketId={MARKET_ID} />
+        <AuthWidget />
+        <div style={{ marginTop: '1rem' }}>
+          <MarketStats marketId={MARKET_ID} />
+        </div>
 
         <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
           <ConsensusChart marketId={MARKET_ID} height={500} />

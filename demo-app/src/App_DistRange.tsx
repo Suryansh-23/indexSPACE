@@ -1,5 +1,5 @@
 import { FunctionSpaceProvider, useDistributionState } from '@functionspace/react';
-import { MarketCharts, MarketStats, BucketRangeSelector } from '@functionspace/ui';
+import { MarketCharts, MarketStats, BucketRangeSelector, AuthWidget } from '@functionspace/ui';
 import { ArticlePage } from './pages/ArticlePage';
 import { config, MARKET_ID, widgetTheme } from './App';
 
@@ -9,7 +9,10 @@ function DistRangeContent() {
 
   return (
     <>
-      <MarketStats marketId={MARKET_ID} />
+      <AuthWidget />
+      <div style={{ marginTop: '1rem' }}>
+        <MarketStats marketId={MARKET_ID} />
+      </div>
 
       <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
         <MarketCharts marketId={MARKET_ID} height={350} views={['consensus', 'distribution']} distributionState={distState} />

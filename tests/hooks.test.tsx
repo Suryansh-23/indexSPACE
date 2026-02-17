@@ -7,6 +7,10 @@ vi.mock('@functionspace/core', () => ({
   FSClient: vi.fn().mockImplementation(() => ({
     authenticate: vi.fn().mockResolvedValue(undefined),
     get: vi.fn(),
+    setToken: vi.fn(),
+    clearToken: vi.fn(),
+    isAuthenticated: false,
+    base: 'https://test.api.com',
   })),
   queryMarketState: vi.fn(),
   getConsensusCurve: vi.fn(),
@@ -16,10 +20,20 @@ vi.mock('@functionspace/core', () => ({
   mapPosition: vi.fn((p) => p),
   calculateBucketDistribution: vi.fn(),
   computePercentiles: vi.fn(),
+  loginUser: vi.fn().mockResolvedValue({
+    token: 'mock-token',
+    user: { userId: 1, username: 'testuser', walletValue: 1000, role: 'trader' },
+  }),
+  signupUser: vi.fn().mockResolvedValue({
+    user: { userId: 2, username: 'newuser', walletValue: 1000, role: 'trader' },
+  }),
+  fetchCurrentUser: vi.fn().mockResolvedValue({
+    userId: 1, username: 'testuser', walletValue: 1000, role: 'trader',
+  }),
 }));
 
-import { FunctionSpaceProvider, useMarket, useConsensus, usePositions, useTradeHistory, useBucketDistribution, useMarketHistory, useDistributionState } from '../packages/react/src';
-import { queryMarketState, getConsensusCurve, queryMarketPositions, queryTradeHistory, queryMarketHistory, calculateBucketDistribution, computePercentiles, FSClient } from '@functionspace/core';
+import { FunctionSpaceProvider, useMarket, useConsensus, usePositions, useTradeHistory, useBucketDistribution, useMarketHistory, useDistributionState, useAuth } from '../packages/react/src';
+import { queryMarketState, getConsensusCurve, queryMarketPositions, queryTradeHistory, queryMarketHistory, calculateBucketDistribution, computePercentiles, FSClient, loginUser } from '@functionspace/core';
 
 const mockConfig = {
   baseUrl: 'https://test.api.com',
@@ -266,6 +280,10 @@ describe('Hook Return Shape', () => {
     vi.mocked(FSClient).mockImplementation(() => ({
       authenticate: vi.fn().mockResolvedValue(undefined),
       get: vi.fn().mockResolvedValue({ positions: [] }),
+      setToken: vi.fn(),
+      clearToken: vi.fn(),
+      isAuthenticated: false,
+      base: 'https://test.api.com',
     }) as any);
   });
 
@@ -812,5 +830,89 @@ describe('useDistributionState hook', () => {
     expect(typeof result.current.refetch).toBe('function');
     expect(typeof result.current.setBucketCount).toBe('function');
     expect(typeof result.current.getBucketsForRange).toBe('function');
+  });
+});
+
+describe('useAuth hook', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('throws error when used outside provider', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect(() => {
+      renderHook(() => useAuth());
+    }).toThrow('useAuth must be used within FunctionSpaceProvider');
+
+    spy.mockRestore();
+  });
+
+  it('returns correct shape { user, isAuthenticated, loading, error, login, signup, logout, refreshUser }', async () => {
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current).toHaveProperty('user');
+    expect(result.current).toHaveProperty('isAuthenticated');
+    expect(result.current).toHaveProperty('loading');
+    expect(result.current).toHaveProperty('error');
+    expect(result.current).toHaveProperty('login');
+    expect(result.current).toHaveProperty('signup');
+    expect(result.current).toHaveProperty('logout');
+    expect(result.current).toHaveProperty('refreshUser');
+    expect(typeof result.current.login).toBe('function');
+    expect(typeof result.current.signup).toBe('function');
+    expect(typeof result.current.logout).toBe('function');
+    expect(typeof result.current.refreshUser).toBe('function');
+  });
+
+  it('returns authenticated state when credentials are provided (auto-auth)', async () => {
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: createWrapper(),
+    });
+
+    // Auto-auth mode: provider calls loginUser during mount
+    await waitFor(() => {
+      expect(result.current.isAuthenticated).toBe(true);
+    });
+
+    expect(result.current.user).toEqual({
+      userId: 1,
+      username: 'testuser',
+      walletValue: 1000,
+      role: 'trader',
+    });
+    expect(loginUser).toHaveBeenCalledWith(
+      expect.anything(),
+      'testuser',
+      'testpass',
+    );
+  });
+
+  it('returns unauthenticated state when no credentials provided', async () => {
+    function GuestWrapper({ children }: { children: React.ReactNode }) {
+      return (
+        <FunctionSpaceProvider config={{ baseUrl: 'https://test.api.com' }} theme="dark">
+          {children}
+        </FunctionSpaceProvider>
+      );
+    }
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: GuestWrapper,
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.isAuthenticated).toBe(false);
+    expect(result.current.user).toBe(null);
+    expect(loginUser).not.toHaveBeenCalled();
   });
 });
