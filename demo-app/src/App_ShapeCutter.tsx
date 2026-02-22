@@ -1,5 +1,5 @@
 import { FunctionSpaceProvider } from '@functionspace/react';
-import { MarketCharts, DistributionChart, ShapeCutter, MarketStats, PositionTable, TimeSales } from '@functionspace/ui';
+import { MarketCharts, DistributionChart, ShapeCutter, MarketStats, PositionTable, TimeSales, AuthWidget } from '@functionspace/ui';
 import { ArticlePage } from './pages/ArticlePage';
 import { config, MARKET_ID, widgetTheme } from './App';
 
@@ -8,7 +8,14 @@ export default function App_ShapeCutter() {
   return (
     <ArticlePage widgetWidth="150%">
       <FunctionSpaceProvider config={config} theme={widgetTheme}>
-        <MarketStats marketId={MARKET_ID} />
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <div style={{ flex: 7, minWidth: 0 }}>
+            <MarketStats marketId={MARKET_ID} />
+          </div>
+          <div style={{ flex: 3, minWidth: 0 }}>
+            <AuthWidget />
+          </div>
+        </div>
 
         <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
           <MarketCharts marketId={MARKET_ID} height={350} views={['consensus', 'distribution', 'timeline']} />

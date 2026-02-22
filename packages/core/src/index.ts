@@ -19,6 +19,10 @@ export type {
   MarketHistory,
   PercentileSet,
   FanChartPoint,
+  UserProfile,
+  AuthResult,
+  SignupResult,
+  SignupOptions,
 } from './types.js';
 
 // Client
@@ -48,6 +52,9 @@ export { sell } from './transactions/sell.js';
 // Projections
 export { projectSell } from './projections/projectSell.js';
 export { projectPayoutCurve } from './projections/projectPayoutCurve.js';
+
+// Auth
+export { loginUser, signupUser, fetchCurrentUser, validateUsername } from './auth/auth.js';
 
 // Discovery
 export { discoverMarkets } from './discovery/markets.js';

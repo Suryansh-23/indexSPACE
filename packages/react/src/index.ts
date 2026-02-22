@@ -10,3 +10,4 @@ export { useBucketDistribution } from './useBucketDistribution.js';
 export { useMarketHistory } from './useMarketHistory.js';
 export { useDistributionState } from './useDistributionState.js';
 export type { DistributionState, DistributionStateConfig } from './useDistributionState.js';
+export { useAuth } from './useAuth.js';

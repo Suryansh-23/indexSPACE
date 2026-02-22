@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { FSClient } from '@functionspace/core';
-import type { PayoutCurve, Position } from '@functionspace/core';
+import { FSClient, loginUser, signupUser, fetchCurrentUser } from '@functionspace/core';
+import type { PayoutCurve, Position, UserProfile, SignupOptions } from '@functionspace/core';
 import { FunctionSpaceContext } from './context.js';
 
 // ── Theme Types ──
@@ -66,8 +66,9 @@ function resolveTheme(input?: FSThemeInput): FSTheme {
 export interface FunctionSpaceProviderProps {
   config: {
     baseUrl: string;
-    username: string;
-    password: string;
+    username?: string;
+    password?: string;
+    autoAuthenticate?: boolean;
   };
   theme?: FSThemeInput;
   children: React.ReactNode;
@@ -75,8 +76,10 @@ export interface FunctionSpaceProviderProps {
 
 export function FunctionSpaceProvider({ config, theme, children }: FunctionSpaceProviderProps) {
   const clientRef = useRef<FSClient | null>(null);
+  const [providerReady, setProviderReady] = useState(false);
   const [authError, setAuthError] = useState<Error | null>(null);
-  const [authenticated, setAuthenticated] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [previewBelief, setPreviewBelief] = useState<number[] | null>(null);
   const [previewPayout, setPreviewPayout] = useState<PayoutCurve | null>(null);
   const [invalidationCount, setInvalidationCount] = useState(0);
@@ -87,17 +90,101 @@ export function FunctionSpaceProvider({ config, theme, children }: FunctionSpace
     clientRef.current = new FSClient(config);
   }
 
-  // Authenticate on mount
+  const client = clientRef.current;
+
+  // Dual-mode auth on mount
   useEffect(() => {
-    const client = clientRef.current!;
-    client.authenticate()
-      .then(() => setAuthenticated(true))
-      .catch((err) => setAuthError(err));
+    const shouldAutoAuth = config.autoAuthenticate !== false && !!config.username && !!config.password;
+
+    if (shouldAutoAuth) {
+      // Auto-auth via loginUser — single request returns token + user profile
+      setAuthLoading(true);
+      loginUser(client, config.username!, config.password!)
+        .then((result) => {
+          client.setToken(result.token);
+          setUser(result.user);
+          setProviderReady(true);
+        })
+        .catch((err) => {
+          setAuthError(err instanceof Error ? err : new Error(String(err)));
+          setProviderReady(true);
+        })
+        .finally(() => setAuthLoading(false));
+    } else {
+      // Interactive mode: ready immediately, guest browsing enabled
+      setProviderReady(true);
+    }
   }, []);
 
+  // Login callback (interactive auth) — returns UserProfile for caller convenience
+  const login = useCallback(async (username: string, password: string) => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      const result = await loginUser(client, username, password);
+      client.setToken(result.token);
+      setUser(result.user);
+      setInvalidationCount((c) => c + 1);
+      return result.user;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      setAuthError(error);
+      throw error; // re-throw so AuthWidget can catch and display inline
+    } finally {
+      setAuthLoading(false);
+    }
+  }, [client]);
+
+  // Signup callback (signup → auto-login) — returns UserProfile for caller convenience
+  const signup = useCallback(async (username: string, password: string, options?: SignupOptions) => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      await signupUser(client, username, password, options);
+      // Signup returns no token — login to get session
+      const result = await loginUser(client, username, password);
+      client.setToken(result.token);
+      setUser(result.user);
+      setInvalidationCount((c) => c + 1);
+      return result.user;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      setAuthError(error);
+      throw error;
+    } finally {
+      setAuthLoading(false);
+    }
+  }, [client]);
+
+  // Logout callback
+  const logout = useCallback(() => {
+    client.clearToken();
+    setUser(null);
+    setAuthError(null);
+    setSelectedPosition(null);
+    setPreviewBelief(null);
+    setPreviewPayout(null);
+    setInvalidationCount((c) => c + 1);
+  }, [client]);
+
+  // Refresh user profile (wallet balance update after trades)
+  const refreshUser = useCallback(async () => {
+    if (!client.isAuthenticated) return;
+    try {
+      const profile = await fetchCurrentUser(client);
+      setUser(profile);
+    } catch {
+      // silently fail — wallet refresh is best-effort
+    }
+  }, [client]);
+
+  // Invalidate: increment counter + refresh user wallet when authenticated
   const invalidate = useCallback((_marketId: string | number) => {
     setInvalidationCount((c) => c + 1);
-  }, []);
+    if (client.isAuthenticated) {
+      fetchCurrentUser(client).then(setUser).catch(() => {});
+    }
+  }, [client]);
 
   // Resolve theme from preset + overrides
   const resolvedTheme = useMemo(() => resolveTheme(theme), [theme]);
@@ -115,8 +202,10 @@ export function FunctionSpaceProvider({ config, theme, children }: FunctionSpace
     '--fs-border': resolvedTheme.border,
   } as React.CSSProperties), [resolvedTheme]);
 
+  const isAuthenticated = user !== null;
+
   const contextValue = useMemo(() => ({
-    client: clientRef.current!,
+    client,
     previewBelief,
     setPreviewBelief,
     previewPayout,
@@ -125,13 +214,21 @@ export function FunctionSpaceProvider({ config, theme, children }: FunctionSpace
     invalidationCount,
     selectedPosition,
     setSelectedPosition,
-  }), [previewBelief, previewPayout, invalidate, invalidationCount, selectedPosition]);
+    user,
+    isAuthenticated,
+    authLoading,
+    authError,
+    login,
+    signup,
+    logout,
+    refreshUser,
+  }), [
+    previewBelief, previewPayout, invalidate, invalidationCount,
+    selectedPosition, user, isAuthenticated, authLoading, authError,
+    login, signup, logout, refreshUser,
+  ]);
 
-  if (authError) {
-    return <div style={{ color: 'red', padding: '1rem' }}>Authentication failed: {authError.message}</div>;
-  }
-
-  if (!authenticated) {
+  if (!providerReady) {
     return <div style={{ color: '#94a3b8', padding: '1rem' }}>Authenticating...</div>;
   }
 

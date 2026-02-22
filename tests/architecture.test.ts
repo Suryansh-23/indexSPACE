@@ -86,12 +86,15 @@ describe('SDK Architecture', () => {
 
     it('data-fetching hooks react to invalidationCount', () => {
       const reactDir = path.join(__dirname, '../packages/react/src');
-      const hookFiles = getFiles(reactDir, /^use.*\.ts$/);
+      const hookFiles = getFiles(reactDir, /^use.*\.ts$/).filter(
+        f => !path.basename(f).startsWith('useAuth')
+      );
 
       for (const file of hookFiles) {
         const content = fs.readFileSync(file, 'utf-8');
 
         // Should reference invalidationCount for cache busting
+        // (useAuth is excluded — it's a state/action hook, not data-fetching)
         expect(content).toMatch(/ctx\.invalidationCount/);
       }
     });
@@ -121,6 +124,25 @@ describe('SDK Architecture', () => {
       expect(contextFile).toMatch(/invalidationCount:\s*number/);
     });
 
+    it('context stores auth state for interactive authentication', () => {
+      const contextFile = fs.readFileSync(
+        path.join(__dirname, '../packages/react/src/context.ts'),
+        'utf-8'
+      );
+
+      // Auth state fields
+      expect(contextFile).toMatch(/user:\s*UserProfile\s*\|\s*null/);
+      expect(contextFile).toMatch(/isAuthenticated:\s*boolean/);
+      expect(contextFile).toMatch(/authLoading:\s*boolean/);
+      expect(contextFile).toMatch(/authError:\s*Error\s*\|\s*null/);
+
+      // Auth action methods
+      expect(contextFile).toMatch(/login:/);
+      expect(contextFile).toMatch(/signup:/);
+      expect(contextFile).toMatch(/logout:/);
+      expect(contextFile).toMatch(/refreshUser:/);
+    });
+
     it('context does not store market data (use hooks instead)', () => {
       const contextFile = fs.readFileSync(
         path.join(__dirname, '../packages/react/src/context.ts'),
@@ -148,6 +170,7 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('useBucketDistribution');
       expect(indexContent).toContain('useMarketHistory');
       expect(indexContent).toContain('useDistributionState');
+      expect(indexContent).toContain('useAuth');
     });
 
     it('all components are exported from ui package index', () => {
@@ -169,6 +192,16 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('TimeSales');
       expect(indexContent).toContain('BucketRangeSelector');
       expect(indexContent).toContain('BucketTradePanel');
+    });
+
+    it('AuthWidget is exported from ui package', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/ui/src/index.ts'),
+        'utf-8'
+      );
+
+      expect(indexContent).toContain('AuthWidget');
+      expect(indexContent).toContain('AuthWidgetProps');
     });
 
     it('OverlayCurve type is exported from ui package', () => {
@@ -206,6 +239,30 @@ describe('SDK Architecture', () => {
 
       expect(indexContent).toContain('calculateBucketDistribution');
       expect(indexContent).toContain('BucketData');
+    });
+
+    it('auth types are exported from core', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/core/src/index.ts'),
+        'utf-8'
+      );
+
+      expect(indexContent).toContain('UserProfile');
+      expect(indexContent).toContain('AuthResult');
+      expect(indexContent).toContain('SignupResult');
+      expect(indexContent).toContain('SignupOptions');
+    });
+
+    it('auth functions are exported from core', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/core/src/index.ts'),
+        'utf-8'
+      );
+
+      expect(indexContent).toContain('loginUser');
+      expect(indexContent).toContain('signupUser');
+      expect(indexContent).toContain('fetchCurrentUser');
+      expect(indexContent).toContain('validateUsername');
     });
 
     it('timeline core functions are exported from core', () => {

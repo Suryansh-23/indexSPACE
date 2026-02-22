@@ -3,8 +3,8 @@ import type { FSConfig } from './types.js';
 export class FSClient {
   private baseUrl: string;
   private token: string | null = null;
-  private username: string;
-  private password: string;
+  private username?: string;
+  private password?: string;
   private authenticating: Promise<void> | null = null;
 
   constructor(config: FSConfig) {
@@ -13,7 +13,31 @@ export class FSClient {
     this.password = config.password;
   }
 
+  // ── Public accessors ──
+
+  get base(): string {
+    return this.baseUrl;
+  }
+
+  get isAuthenticated(): boolean {
+    return this.token !== null;
+  }
+
+  setToken(token: string): void {
+    this.token = token;
+  }
+
+  clearToken(): void {
+    this.token = null;
+  }
+
+  // ── Authentication ──
+
   async authenticate(): Promise<void> {
+    if (!this.username || !this.password) {
+      throw new Error('Cannot authenticate: no credentials provided');
+    }
+
     const res = await fetch(`${this.baseUrl}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -37,6 +61,7 @@ export class FSClient {
 
   private async ensureAuth(): Promise<void> {
     if (this.token) return;
+    if (!this.username || !this.password) return; // guest mode: skip auto-auth
     if (!this.authenticating) {
       this.authenticating = this.authenticate().finally(() => {
         this.authenticating = null;
@@ -64,11 +89,21 @@ export class FSClient {
   ): Promise<T> {
     await this.ensureAuth();
 
+    // Guest mode: allow GET, block mutations
+    if (!this.token && method !== 'GET') {
+      throw new Error('Authentication required. Please sign in to perform this action.');
+    }
+
     const url = this.buildUrl(path, params);
     const headers: Record<string, string> = {
-      'Authorization': `Bearer ${this.token}`,
       'Content-Type': 'application/json',
     };
+
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    } else {
+      headers['X-Username'] = 'guest';
+    }
 
     const res = await fetch(url, {
       method,
@@ -76,8 +111,12 @@ export class FSClient {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
 
+    // 401 retry: only when credentials exist (guest mode cannot re-authenticate)
     if (res.status === 401 && !isRetry) {
       this.token = null;
+      if (!this.username || !this.password) {
+        throw new Error('Authentication required. Please sign in to perform this action.');
+      }
       await this.authenticate();
       return this.request<T>(method, path, body, params, true);
     }
