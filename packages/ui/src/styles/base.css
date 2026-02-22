@@ -707,6 +707,8 @@
   border: 1px solid var(--fs-border);
   border-radius: 0.5rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .fs-stats-inner {
@@ -1457,6 +1459,8 @@
   border: 1px solid var(--fs-border);
   border-radius: 0.5rem;
   padding: 1rem 1.25rem;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 /* Authenticated state — horizontal row */

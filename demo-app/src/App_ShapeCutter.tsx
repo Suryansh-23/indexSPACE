@@ -8,9 +8,13 @@ export default function App_ShapeCutter() {
   return (
     <ArticlePage widgetWidth="150%">
       <FunctionSpaceProvider config={config} theme={widgetTheme}>
-        <AuthWidget />
-        <div style={{ marginTop: '1rem' }}>
-          <MarketStats marketId={MARKET_ID} />
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <div style={{ flex: 7, minWidth: 0 }}>
+            <MarketStats marketId={MARKET_ID} />
+          </div>
+          <div style={{ flex: 3, minWidth: 0 }}>
+            <AuthWidget />
+          </div>
         </div>
 
         <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
