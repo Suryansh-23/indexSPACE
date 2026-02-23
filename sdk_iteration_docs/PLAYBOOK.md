@@ -316,7 +316,7 @@ interface RangeRegion {
 - Taper width: `(2/K) * (1 - sharpness)` — at 0, cosine taper over 2 coefficient bins; at 1, no taper (hard step).
 - EPS (out-of-range floor): `0.001 - sharpness * 0.0009` — at 0, floor is 0.001; at 1, floor is 0.0001.
 
-When `sharpness = 1`, the coefficient vector has a hard step function at the range boundaries. The actual visual sharpness on the chart depends on the rendering mode (see "Rendering Modes" below).
+When `sharpness = 1`, the coefficient vector has a hard step function at the range boundaries. The actual visual sharpness on the chart depends on the polynomial degree `K` and the density evaluation (piecewise-linear interpolation).
 
 ### When to Create a New L2 vs Call L1 Directly
 
@@ -506,6 +506,13 @@ onSuccess?.(result);       // Notify parent
 | `DistributionChart` | Distribution bar chart | Standalone chart with bucket slider |
 | `TimelineChart` | Fan chart (percentile bands over time) | Standalone chart, fetches own history data (see note below) |
 | `MarketCharts` | Tabbed chart wrapper | Combines ConsensusChart + DistributionChart + TimelineChart with tab switching |
+| `TradePanel` | Form input | Debouncing, preview sync, three-phase pattern |
+| `ShapeCutter` | Shape-based trade input | Shape definitions, two-column layout, skew/confidence sliders |
+| `BinaryPanel` | Binary yes/no trade input | X-point modes (static/variable/dynamic-mode/dynamic-mean), extends `TradeInputBaseProps`, three-phase pattern |
+| `BucketRangeSelector` | Bucket-based range selection with trade | Uses `useDistributionState` (shared or own), multi-range `buildRange`, bucket selection UI |
+| `BucketTradePanel` | Composed chart + range selector | Composes `DistributionChart` + `BucketRangeSelector` with shared `useDistributionState` (see shared state composition below) |
+| `PositionTable` | Data table | Tabbed views (Open Orders / Trade History / Market Positions), per-tab columns, pagination, row selection → chart overlay, sell actions |
+| `TimeSales` | Time & sales ticker | Uses `useTradeHistory` with `pollInterval` (default 5s), read-only market activity feed |
 
 **TimelineChart data-fetching pattern:** Unlike Consensus/Distribution (which receive shared `market` + `consensus` data as props from `MarketCharts`), `TimelineChartContent` calls `useMarketHistory` internally. This avoids fetching history data when the timeline tab isn't active. The `timeFilter` state is lifted to `MarketCharts` so it persists across tab switches.
 
@@ -520,13 +527,6 @@ const [activeTab, setActiveTab] = useState(effectiveTabs[0]);
 When adding a new tabbed widget, follow this exact pattern — do not invent a different approach.
 
 **PositionTable tab-aware data fetching:** The table uses a single `usePositions` call. When the `market-positions` tab is enabled, `username` is omitted to fetch all positions; client-side filtering derives per-tab data. Market value fetching (`projectSell`) only runs for open positions on the active tab — never for Trade History.
-| `TradePanel` | Form input | Debouncing, preview sync, three-phase pattern |
-| `ShapeCutter` | Shape-based trade input | Shape definitions, two-column layout, skew/confidence sliders |
-| `BinaryPanel` | Binary yes/no trade input | X-point modes (static/variable/dynamic-mode/dynamic-mean), extends `TradeInputBaseProps`, three-phase pattern |
-| `BucketRangeSelector` | Bucket-based range selection with trade | Uses `useDistributionState` (shared or own), multi-range `buildRange`, bucket selection UI |
-| `BucketTradePanel` | Composed chart + range selector | Composes `DistributionChart` + `BucketRangeSelector` with shared `useDistributionState` (see shared state composition below) |
-| `PositionTable` | Data table | Tabbed views (Open Orders / Trade History / Market Positions), per-tab columns, pagination, row selection → chart overlay, sell actions |
-| `TimeSales` | Time & sales ticker | Uses `useTradeHistory` with `pollInterval` (default 5s), read-only market activity feed |
 
 **Shared state composition pattern:** `BucketTradePanel` is a "composed widget" — it renders `DistributionChart` + `BucketRangeSelector` and coordinates them via a shared `useDistributionState` instance passed as a prop. This differs from context-based coordination (used by charts + trade panels). Use this pattern when two public widgets need to share derived state that isn't relevant to the broader SDK context.
 
