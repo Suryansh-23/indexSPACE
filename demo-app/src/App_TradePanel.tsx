@@ -25,7 +25,7 @@ export default function App_TradePanel() {
           </div>
         </div>
 
-        <PositionTable marketId={MARKET_ID} username={config.username} />
+        <PositionTable marketId={MARKET_ID} username={config.username} tabs={['open-orders', 'trade-history', 'market-positions']} />
       </FunctionSpaceProvider>
     </ArticlePage>
   );

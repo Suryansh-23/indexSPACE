@@ -1,5 +1,6 @@
 import { createContext } from 'react';
 import type { FSClient, PayoutCurve, Position, UserProfile, SignupOptions } from '@functionspace/core';
+import type { ChartColors } from './themes.js';
 
 export interface FSContext {
   client: FSClient;
@@ -22,6 +23,8 @@ export interface FSContext {
   signup: (username: string, password: string, options?: SignupOptions) => Promise<UserProfile>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  /** Resolved chart colors for the current theme (concrete hex values for Recharts) */
+  chartColors: ChartColors;
 }
 
 export const FunctionSpaceContext = createContext<FSContext | null>(null);

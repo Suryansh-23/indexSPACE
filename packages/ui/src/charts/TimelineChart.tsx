@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useContext, useMemo, useState } from 'react';
 import {
   ComposedChart,
   Area,
@@ -11,17 +11,16 @@ import {
 } from 'recharts';
 import { transformHistoryToFanChart } from '@functionspace/core';
 import type { MarketState, FanChartPoint } from '@functionspace/core';
-import { useMarket, useMarketHistory } from '@functionspace/react';
-import { FAN_BAND_COLORS } from '../theme.js';
+import { FunctionSpaceContext, useMarket, useMarketHistory } from '@functionspace/react';
 import '../styles/base.css';
 
-// ── Band configuration ──
+// ── Band configuration (static metadata, colors resolved at render time) ──
 
-const BANDS = [
-  { key: 'band95', label: '95% CI', dataKey: 'band95' as const, color: FAN_BAND_COLORS.band95 },
-  { key: 'band75', label: '75% CI', dataKey: 'band75' as const, color: FAN_BAND_COLORS.band75 },
-  { key: 'band50', label: '50% CI', dataKey: 'band50' as const, color: FAN_BAND_COLORS.band50 },
-  { key: 'band25', label: '25% CI', dataKey: 'band25' as const, color: FAN_BAND_COLORS.band25 },
+const BAND_DEFS = [
+  { key: 'band95', label: '95% CI', dataKey: 'band95' as const, colorKey: 'band95' as const },
+  { key: 'band75', label: '75% CI', dataKey: 'band75' as const, colorKey: 'band75' as const },
+  { key: 'band50', label: '50% CI', dataKey: 'band50' as const, colorKey: 'band50' as const },
+  { key: 'band25', label: '25% CI', dataKey: 'band25' as const, colorKey: 'band25' as const },
 ] as const;
 
 const TIME_FILTERS = [
@@ -67,8 +66,12 @@ export function TimelineChartContent({
   timeFilter,
   onTimeFilterChange,
 }: TimelineChartContentProps) {
+  const ctx = useContext(FunctionSpaceContext);
+  if (!ctx) throw new Error('TimelineChartContent must be used within FunctionSpaceProvider');
+
   const { history, loading } = useMarketHistory(marketId);
   const [hiddenBands, setHiddenBands] = useState<Set<string>>(new Set());
+  const fanBandColors = ctx.chartColors.fanBands;
 
   const { L, H } = market.config;
   const decimals = market.decimals ?? 0;
@@ -173,7 +176,7 @@ export function TimelineChartContent({
     return (
       <div className="fs-tooltip">
         <p className="fs-tooltip-label">{dateStr} {timeStr}</p>
-        <p className="fs-tooltip-row" style={{ color: FAN_BAND_COLORS.mean }}>
+        <p className="fs-tooltip-row" style={{ color: fanBandColors.mean }}>
           Mean: {point.mean.toFixed(decimals)}
         </p>
         <p className="fs-tooltip-row" style={{ color: 'var(--fs-text-secondary)' }}>
@@ -223,32 +226,32 @@ export function TimelineChartContent({
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={chartData} margin={{ top: 20, right: 15, left: 10, bottom: 30 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--fs-border)" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={ctx.chartColors.grid} vertical={false} />
 
               <XAxis
                 dataKey="timestamp"
                 type="number"
                 domain={['dataMin', 'dataMax']}
-                tick={{ fill: 'var(--fs-text-secondary)', fontSize: 11 }}
+                tick={{ fill: ctx.chartColors.axisText, fontSize: 11 }}
                 tickFormatter={formatTimestamp}
                 label={{
                   value: 'Time',
                   position: 'insideBottom',
                   offset: -15,
-                  fill: 'var(--fs-text-secondary)',
+                  fill: ctx.chartColors.axisText,
                   fontSize: 12,
                 }}
               />
 
               <YAxis
                 domain={yDomain}
-                tick={{ fill: 'var(--fs-text-secondary)', fontSize: 10 }}
+                tick={{ fill: ctx.chartColors.axisText, fontSize: 10 }}
                 tickFormatter={(v: number) => v.toFixed(decimals)}
                 label={{
                   value: `Outcome${market.xAxisUnits ? ` (${market.xAxisUnits})` : ''}`,
                   angle: -90,
                   position: 'insideLeft',
-                  fill: 'var(--fs-text-secondary)',
+                  fill: ctx.chartColors.axisText,
                   fontSize: 11,
                   dy: 50,
                 }}
@@ -256,18 +259,18 @@ export function TimelineChartContent({
 
               <Tooltip
                 content={<FanChartTooltip />}
-                cursor={{ stroke: 'var(--fs-border)', strokeWidth: 1, strokeDasharray: '4 4' }}
+                cursor={{ stroke: ctx.chartColors.crosshair, strokeWidth: 1, strokeDasharray: '4 4' }}
               />
 
               {/* Bands: widest first (95% → 25%) so narrower bands paint on top */}
-              {BANDS.map(band => (
+              {BAND_DEFS.map(band => (
                 !hiddenBands.has(band.key) && (
                   <Area
                     key={band.key}
                     type="monotone"
                     dataKey={band.dataKey}
                     stroke="none"
-                    fill={band.color}
+                    fill={fanBandColors[band.colorKey]}
                     fillOpacity={1}
                     activeDot={false}
                     isAnimationActive={false}
@@ -279,7 +282,7 @@ export function TimelineChartContent({
               <Line
                 type="monotone"
                 dataKey="mean"
-                stroke={FAN_BAND_COLORS.mean}
+                stroke={fanBandColors.mean}
                 strokeWidth={2}
                 dot={false}
                 activeDot={false}
@@ -292,7 +295,7 @@ export function TimelineChartContent({
         {/* End-of-series annotation */}
         {chartData.length > 0 && !loading && (
           <div className="fs-chart-fan-annotation">
-            <span style={{ color: FAN_BAND_COLORS.mean, fontSize: '0.6875rem', fontWeight: 600 }}>
+            <span style={{ color: fanBandColors.mean, fontSize: '0.6875rem', fontWeight: 600 }}>
               {chartData[chartData.length - 1].mean.toFixed(decimals)}
             </span>
           </div>
@@ -305,16 +308,16 @@ export function TimelineChartContent({
           className={`fs-chart-fan-legend-item`}
           style={{ cursor: 'default' }}
         >
-          <span className="fs-chart-fan-legend-swatch" style={{ background: FAN_BAND_COLORS.mean, width: '16px', height: '2px' }} />
+          <span className="fs-chart-fan-legend-swatch" style={{ background: fanBandColors.mean, width: '16px', height: '2px' }} />
           <span style={{ fontSize: '0.6875rem', color: 'var(--fs-text-secondary)' }}>Mean</span>
         </div>
-        {BANDS.map(band => (
+        {BAND_DEFS.map(band => (
           <div
             key={band.key}
             className={`fs-chart-fan-legend-item ${hiddenBands.has(band.key) ? 'hidden' : ''}`}
             onClick={() => toggleBand(band.key)}
           >
-            <span className="fs-chart-fan-legend-swatch" style={{ background: band.color }} />
+            <span className="fs-chart-fan-legend-swatch" style={{ background: fanBandColors[band.colorKey] }} />
             <span style={{ fontSize: '0.6875rem', color: 'var(--fs-text-secondary)' }}>{band.label}</span>
           </div>
         ))}

@@ -55,8 +55,8 @@ export function MyWidget({ marketId }: MyWidgetProps) {
 
 .fs-mywidget {
   background: linear-gradient(to bottom right, var(--fs-background), var(--fs-background-dark));
-  border: 1px solid var(--fs-border);
-  border-radius: 0.5rem;
+  border: var(--fs-border-width) solid var(--fs-border);
+  border-radius: var(--fs-radius-lg);
   padding: 1.5rem;
 }
 
@@ -103,6 +103,27 @@ export type { MyWidgetProps } from './{category}/index.js';
 | `--fs-text` | Primary text |
 | `--fs-text-secondary` | Muted/secondary text |
 | `--fs-border` | Borders and dividers |
+| `--fs-bg-secondary` | Secondary background (e.g., chart areas) |
+| `--fs-surface-hover` | Surface hover state |
+| `--fs-border-subtle` | Subtle border (lighter weight) |
+| `--fs-text-muted` | Muted text (lower contrast than secondary) |
+| `--fs-nav-from` | Navigation gradient start |
+| `--fs-nav-to` | Navigation gradient end |
+| `--fs-overlay` | Overlay background |
+| `--fs-input-bg` | Input field background |
+| `--fs-code-bg` | Code block background |
+| `--fs-chart-bg` | Chart area background |
+| `--fs-accent-glow` | Accent glow effect (focus rings) |
+| `--fs-badge-bg` | Badge background |
+| `--fs-badge-border` | Badge border |
+| `--fs-badge-text` | Badge text color |
+| `--fs-logo-filter` | Logo CSS filter |
+| `--fs-font-family` | Font family |
+| `--fs-radius-sm` | Small border radius |
+| `--fs-radius-md` | Medium border radius |
+| `--fs-radius-lg` | Large border radius |
+| `--fs-border-width` | Default border width |
+| `--fs-transition-speed` | Default transition duration |
 
 ### Theme Props → CSS Variables
 
@@ -119,11 +140,32 @@ When passing custom colors to `FunctionSpaceProvider`, these theme props become 
 | `text` | `--fs-text` |
 | `textSecondary` | `--fs-text-secondary` |
 | `border` | `--fs-border` |
+| `bgSecondary` | `--fs-bg-secondary` |
+| `surfaceHover` | `--fs-surface-hover` |
+| `borderSubtle` | `--fs-border-subtle` |
+| `textMuted` | `--fs-text-muted` |
+| `navFrom` | `--fs-nav-from` |
+| `navTo` | `--fs-nav-to` |
+| `overlay` | `--fs-overlay` |
+| `inputBg` | `--fs-input-bg` |
+| `codeBg` | `--fs-code-bg` |
+| `chartBg` | `--fs-chart-bg` |
+| `accentGlow` | `--fs-accent-glow` |
+| `badgeBg` | `--fs-badge-bg` |
+| `badgeBorder` | `--fs-badge-border` |
+| `badgeText` | `--fs-badge-text` |
+| `logoFilter` | `--fs-logo-filter` |
+| `fontFamily` | `--fs-font-family` |
+| `radiusSm` | `--fs-radius-sm` |
+| `radiusMd` | `--fs-radius-md` |
+| `radiusLg` | `--fs-radius-lg` |
+| `borderWidth` | `--fs-border-width` |
+| `transitionSpeed` | `--fs-transition-speed` |
 
 Example:
 ```tsx
-<FunctionSpaceProvider theme={{ preset: "dark", primary: "#ff6b6b" }}>
-  {/* --fs-primary is now #ff6b6b, other vars from dark preset */}
+<FunctionSpaceProvider theme={{ preset: "fs-dark", primary: "#ff6b6b" }}>
+  {/* --fs-primary is now #ff6b6b, other vars from fs-dark preset */}
 </FunctionSpaceProvider>
 ```
 
@@ -131,13 +173,14 @@ Example:
 
 ```css
 --fs-background-dark    /* Darker bg for gradients */
---fs-input-bg           /* Input field backgrounds */
 --fs-primary-glow       /* Focus rings, shadows */
 --fs-primary-light      /* Hover states */
 --fs-header-gradient    /* Header accent gradients */
 ```
 
-**CRITICAL:** These derived variables are computed via a shared CSS selector near the top of `base.css`. When adding a new widget that uses gradient backgrounds, input fields, or any derived variable, you **MUST** add its root class to this selector:
+**Note:** `--fs-input-bg` is no longer derived via `color-mix()` in CSS — it is now set as an explicit CSS variable via inline styles from the resolved theme (Phase 1A). Each theme preset defines its own `inputBg` token.
+
+**CRITICAL:** These derived variables are computed via a shared CSS selector near the top of `base.css`. When adding a new widget that uses gradient backgrounds or any derived variable, you **MUST** add its root class to this selector:
 
 ```css
 /* base.css — shared derived-variables selector */
@@ -152,12 +195,13 @@ Example:
 .fs-bucket-trade-panel,
 .fs-auth-widget {          /* ← add new widget roots here */
   --fs-background-dark: color-mix(in srgb, var(--fs-background) 70%, black);
-  --fs-input-bg: ...
+  --fs-primary-glow: ...
   /* etc */
+  font-family: var(--fs-font-family, inherit);
 }
 ```
 
-Without this, the widget's `var(--fs-background-dark)` etc. will resolve to nothing and all gradient backgrounds / input styling will break silently.
+Without this, the widget's `var(--fs-background-dark)` etc. will resolve to nothing and all gradient backgrounds will break silently.
 
 ### Never Hardcode Colors
 
@@ -169,14 +213,128 @@ Without this, the widget's `var(--fs-background-dark)` etc. will resolve to noth
 .my-element { color: var(--fs-primary); }
 ```
 
-### Recharts Color Constants (theme.ts)
+### Two Color Systems: CSS Variables vs Chart Colors
 
-Recharts `fill`/`stroke` props require concrete color values (CSS variables don't work). These are defined as JS constants in `packages/ui/src/theme.ts`:
+The SDK has two parallel color systems because of a Recharts limitation:
 
-- `CHART_COLORS` — consensus line, overlay, grid, etc.
-- `FAN_BAND_COLORS` — mean line + 4 graduated band fills (band25 darkest → band95 lightest)
+| Element Type | Color Source | Why |
+|-------------|-------------|-----|
+| **HTML/CSS elements** (backgrounds, borders, text, inputs) | CSS variables (`var(--fs-primary)`) | Standard CSS cascade — works everywhere |
+| **Recharts SVG elements** (line strokes, area fills, grid, axis ticks, tooltips) | `ctx.chartColors.*` (concrete hex values) | SVG `fill`/`stroke` props ignore CSS `var()` — they need literal color strings |
 
-When adding new chart colors, add them to the appropriate constant in `theme.ts` rather than inlining hex values in components.
+**Rule for new widgets:**
+- If the element is styled via CSS (`.fs-my-widget { color: ... }`) → use `var(--fs-*)` variables
+- If the element is a Recharts prop (`stroke={...}`, `fill={...}`, `tick={{ fill: ... }}`) → use `ctx.chartColors.*`
+- If the element is a custom tooltip or legend rendered as HTML inside a chart → use `ctx.chartColors.*` for consistency with the chart it belongs to
+- **Never** import from `packages/ui/src/theme.ts` — those exports are deprecated and hardcoded to FS Dark
+
+### Dynamic Chart Colors (context-based)
+
+Chart colors are resolved per-theme via `resolveChartColors()` in `packages/react/src/themes.ts` and available on the context:
+
+```typescript
+const ctx = useContext(FunctionSpaceContext);
+
+// ── Structural chart elements ──
+ctx.chartColors.grid          // CartesianGrid stroke
+ctx.chartColors.axisText      // Axis label/tick fill
+ctx.chartColors.tooltipBg     // Custom tooltip background
+ctx.chartColors.tooltipBorder // Custom tooltip border
+ctx.chartColors.tooltipText   // Custom tooltip text
+ctx.chartColors.crosshair     // Cursor/crosshair stroke
+
+// ── Data series colors ──
+ctx.chartColors.consensus     // Consensus curve stroke/fill
+ctx.chartColors.previewLine   // Trade preview line stroke
+ctx.chartColors.payout        // Payout curve color (from theme.positive)
+ctx.chartColors.positions     // Position curve colors array [positive, negative, purple, orange, ...]
+
+// ── Fan chart bands ──
+ctx.chartColors.fanBands.mean   // Mean line color
+ctx.chartColors.fanBands.band25 // Narrowest CI band (highest opacity)
+ctx.chartColors.fanBands.band50 // ...
+ctx.chartColors.fanBands.band75 // ...
+ctx.chartColors.fanBands.band95 // Widest CI band (lowest opacity)
+```
+
+### How Chart Colors Are Resolved
+
+The resolution pipeline (in `resolveChartColors()`) works in three layers:
+
+1. **Smart defaults** — derived from the resolved theme's semantic tokens:
+   - `consensus` ← `theme.primary`
+   - `previewLine` ← `theme.accent`
+   - `payout` ← `theme.positive`
+   - `grid` ← `theme.borderSubtle`
+   - `axisText` ← `theme.textMuted`
+   - `tooltipBg` ← `theme.surface`, `tooltipBorder` ← `theme.border`, `tooltipText` ← `theme.text`
+   - `crosshair` ← `theme.textSecondary`
+
+2. **Preset overrides** — each named preset can override any field (defined in `PRESET_CHART_COLORS`):
+   - FS presets override grid/tooltip values but let consensus/preview derive from theme tokens (stays blue/amber)
+   - Native presets explicitly set `consensus: '#6B7280'` and `previewLine: '#9CA3AF'` (gray, de-branded)
+   - Fan band colors are provided per preset with matching opacity variants
+
+3. **Custom overrides** — consumers can pass additional overrides that take highest precedence
+
+### Adding a New Chart Widget — Color Checklist
+
+When building a new Recharts-based widget:
+
+- [ ] Access context: `const ctx = useContext(FunctionSpaceContext)`
+- [ ] Use `ctx.chartColors.grid` for `<CartesianGrid stroke={...} />`
+- [ ] Use `ctx.chartColors.axisText` for all `<XAxis>` / `<YAxis>` tick fills and label fills
+- [ ] Use `ctx.chartColors.crosshair` for `<Tooltip cursor={{ stroke: ... }} />`
+- [ ] Build custom tooltips using `ctx.chartColors.tooltipBg`, `tooltipBorder`, `tooltipText`
+- [ ] Use `ctx.chartColors.consensus` for any data series representing market consensus
+- [ ] Use `ctx.chartColors.previewLine` for trade preview overlays
+- [ ] Use `ctx.chartColors.payout` for payout-related series
+- [ ] Use `ctx.chartColors.positions[i]` for position overlays (index 0 = positive, 1 = negative, 2+ = accent colors)
+- [ ] For SVG gradient `<defs>`, use `ctx.chartColors.*` for `stopColor` values
+- [ ] **Never** hardcode hex colors in Recharts props — they won't respond to theme changes
+- [ ] **Never** use `var(--fs-*)` in Recharts props — they resolve to empty strings in SVG
+
+### Template: Themed Chart Component
+
+```typescript
+import React, { useContext } from 'react';
+import { CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { FunctionSpaceContext } from '@functionspace/react';
+
+export function MyChart({ data }: { data: any[] }) {
+  const ctx = useContext(FunctionSpaceContext);
+  if (!ctx) throw new Error('MyChart must be used within FunctionSpaceProvider');
+
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div style={{
+        background: ctx.chartColors.tooltipBg,
+        border: `1px solid ${ctx.chartColors.tooltipBorder}`,
+        color: ctx.chartColors.tooltipText,
+        padding: '8px 12px',
+        borderRadius: '6px',
+      }}>
+        {/* tooltip content */}
+      </div>
+    );
+  };
+
+  return (
+    <ResponsiveContainer width="100%" height={300}>
+      <AreaChart data={data}>
+        <CartesianGrid strokeDasharray="3 3" stroke={ctx.chartColors.grid} vertical={false} />
+        <XAxis tick={{ fill: ctx.chartColors.axisText, fontSize: 12 }} />
+        <YAxis tick={{ fill: ctx.chartColors.axisText, fontSize: 10 }} />
+        <Tooltip content={<CustomTooltip />} cursor={{ stroke: ctx.chartColors.crosshair }} />
+        <Area stroke={ctx.chartColors.consensus} fill={ctx.chartColors.consensus} fillOpacity={0.2} />
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+}
+```
+
+**Deprecated:** `CHART_COLORS` and `FAN_BAND_COLORS` in `packages/ui/src/theme.ts` are still exported for backward compatibility but are hardcoded to FS Dark values. Do not use them in new code.
 
 ---
 
@@ -230,6 +388,7 @@ ctx.login(username, password)       // Interactive login
 ctx.signup(username, password, options?) // Interactive signup (auto-logs-in)
 ctx.logout()                        // Clear auth state
 ctx.refreshUser()                   // Refresh wallet balance
+ctx.chartColors                     // Resolved chart colors (ChartColors) for Recharts
 ```
 
 ---
@@ -788,13 +947,14 @@ packages/
 ├── react/src/
 │   ├── index.ts              # All exports
 │   ├── context.ts            # FunctionSpaceContext (FSContext interface)
-│   ├── FunctionSpaceProvider.tsx  # Provider + themes
+│   ├── themes.ts             # Theme types (FSTheme, ResolvedFSTheme, ThemePresetId) + 4 preset definitions + ChartColors + resolveChartColors
+│   ├── FunctionSpaceProvider.tsx  # Provider + theme resolution (resolveTheme, applyDefaults)
 │   ├── useAuth.ts            # Auth state/action hook (not data-fetching)
 │   ├── useDistributionState.ts  # Shared distribution state for bucket components
 │   └── use*.ts               # Data-fetching hooks (useMarket, useConsensus, usePositions, etc.)
 └── ui/src/
     ├── index.ts              # Re-exports all public components
-    ├── theme.ts              # Chart colors (CHART_COLORS, FAN_BAND_COLORS)
+    ├── theme.ts              # Deprecated static chart colors (use ctx.chartColors instead)
     ├── styles/base.css       # All widget styles
     ├── styles/slider.css     # Slider component styles
     ├── charts/               # Data visualizations
@@ -828,6 +988,7 @@ packages/
 tests/
 ├── architecture.test.ts  # Layer boundaries, hook patterns, exports
 ├── hooks.test.tsx        # React hook unit tests (jsdom)
+├── themes.test.ts        # Theme preset validation, resolveTheme behavior
 ├── shapes.test.ts        # Belief shape validation (vector properties, shape characteristics)
 ├── binary.test.ts        # Binary panel-specific tests
 ├── stage1.test.ts        # Core math functions

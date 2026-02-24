@@ -43,7 +43,7 @@ Every new function must be classifiable by both layer AND category. This keeps t
 
 ## Key Principles
 
-1. **Single entry point for theming** — Developers pass `theme="light"` or custom colors to `FunctionSpaceProvider`. All widgets inherit automatically.
+1. **Single entry point for theming** — Developers pass `theme="fs-dark"` or custom colors to `FunctionSpaceProvider`. All widgets inherit automatically.
 
 2. **No hardcoded colors** — Every color in CSS must use `var(--fs-*)` variables. This is non-negotiable.
 
@@ -84,7 +84,8 @@ Every new function must be classifiable by both layer AND category. This keeps t
 | Add a hook | `packages/react/src/` |
 | Add API/math function | `packages/core/src/` |
 | Add widget styles | `packages/ui/src/styles/base.css` |
-| Modify theme system | `packages/react/src/FunctionSpaceProvider.tsx` |
+| Modify theme system | `packages/react/src/themes.ts` (types + presets + chart colors), `packages/react/src/FunctionSpaceProvider.tsx` (resolution + provider) |
+| Modify chart colors | `packages/react/src/themes.ts` (ChartColors, resolveChartColors, preset overrides) |
 | Add/modify belief shapes | `packages/core/src/shapes/definitions.ts` + `packages/core/src/math/builders.ts` |
 | Add auth functions | `packages/core/src/auth/auth.ts` |
 | Add internal UI primitives | `packages/ui/src/components/` (not exported from package root) |
@@ -105,6 +106,7 @@ cd demo-app && npx vite build   # Build verification (required)
 | `tests/stage1.test.ts` | Core math functions | Changing belief builders or curve evaluation |
 | `tests/stage2.test.ts` | API/transaction functions | Changing buy, sell, or query functions |
 | `tests/shapes.test.ts` | Belief shape validation (vector properties, shape characteristics) | Adding new L2 builders or modifying kernel functions |
+| `tests/themes.test.ts` | Theme preset validation, resolveTheme behavior | Adding/modifying presets or theme resolution logic |
 | `tests/binary.test.ts` | Binary panel-specific tests | Changing BinaryPanel behavior or x-point modes |
 
 **When changing UI components:** Update `architecture.test.ts` if adding new exports or changing prop patterns.
@@ -123,21 +125,27 @@ Developers configure once at provider level:
 
 ```tsx
 // Simple
-<FunctionSpaceProvider config={config} theme="light">
+<FunctionSpaceProvider config={config} theme="fs-dark">
 
 // Custom
 <FunctionSpaceProvider config={config} theme={{
-  preset: "dark",
+  preset: "fs-dark",
   primary: "#brand-color"
 }}>
 ```
 
-Available presets: `"light"` | `"dark"`
+Available presets: `"fs-dark"` | `"fs-light"` | `"native-dark"` | `"native-light"`
+
+Theme types and presets are defined in `packages/react/src/themes.ts`. Resolution logic lives in `FunctionSpaceProvider.tsx`. Each preset defines all 30 tokens. Custom themes only require the 9 core tokens — the remaining 21 are derived via `applyDefaults()`.
+
+Chart colors (concrete hex values for Recharts SVG rendering) are resolved via `resolveChartColors()` and exposed on `ctx.chartColors`. Each preset has explicit chart color overrides (e.g., native themes use gray consensus instead of blue). Custom themes derive chart colors from semantic tokens (primary → consensus, accent → preview, etc.). Chart components access colors via `useContext(FunctionSpaceContext).chartColors`.
 
 ## What NOT To Do
 
 - Don't skip running tests — `npx vitest run` must pass before and after changes
 - Don't add colors as hex values in CSS — use `var(--fs-primary)` etc.
+- Don't use CSS variables in Recharts SVG props — use `ctx.chartColors.*` instead
+- Don't import from `packages/ui/src/theme.ts` — those are deprecated static values
 - Don't create new CSS files — add to `base.css`
 - Don't skip loading/error states in widgets
 - Don't forget to export from `index.ts`
@@ -145,16 +153,61 @@ Available presets: `"light"` | `"dark"`
 - Don't require consumers to wire components together — they should work automatically via context
 - Don't push SDK-level coordination state to consumers — keep it in context
 
+## Automated Reviewers
+
+The project has subagent reviewers in `.claude/agents/`. These MUST be run after relevant changes — they are not optional.
+
+### Architecture Reviewer (`.claude/agents/architecture-reviewer.md`)
+
+**Run after ANY of these changes:**
+- Adding or modifying hooks in `packages/react/src/`
+- Adding or modifying components in `packages/ui/src/`
+- Changing imports between packages (layer boundary risk)
+- Changing exports in any `index.ts` file
+- Any change that touches more than one package
+
+**What it checks:** Architecture tests, layer boundary violations, hook pattern conformance, export completeness, hardcoded colors in components, derived-variables CSS selector coverage.
+
+### Theme Reviewer (`.claude/agents/theme-reviewer.md`)
+
+**Run after ANY of these changes:**
+- Modifying `packages/react/src/themes.ts` (presets, types, chart colors)
+- Modifying `packages/react/src/FunctionSpaceProvider.tsx` (theme resolution, CSS variable injection)
+- Modifying `packages/ui/src/styles/base.css` (CSS variables, derived-variables selector)
+- Adding or modifying chart components in `packages/ui/src/charts/`
+- Adding new widget root classes (`.fs-*`)
+
+**What it checks:** Theme tests, TypeScript token ↔ CSS variable sync, preset completeness (30 tokens each), chart color resolution consistency, component chart color usage, derived-variables selector, theme resolution logic.
+
+### When to run both
+
+If a change touches both architecture (hooks, imports, exports) AND theming (CSS variables, chart colors, presets), run both reviewers.
+
+## Skills
+
+### add-hook (`.claude/skills/add-hook/SKILL.md`)
+
+Use this skill when adding a new data-fetching hook to `packages/react/src/`. It contains the exact pattern, a reference implementation (`useMarket`), and a full checklist covering: core function, hook file, exports, architecture tests, hook behavior tests, and doc updates.
+
+This skill should be invoked automatically when the task involves adding a hook — it is not restricted to manual invocation.
+
+## Commit Style
+
+- Never add `Co-Authored-By` lines to git commits.
+
 ## Keeping These Docs Current — MANDATORY
 
 **These documents are living references. They MUST be updated after every implementation.**
 
-After completing any change to the codebase, perform this two-step review:
+After completing any change to the codebase, perform this three-step review:
 
 ### Step 1: Verify compliance
 Re-read the relevant sections of CLAUDE.md and PLAYBOOK.md. Confirm the implementation followed the patterns and rules documented here. If it didn't, fix the implementation — the docs are the source of truth for how things should be built.
 
-### Step 2: Update the docs
+### Step 2: Run reviewers
+Run the appropriate automated reviewer(s) based on what changed (see Automated Reviewers section above). Fix any violations they report before considering the work complete.
+
+### Step 3: Update the docs
 If the implementation introduced anything new or improved on existing patterns, update the docs to reflect it:
 
 | What changed | Update in... |
@@ -167,5 +220,6 @@ If the implementation introduced anything new or improved on existing patterns, 
 | New pattern discovered | PLAYBOOK.md — relevant section (e.g., Common Patterns, Trade Input) |
 | New test file added | CLAUDE.md — Testing Requirements table |
 | Architecture change | CLAUDE.md — Architecture section; PLAYBOOK.md — Layer Boundaries |
+| New agent or skill added | CLAUDE.md — Automated Reviewers or Skills section |
 
 **If you added it to the code but not to the docs, the work is not done.**

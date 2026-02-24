@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useContext, useMemo, useState } from 'react';
 import {
   BarChart,
   Bar,
@@ -12,9 +12,9 @@ import {
 } from 'recharts';
 import { calculateBucketDistribution } from '@functionspace/core';
 import type { BucketData, MarketState, ConsensusCurve } from '@functionspace/core';
-import { useMarket, useConsensus } from '@functionspace/react';
+import { FunctionSpaceContext, useMarket, useConsensus } from '@functionspace/react';
+import type { ChartColors } from '@functionspace/react';
 import type { DistributionState } from '@functionspace/react';
-import { CHART_COLORS } from '../theme.js';
 import '../styles/base.css';
 
 // ── Content component (used by MarketCharts and standalone) ──
@@ -34,6 +34,9 @@ export function DistributionChartContent({
   bucketCount,
   onBucketCountChange,
 }: DistributionChartContentProps) {
+  const ctx = useContext(FunctionSpaceContext);
+  if (!ctx) throw new Error('DistributionChartContent must be used within FunctionSpaceProvider');
+
   // Smart decimals for bucket labels: use 0 if bucket width >= 1, otherwise use market.decimals
   const bucketDecimals = useMemo(() => {
     const bucketWidth = (market.config.H - market.config.L) / bucketCount;
@@ -73,7 +76,7 @@ export function DistributionChartContent({
         </div>
       </div>
       <div className="fs-chart-body" style={{ height }}>
-        <DistributionView bucketData={bucketData} market={market} />
+        <DistributionView bucketData={bucketData} market={market} chartColors={ctx.chartColors} />
       </div>
     </>
   );
@@ -84,9 +87,11 @@ export function DistributionChartContent({
 function DistributionView({
   bucketData,
   market,
+  chartColors,
 }: {
   bucketData: BucketData[];
   market: MarketState | null;
+  chartColors: ChartColors;
 }) {
   const maxPercentage = useMemo(() => {
     if (!bucketData.length) return 10;
@@ -122,15 +127,12 @@ function DistributionView({
         <p className="fs-tooltip-label">
           Range: {data.range}{market?.xAxisUnits ? ` ${market.xAxisUnits}` : ''}
         </p>
-        <p className="fs-tooltip-row" style={{ color: CHART_COLORS.consensus }}>
+        <p className="fs-tooltip-row" style={{ color: chartColors.consensus }}>
           Probability: {data.percentage.toFixed(1)}%
         </p>
       </div>
     );
   };
-
-  // Use a lighter variant of primary for the peak bar
-  const peakColor = '#60a5fa';
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -141,29 +143,29 @@ function DistributionView({
       >
         <CartesianGrid
           strokeDasharray="3 3"
-          stroke="var(--fs-border)"
+          stroke={chartColors.grid}
           horizontal={true}
           vertical={false}
         />
         <XAxis
           type="number"
           domain={[0, Math.ceil(maxPercentage * 1.15)]}
-          tick={{ fill: 'var(--fs-text-secondary)', fontSize: 11 }}
+          tick={{ fill: chartColors.axisText, fontSize: 11 }}
           tickFormatter={(v: number) => `${v.toFixed(0)}%`}
-          axisLine={{ stroke: 'var(--fs-border)' }}
-          tickLine={{ stroke: 'var(--fs-border)' }}
+          axisLine={{ stroke: chartColors.grid }}
+          tickLine={{ stroke: chartColors.grid }}
         />
         <YAxis
           type="category"
           dataKey="range"
           width={65}
-          tick={{ fill: 'var(--fs-text-secondary)', fontSize: 11 }}
-          axisLine={{ stroke: 'var(--fs-border)' }}
+          tick={{ fill: chartColors.axisText, fontSize: 11 }}
+          axisLine={{ stroke: chartColors.grid }}
           tickLine={false}
         />
         <Tooltip
           content={<DistributionTooltip />}
-          cursor={{ fill: 'rgba(59, 130, 246, 0.1)' }}
+          cursor={{ fill: `${chartColors.consensus}1a` }}
         />
         <Bar
           dataKey="percentage"
@@ -173,7 +175,7 @@ function DistributionView({
           {bucketData.map((_entry, index) => (
             <Cell
               key={`cell-${index}`}
-              fill={index === peakBucketIdx ? peakColor : CHART_COLORS.consensus}
+              fill={chartColors.consensus}
               fillOpacity={index === peakBucketIdx ? 1 : 0.8}
             />
           ))}
@@ -181,7 +183,7 @@ function DistributionView({
             dataKey="percentage"
             position="right"
             formatter={(v: number) => `${v.toFixed(0)}%`}
-            fill="var(--fs-text-secondary)"
+            fill={chartColors.axisText}
             fontSize={11}
           />
         </Bar>

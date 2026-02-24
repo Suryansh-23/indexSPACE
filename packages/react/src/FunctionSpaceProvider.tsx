@@ -2,63 +2,72 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { FSClient, loginUser, signupUser, fetchCurrentUser } from '@functionspace/core';
 import type { PayoutCurve, Position, UserProfile, SignupOptions } from '@functionspace/core';
 import { FunctionSpaceContext } from './context.js';
+import {
+  FS_DARK, FS_LIGHT, NATIVE_DARK, NATIVE_LIGHT,
+  resolveChartColors, getPresetChartColors,
+  type FSTheme, type ResolvedFSTheme, type ThemePresetId,
+} from './themes.js';
 
-// ── Theme Types ──
+// Re-export theme types from themes.ts for backward compat
+export type { FSTheme, ResolvedFSTheme, ThemePresetId } from './themes.js';
 
-export interface FSTheme {
-  primary: string;
-  accent: string;
-  positive: string;
-  negative: string;
-  background: string;
-  surface: string;
-  text: string;
-  textSecondary: string;
-  border: string;
-}
-
-export type ThemePreset = 'light' | 'dark';
+// ── Theme Input Type ──
 
 export type FSThemeInput =
-  | ThemePreset
-  | (Partial<FSTheme> & { preset?: ThemePreset });
-
-// ── Theme Presets ──
-
-export const DARK_THEME: FSTheme = {
-  primary: '#3b82f6',
-  accent: '#fbbf24',
-  positive: '#10b981',
-  negative: '#f43f5e',
-  background: '#0f1729',
-  surface: '#1a2332',
-  text: '#ffffff',
-  textSecondary: '#94a3b8',
-  border: '#2d3748',
-};
-
-export const LIGHT_THEME: FSTheme = {
-  primary: '#2563eb',
-  accent: '#f59e0b',
-  positive: '#059669',
-  negative: '#dc2626',
-  background: '#ffffff',
-  surface: '#f8fafc',
-  text: '#0f172a',
-  textSecondary: '#64748b',
-  border: '#e2e8f0',
-};
+  | ThemePresetId
+  | (Partial<FSTheme> & { preset?: ThemePresetId });
 
 // ── Theme Resolution ──
 
-function resolveTheme(input?: FSThemeInput): FSTheme {
-  if (!input) return DARK_THEME;
-  if (input === 'light') return LIGHT_THEME;
-  if (input === 'dark') return DARK_THEME;
+const PRESET_MAP: Record<ThemePresetId, ResolvedFSTheme> = {
+  'fs-dark': FS_DARK,
+  'fs-light': FS_LIGHT,
+  'native-dark': NATIVE_DARK,
+  'native-light': NATIVE_LIGHT,
+};
 
-  const base = input.preset === 'light' ? LIGHT_THEME : DARK_THEME;
+function applyDefaults(theme: FSTheme): ResolvedFSTheme {
+  return {
+    ...theme,
+    bgSecondary:     theme.bgSecondary     ?? theme.background,
+    surfaceHover:    theme.surfaceHover    ?? theme.surface,
+    borderSubtle:    theme.borderSubtle    ?? theme.border,
+    textMuted:       theme.textMuted       ?? theme.textSecondary,
+    navFrom:         theme.navFrom         ?? theme.background,
+    navTo:           theme.navTo           ?? theme.background,
+    overlay:         theme.overlay         ?? 'rgba(0,0,0,0.2)',
+    inputBg:         theme.inputBg         ?? theme.background,
+    codeBg:          theme.codeBg          ?? theme.background,
+    chartBg:         theme.chartBg         ?? theme.background,
+    accentGlow:      theme.accentGlow      ?? 'rgba(59,130,246,0.25)',
+    badgeBg:         theme.badgeBg         ?? 'rgba(128,128,128,0.15)',
+    badgeBorder:     theme.badgeBorder     ?? 'rgba(128,128,128,0.25)',
+    badgeText:       theme.badgeText       ?? theme.textSecondary,
+    logoFilter:      theme.logoFilter      ?? 'none',
+    fontFamily:      theme.fontFamily      ?? 'inherit',
+    radiusSm:        theme.radiusSm        ?? '0.375rem',
+    radiusMd:        theme.radiusMd        ?? '0.75rem',
+    radiusLg:        theme.radiusLg        ?? '1rem',
+    borderWidth:     theme.borderWidth     ?? '1px',
+    transitionSpeed: theme.transitionSpeed ?? '200ms',
+  };
+}
+
+export function resolveTheme(input?: FSThemeInput): ResolvedFSTheme {
+  if (!input) return FS_DARK;
+
+  if (typeof input === 'string') {
+    return PRESET_MAP[input] ?? FS_DARK;
+  }
+
   const { preset, ...overrides } = input;
-  return { ...base, ...overrides };
+  if (preset) {
+    const base = PRESET_MAP[preset] ?? FS_DARK;
+    return applyDefaults({ ...base, ...overrides });
+  }
+
+  // No preset — apply defaults to derive optional tokens from core 9
+  return applyDefaults(overrides as FSTheme);
 }
 
 // ── Provider Props ──
@@ -189,17 +198,47 @@ export function FunctionSpaceProvider({ config, theme, children }: FunctionSpace
   // Resolve theme from preset + overrides
   const resolvedTheme = useMemo(() => resolveTheme(theme), [theme]);
 
-  // CSS custom properties
+  // Determine if input is a named preset (for chart color overrides)
+  const presetId = typeof theme === 'string' ? theme : theme?.preset;
+  const presetChartOverrides = presetId ? getPresetChartColors(presetId as ThemePresetId) : undefined;
+
+  const resolvedChartColors = useMemo(
+    () => resolveChartColors(resolvedTheme, presetChartOverrides),
+    [resolvedTheme, presetChartOverrides]
+  );
+
+  // CSS custom properties (all 30 tokens)
   const style = useMemo(() => ({
-    '--fs-primary': resolvedTheme.primary,
-    '--fs-accent': resolvedTheme.accent,
-    '--fs-positive': resolvedTheme.positive,
-    '--fs-negative': resolvedTheme.negative,
-    '--fs-background': resolvedTheme.background,
-    '--fs-surface': resolvedTheme.surface,
-    '--fs-text': resolvedTheme.text,
-    '--fs-text-secondary': resolvedTheme.textSecondary,
-    '--fs-border': resolvedTheme.border,
+    '--fs-primary':          resolvedTheme.primary,
+    '--fs-accent':           resolvedTheme.accent,
+    '--fs-positive':         resolvedTheme.positive,
+    '--fs-negative':         resolvedTheme.negative,
+    '--fs-background':       resolvedTheme.background,
+    '--fs-surface':          resolvedTheme.surface,
+    '--fs-text':             resolvedTheme.text,
+    '--fs-text-secondary':   resolvedTheme.textSecondary,
+    '--fs-border':           resolvedTheme.border,
+    '--fs-bg-secondary':     resolvedTheme.bgSecondary,
+    '--fs-surface-hover':    resolvedTheme.surfaceHover,
+    '--fs-border-subtle':    resolvedTheme.borderSubtle,
+    '--fs-text-muted':       resolvedTheme.textMuted,
+    '--fs-nav-from':         resolvedTheme.navFrom,
+    '--fs-nav-to':           resolvedTheme.navTo,
+    '--fs-overlay':          resolvedTheme.overlay,
+    '--fs-input-bg':         resolvedTheme.inputBg,
+    '--fs-code-bg':          resolvedTheme.codeBg,
+    '--fs-chart-bg':         resolvedTheme.chartBg,
+    '--fs-accent-glow':      resolvedTheme.accentGlow,
+    '--fs-badge-bg':         resolvedTheme.badgeBg,
+    '--fs-badge-border':     resolvedTheme.badgeBorder,
+    '--fs-badge-text':       resolvedTheme.badgeText,
+    '--fs-logo-filter':      resolvedTheme.logoFilter,
+    '--fs-font-family':      resolvedTheme.fontFamily,
+    '--fs-radius-sm':        resolvedTheme.radiusSm,
+    '--fs-radius-md':        resolvedTheme.radiusMd,
+    '--fs-radius-lg':        resolvedTheme.radiusLg,
+    '--fs-border-width':     resolvedTheme.borderWidth,
+    '--fs-transition-speed': resolvedTheme.transitionSpeed,
   } as React.CSSProperties), [resolvedTheme]);
 
   const isAuthenticated = user !== null;
@@ -222,10 +261,11 @@ export function FunctionSpaceProvider({ config, theme, children }: FunctionSpace
     signup,
     logout,
     refreshUser,
+    chartColors: resolvedChartColors,
   }), [
     previewBelief, previewPayout, invalidate, invalidationCount,
     selectedPosition, user, isAuthenticated, authLoading, authError,
-    login, signup, logout, refreshUser,
+    login, signup, logout, refreshUser, resolvedChartColors,
   ]);
 
   if (!providerReady) {

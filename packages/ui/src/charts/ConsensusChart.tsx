@@ -13,7 +13,6 @@ import { evaluateDensityCurve } from '@functionspace/core';
 import type { MarketState, ConsensusCurve } from '@functionspace/core';
 import { FunctionSpaceContext, useMarket, useConsensus } from '@functionspace/react';
 import type { OverlayCurve } from './types.js';
-import { CHART_COLORS } from '../theme.js';
 import '../styles/base.css';
 
 // ── Content component (used by MarketCharts and standalone) ──
@@ -146,28 +145,28 @@ export function ConsensusChartContent({
         {payload.map((entry: any, i: number) => {
           if (entry.dataKey === 'consensus') {
             return (
-              <p key={i} className="fs-tooltip-row" style={{ color: CHART_COLORS.consensus }}>
+              <p key={i} className="fs-tooltip-row" style={{ color: ctx.chartColors.consensus }}>
                 Market Consensus: {entry.value?.toFixed(4)}
               </p>
             );
           }
           if (entry.dataKey === 'preview') {
             return (
-              <p key={i} className="fs-tooltip-row" style={{ color: CHART_COLORS.preview }}>
+              <p key={i} className="fs-tooltip-row" style={{ color: ctx.chartColors.previewLine }}>
                 Trade Preview: {entry.value?.toFixed(4)}
               </p>
             );
           }
           if (entry.dataKey === 'selected') {
             return (
-              <p key={i} className="fs-tooltip-row" style={{ color: '#10b981' }}>
+              <p key={i} className="fs-tooltip-row" style={{ color: ctx.chartColors.positions[0] }}>
                 Selected Position: {entry.value?.toFixed(4)}
               </p>
             );
           }
           if (entry.dataKey === 'payout' && entry.value > 0) {
             return (
-              <p key={i} className="fs-tooltip-row" style={{ color: CHART_COLORS.payout }}>
+              <p key={i} className="fs-tooltip-row" style={{ color: ctx.chartColors.payout }}>
                 Potential Payout: ${entry.value?.toFixed(2)}
               </p>
             );
@@ -176,7 +175,7 @@ export function ConsensusChartContent({
           const overlay = overlayCurves?.find(o => o.id === entry.dataKey);
           if (overlay && entry.value !== undefined) {
             return (
-              <p key={i} className="fs-tooltip-row" style={{ color: overlay.color || CHART_COLORS.payout }}>
+              <p key={i} className="fs-tooltip-row" style={{ color: overlay.color || ctx.chartColors.payout }}>
                 {overlay.label}: {entry.value?.toFixed(4)}
               </p>
             );
@@ -193,39 +192,39 @@ export function ConsensusChartContent({
         <ComposedChart data={chartData} margin={{ top: 25, right: 15, left: 10, bottom: 30 }}>
           <defs>
             <linearGradient id="fsConsensusGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={CHART_COLORS.consensus} stopOpacity={0.4} />
-              <stop offset="95%" stopColor={CHART_COLORS.consensus} stopOpacity={0.05} />
+              <stop offset="5%" stopColor={ctx.chartColors.consensus} stopOpacity={0.4} />
+              <stop offset="95%" stopColor={ctx.chartColors.consensus} stopOpacity={0.05} />
             </linearGradient>
             <linearGradient id="fsPreviewGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={CHART_COLORS.preview} stopOpacity={0.3} />
-              <stop offset="95%" stopColor={CHART_COLORS.preview} stopOpacity={0.0} />
+              <stop offset="5%" stopColor={ctx.chartColors.previewLine} stopOpacity={0.3} />
+              <stop offset="95%" stopColor={ctx.chartColors.previewLine} stopOpacity={0.0} />
             </linearGradient>
             <linearGradient id="fsSelectedGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+              <stop offset="5%" stopColor={ctx.chartColors.positions[0]} stopOpacity={0.3} />
+              <stop offset="95%" stopColor={ctx.chartColors.positions[0]} stopOpacity={0.0} />
             </linearGradient>
             {/* Dynamic gradients for overlay curves */}
             {overlayCurves?.map((overlay) => (
               <linearGradient key={`grad-${overlay.id}`} id={`fsOverlayGrad-${overlay.id}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={overlay.color || CHART_COLORS.payout} stopOpacity={0.3} />
-                <stop offset="95%" stopColor={overlay.color || CHART_COLORS.payout} stopOpacity={0.0} />
+                <stop offset="5%" stopColor={overlay.color || ctx.chartColors.payout} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={overlay.color || ctx.chartColors.payout} stopOpacity={0.0} />
               </linearGradient>
             ))}
           </defs>
 
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--fs-border)" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke={ctx.chartColors.grid} vertical={false} />
 
           <XAxis
             dataKey="x"
             type="number"
             domain={['dataMin', 'dataMax']}
-            tick={{ fill: 'var(--fs-text-secondary)', fontSize: 12 }}
+            tick={{ fill: ctx.chartColors.axisText, fontSize: 12 }}
             tickFormatter={(v: number) => v.toFixed(1)}
             label={{
               value: `Outcome${market?.xAxisUnits ? ` (${market.xAxisUnits})` : ''}`,
               position: 'insideBottom',
               offset: -15,
-              fill: 'var(--fs-text-secondary)',
+              fill: ctx.chartColors.axisText,
               fontSize: 12,
             }}
           />
@@ -233,13 +232,13 @@ export function ConsensusChartContent({
           <YAxis
             yAxisId="left"
             domain={densityDomain}
-            tick={{ fill: 'var(--fs-text-secondary)', fontSize: 10 }}
+            tick={{ fill: ctx.chartColors.axisText, fontSize: 10 }}
             tickFormatter={(v: number) => v.toFixed(3)}
             label={{
               value: 'Probability Density',
               angle: -90,
               position: 'insideLeft',
-              fill: 'var(--fs-text-secondary)',
+              fill: ctx.chartColors.axisText,
               fontSize: 11,
               dy: 50,
             }}
@@ -256,17 +255,17 @@ export function ConsensusChartContent({
 
           <Tooltip
             content={<CustomTooltip />}
-            cursor={{ stroke: 'var(--fs-border)', strokeWidth: 1, strokeDasharray: '4 4' }}
+            cursor={{ stroke: ctx.chartColors.crosshair, strokeWidth: 1, strokeDasharray: '4 4' }}
           />
 
           <Legend
             wrapperStyle={{ paddingTop: '10px' }}
             formatter={(value: string) => {
-              if (value === 'consensus') return <span style={{ color: CHART_COLORS.consensus, fontSize: '0.75rem' }}>Market Consensus</span>;
-              if (value === 'preview') return <span style={{ color: CHART_COLORS.preview, fontSize: '0.75rem' }}>Trade Preview</span>;
-              if (value === 'selected') return <span style={{ color: '#10b981', fontSize: '0.75rem' }}>Selected Position</span>;
+              if (value === 'consensus') return <span style={{ color: ctx.chartColors.consensus, fontSize: '0.75rem' }}>Market Consensus</span>;
+              if (value === 'preview') return <span style={{ color: ctx.chartColors.previewLine, fontSize: '0.75rem' }}>Trade Preview</span>;
+              if (value === 'selected') return <span style={{ color: ctx.chartColors.positions[0], fontSize: '0.75rem' }}>Selected Position</span>;
               const overlay = overlayCurves?.find(o => o.id === value);
-              if (overlay) return <span style={{ color: overlay.color || CHART_COLORS.payout, fontSize: '0.75rem' }}>{overlay.label}</span>;
+              if (overlay) return <span style={{ color: overlay.color || ctx.chartColors.payout, fontSize: '0.75rem' }}>{overlay.label}</span>;
               return null;
             }}
           />
@@ -276,7 +275,7 @@ export function ConsensusChartContent({
             yAxisId="left"
             type="monotone"
             dataKey="consensus"
-            stroke={CHART_COLORS.consensus}
+            stroke={ctx.chartColors.consensus}
             strokeWidth={2}
             fillOpacity={1}
             fill="url(#fsConsensusGrad)"
@@ -290,7 +289,7 @@ export function ConsensusChartContent({
               yAxisId="left"
               type="linear"
               dataKey="preview"
-              stroke={CHART_COLORS.preview}
+              stroke={ctx.chartColors.previewLine}
               strokeWidth={2}
               strokeDasharray="5 5"
               fillOpacity={1}
@@ -306,7 +305,7 @@ export function ConsensusChartContent({
               yAxisId="left"
               type="monotone"
               dataKey="selected"
-              stroke="#10b981"
+              stroke={ctx.chartColors.positions[0]}
               strokeWidth={2}
               fillOpacity={1}
               fill="url(#fsSelectedGrad)"
@@ -337,7 +336,7 @@ export function ConsensusChartContent({
               yAxisId="left"
               type="monotone"
               dataKey={overlay.id}
-              stroke={overlay.color || CHART_COLORS.payout}
+              stroke={overlay.color || ctx.chartColors.payout}
               strokeWidth={2}
               fillOpacity={1}
               fill={`url(#fsOverlayGrad-${overlay.id})`}

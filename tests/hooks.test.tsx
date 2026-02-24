@@ -45,7 +45,7 @@ const mockConfig = {
 function createWrapper() {
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return (
-      <FunctionSpaceProvider config={mockConfig} theme="dark">
+      <FunctionSpaceProvider config={mockConfig} theme="fs-dark">
         {children}
       </FunctionSpaceProvider>
     );
@@ -897,7 +897,7 @@ describe('useAuth hook', () => {
   it('returns unauthenticated state when no credentials provided', async () => {
     function GuestWrapper({ children }: { children: React.ReactNode }) {
       return (
-        <FunctionSpaceProvider config={{ baseUrl: 'https://test.api.com' }} theme="dark">
+        <FunctionSpaceProvider config={{ baseUrl: 'https://test.api.com' }} theme="fs-dark">
           {children}
         </FunctionSpaceProvider>
       );

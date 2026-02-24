@@ -10,9 +10,9 @@ export const config = {
 export const MARKET_ID = import.meta.env.VITE_FS_MARKET_ID;
 
 // ── Theme Options ──
-export const widgetTheme: FSThemeInput = "dark";
+export const widgetTheme: FSThemeInput = "fs-dark";
 // export const widgetTheme: FSThemeInput = {
-//   preset: 'dark',              // Start from dark or light base
+//   preset: 'fs-dark',           // Start from a preset base
 //   primary: '#ff00ff',          // Magenta - main accent color
 //   accent: '#00ffff',           // Cyan - secondary accent
 //   positive: '#39ff14',         // Neon green - profit/success

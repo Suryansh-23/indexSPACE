@@ -173,6 +173,43 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('useAuth');
     });
 
+    it('react index exports new theme presets and types', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/react/src/index.ts'), 'utf-8'
+      );
+      expect(indexContent).toContain('FS_DARK');
+      expect(indexContent).toContain('FS_LIGHT');
+      expect(indexContent).toContain('NATIVE_DARK');
+      expect(indexContent).toContain('NATIVE_LIGHT');
+      expect(indexContent).toContain('THEME_PRESETS');
+      expect(indexContent).toContain('ThemePresetId');
+      expect(indexContent).toContain('ResolvedFSTheme');
+      expect(indexContent).toContain('resolveTheme');
+    });
+
+    it('react index exports ChartColors type and resolveChartColors', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/react/src/index.ts'), 'utf-8'
+      );
+      expect(indexContent).toContain('ChartColors');
+      expect(indexContent).toContain('resolveChartColors');
+    });
+
+    it('context interface includes chartColors', () => {
+      const contextFile = fs.readFileSync(
+        path.join(__dirname, '../packages/react/src/context.ts'), 'utf-8'
+      );
+      expect(contextFile).toMatch(/chartColors.*ChartColors/);
+    });
+
+    it('react index does not export old DARK_THEME/LIGHT_THEME (clean break)', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/react/src/index.ts'), 'utf-8'
+      );
+      expect(indexContent).not.toMatch(/\bDARK_THEME\b/);
+      expect(indexContent).not.toMatch(/\bLIGHT_THEME\b/);
+    });
+
     it('all components are exported from ui package index', () => {
       const indexContent = fs.readFileSync(
         path.join(__dirname, '../packages/ui/src/index.ts'),
