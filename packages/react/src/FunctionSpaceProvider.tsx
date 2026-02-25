@@ -269,7 +269,7 @@ export function FunctionSpaceProvider({ config, theme, children }: FunctionSpace
   ]);
 
   if (!providerReady) {
-    return <div style={{ color: '#94a3b8', padding: '1rem' }}>Authenticating...</div>;
+    return <div style={{ color: 'var(--fs-text-secondary)', padding: '1rem' }}>Authenticating...</div>;
   }
 
   return (

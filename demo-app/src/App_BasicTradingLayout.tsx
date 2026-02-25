@@ -3,17 +3,21 @@ import { ConsensusChart, TradePanel, MarketStats, PositionTable, AuthWidget } fr
 import { ArticlePage } from './pages/ArticlePage';
 import { config, MARKET_ID, widgetTheme } from './App';
 
-const CHART_RATIO = 2.2;
-const PANEL_RATIO = 1;
+const CHART_RATIO = 7
+const PANEL_RATIO = 3;
 
-// TradePanel beside chart (original layout)
-export default function App_TradePanel() {
+// Basic trading layout: TradePanel beside chart
+export default function App_BasicTradingLayout() {
   return (
-    <ArticlePage>
+    <ArticlePage widgetWidth='150%'>
       <FunctionSpaceProvider config={config} theme={widgetTheme}>
-        <AuthWidget />
-        <div style={{ marginTop: '1rem' }}>
-          <MarketStats marketId={MARKET_ID} />
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <div style={{ flex: 7, minWidth: 0 }}>
+            <MarketStats marketId={MARKET_ID} />
+          </div>
+          <div style={{ flex: 3, minWidth: 0 }}>
+            <AuthWidget />
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', marginBottom: '1rem', minHeight: '520px' }}>

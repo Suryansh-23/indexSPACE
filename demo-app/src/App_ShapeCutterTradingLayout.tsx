@@ -3,8 +3,8 @@ import { MarketCharts, DistributionChart, ShapeCutter, MarketStats, PositionTabl
 import { ArticlePage } from './pages/ArticlePage';
 import { config, MARKET_ID, widgetTheme } from './App';
 
-// Chart full width with tabs, ShapeCutter below, distribution-only chart at bottom
-export default function App_ShapeCutter() {
+// ShapeCutter trading layout: chart with tabs, ShapeCutter below
+export default function App_ShapeCutterTradingLayout() {
   return (
     <ArticlePage widgetWidth="150%">
       <FunctionSpaceProvider config={config} theme={widgetTheme}>
@@ -25,9 +25,8 @@ export default function App_ShapeCutter() {
           <ShapeCutter marketId={MARKET_ID} />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr' }}>
           <PositionTable marketId={MARKET_ID} username={config.username} tabs={['open-orders', 'trade-history', 'market-positions']} />
-          <TimeSales marketId={MARKET_ID} />
         </div>
 
       </FunctionSpaceProvider>

@@ -197,9 +197,9 @@
 /* DEMO: Enable the below to wrap the widget in a container for styling */
 
 .fs-widget-container {
-  background: #0f1729;
+  background: #050816;
   border-radius: 0.75rem;
-  border: 1px solid #2d3748;
+  border: 1px solid #1f2937;
   padding: 1.25rem;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
 }
