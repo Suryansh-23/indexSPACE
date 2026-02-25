@@ -274,9 +274,9 @@ export function ShapeCutter({
   return (
     <div className="fs-shape-cutter">
       <form className="fs-trade-form" onSubmit={handleSubmit}>
-        {/* Row 1: Trade summary (left) + Sliders (right) */}
+        {/* Main area: Controls (left) + Strategy Geometry (right) */}
         <div className="fs-sc-columns">
-          {/* Left: Trade summary + peakBias overflow */}
+          {/* Left: Trade summary + all sliders */}
           <div className="fs-sc-left">
             <div className="fs-sc-summary">
               <div className="fs-sc-summary-header">Trade Summary</div>
@@ -302,159 +302,160 @@ export function ShapeCutter({
               </div>
             </div>
 
-            {/* Extra slider slot — always rendered for consistent height, hidden when unused */}
-            <div style={{ visibility: needs('peakBias') || needs('skewAmount') ? 'visible' : 'hidden' }}>
-              {needs('peakBias') ? (
-                <div className="fs-slider-group">
-                  <div className="fs-slider-header">
-                    <span className="fs-slider-label">Peak Balance</span>
-                  </div>
-                  <Slider
-                    min={0}
-                    max={100}
-                    value={peakBias}
-                    onChange={setPeakBias}
-                    step={1}
-                    disabled={isSubmitting}
-                    showTrack={false}
-                  />
-                  <div className="fs-slider-bounds">
-                    <span>Left Peak</span>
-                    <span>Right Peak</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="fs-slider-group">
-                  <div className="fs-slider-header">
-                    <span className="fs-slider-label">Skew Intensity</span>
-                  </div>
-                  <Slider
-                    min={0}
-                    max={100}
-                    value={skewAmount}
-                    onChange={setSkewAmount}
-                    step={1}
-                    disabled={isSubmitting}
-                  />
-                  <div className="fs-slider-bounds">
-                    <span>Symmetric</span>
-                    <span>Heavy Skew</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right: Parameter sliders — all slots always rendered for consistent height */}
-          <div className="fs-sc-controls">
-            {/* Slot 1: Target outcome OR Range — share the same position */}
-            <div style={{ visibility: needs('targetOutcome') || needs('rangeValues') ? 'visible' : 'hidden' }}>
-              {needs('rangeValues') ? (
-                <div className="fs-slider-group">
-                  <div className="fs-slider-header">
-                    <span className="fs-slider-label">{selectedShape === 'bimodal' ? 'Select Peaks' : 'Select Range'}</span>
-                  </div>
-                  {market && rangeValues && (
-                    <div className="fs-range-inline">
-                      <span className="fs-range-value">{Math.round(rangeValues[0])}</span>
-                      <RangeSlider
-                        min={market.config.L}
-                        max={market.config.H}
-                        values={rangeValues}
-                        onChange={setRangeValues}
-                        step={getStep()}
-                        disabled={isSubmitting}
-                        showTrack={selectedShape !== 'bimodal'}
-                      />
-                      <span className="fs-range-value">{Math.round(rangeValues[1])}</span>
+            {/* All sliders consolidated in left column */}
+            <div className="fs-sc-controls">
+              {/* Slot 1: Target outcome OR Range */}
+              <div style={{ visibility: needs('targetOutcome') || needs('rangeValues') ? 'visible' : 'hidden' }}>
+                {needs('rangeValues') ? (
+                  <div className="fs-slider-group">
+                    <div className="fs-slider-header">
+                      <span className="fs-slider-label">{selectedShape === 'bimodal' ? 'Select Peaks' : 'Select Range'}</span>
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div className="fs-slider-group">
-                  <div className="fs-slider-header">
-                    <span className="fs-slider-label">Target Outcome</span>
-                    {market && targetOutcome !== null && (
-                      <span className="fs-slider-value">{targetOutcome.toFixed(1)}</span>
+                    {market && rangeValues && (
+                      <div className="fs-range-inline">
+                        <span className="fs-range-value">{Math.round(rangeValues[0])}</span>
+                        <RangeSlider
+                          min={market.config.L}
+                          max={market.config.H}
+                          values={rangeValues}
+                          onChange={setRangeValues}
+                          step={getStep()}
+                          disabled={isSubmitting}
+                          showTrack={selectedShape !== 'bimodal'}
+                        />
+                        <span className="fs-range-value">{Math.round(rangeValues[1])}</span>
+                      </div>
                     )}
                   </div>
-                  {market && targetOutcome !== null && (
-                    <>
-                      <Slider
-                        min={market.config.L}
-                        max={market.config.H}
-                        value={targetOutcome}
-                        onChange={setTargetOutcome}
-                        step={getStep()}
-                        disabled={isSubmitting || !needs('targetOutcome')}
-                      />
-                      <div className="fs-slider-bounds">
-                        <span>{market.config.L}</span>
-                        <span>{market.config.H}</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
+                ) : (
+                  <div className="fs-slider-group">
+                    <div className="fs-slider-header">
+                      <span className="fs-slider-label">Target Outcome</span>
+                      {market && targetOutcome !== null && (
+                        <span className="fs-slider-value">{targetOutcome.toFixed(1)}</span>
+                      )}
+                    </div>
+                    {market && targetOutcome !== null && (
+                      <>
+                        <Slider
+                          min={market.config.L}
+                          max={market.config.H}
+                          value={targetOutcome}
+                          onChange={setTargetOutcome}
+                          step={getStep()}
+                          disabled={isSubmitting || !needs('targetOutcome')}
+                        />
+                        <div className="fs-slider-bounds">
+                          <span>{market.config.L}</span>
+                          <span>{market.config.H}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
 
-            {/* Slot 2: Confidence slider — always rendered */}
-            <div style={{ visibility: needs('confidence') ? 'visible' : 'hidden' }}>
-              <div className="fs-slider-group">
-                <div className="fs-slider-header">
-                  <span className="fs-slider-label">Confidence</span>
-                  <span className="fs-slider-value">{confidence}%</span>
+              {/* Slot 2: Confidence */}
+              <div style={{ visibility: needs('confidence') ? 'visible' : 'hidden' }}>
+                <div className="fs-slider-group">
+                  <div className="fs-slider-header">
+                    <span className="fs-slider-label">Confidence</span>
+                    <span className="fs-slider-value">{confidence}%</span>
+                  </div>
+                  <Slider
+                    min={0}
+                    max={100}
+                    value={confidence}
+                    onChange={setConfidence}
+                    step={1}
+                    disabled={isSubmitting || !needs('confidence')}
+                  />
+                  <div className="fs-slider-bounds">
+                    <span>Low</span>
+                    <span>High</span>
+                  </div>
                 </div>
-                <Slider
-                  min={0}
-                  max={100}
-                  value={confidence}
-                  onChange={setConfidence}
-                  step={1}
-                  disabled={isSubmitting || !needs('confidence')}
-                />
-                <div className="fs-slider-bounds">
-                  <span>Low</span>
-                  <span>High</span>
-                </div>
+              </div>
+
+              {/* Slot 3: Peak Balance or Skew Intensity */}
+              <div style={{ visibility: needs('peakBias') || needs('skewAmount') ? 'visible' : 'hidden' }}>
+                {needs('peakBias') ? (
+                  <div className="fs-slider-group">
+                    <div className="fs-slider-header">
+                      <span className="fs-slider-label">Peak Balance</span>
+                    </div>
+                    <Slider
+                      min={0}
+                      max={100}
+                      value={peakBias}
+                      onChange={setPeakBias}
+                      step={1}
+                      disabled={isSubmitting}
+                      showTrack={false}
+                    />
+                    <div className="fs-slider-bounds">
+                      <span>Left Peak</span>
+                      <span>Right Peak</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="fs-slider-group">
+                    <div className="fs-slider-header">
+                      <span className="fs-slider-label">Skew Intensity</span>
+                    </div>
+                    <Slider
+                      min={0}
+                      max={100}
+                      value={skewAmount}
+                      onChange={setSkewAmount}
+                      step={1}
+                      disabled={isSubmitting}
+                    />
+                    <div className="fs-slider-bounds">
+                      <span>Symmetric</span>
+                      <span>Heavy Skew</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Row 2: Strategy Geometry — shape selector */}
-        <div className="fs-sc-geometry-section">
-          <span className="fs-sc-geometry-label">Strategy Geometry</span>
-          <div className="fs-shape-grid">
-            {availableShapes.map((def) => (
-              <button
-                key={def.id}
-                type="button"
-                className={`fs-shape-btn ${selectedShape === def.id ? 'active' : ''}`}
-                onClick={() => setSelectedShape(def.id)}
-                title={def.description}
-                disabled={isSubmitting}
-              >
-                <svg
-                  className="fs-shape-icon"
-                  viewBox="0 0 100 60"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+          {/* Right: Strategy Geometry */}
+          <div className="fs-sc-geometry-section">
+            <span className="fs-sc-geometry-label">Strategy Geometry</span>
+            <div className="fs-shape-grid">
+              {availableShapes.map((def) => (
+                <button
+                  key={def.id}
+                  type="button"
+                  className={`fs-shape-btn ${selectedShape === def.id ? 'active' : ''}`}
+                  onClick={() => setSelectedShape(def.id)}
+                  title={def.description}
+                  disabled={isSubmitting}
                 >
-                  <path d={def.svgPath} />
-                </svg>
-                <span className="fs-shape-name">{def.name}</span>
-              </button>
-            ))}
+                  <svg
+                    className="fs-shape-icon"
+                    viewBox="0 0 100 60"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d={def.svgPath} />
+                  </svg>
+                  <span className="fs-shape-name">{def.name}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Row 3: Amount input */}
-        <div className="fs-input-group">
-          <label htmlFor="fs-sc-amount">Amount (USDC)</label>
+        {error && <div className="fs-error-box">{error}</div>}
+
+        {/* Footer: Amount input + Submit side by side */}
+        <div className="fs-sc-footer">
           <div className="fs-sc-amount-wrapper">
             <span className="fs-sc-amount-prefix">$</span>
             <input
@@ -467,20 +468,16 @@ export function ShapeCutter({
               onChange={(e) => setAmount(e.target.value)}
             />
           </div>
+          <button
+            type="submit"
+            className="fs-submit-btn"
+            disabled={!isFormValid || isSubmitting}
+          >
+            {isSubmitting
+              ? 'Submitting...'
+              : `Submit Trade ($${!isNaN(collateral) ? collateral.toFixed(0) : '0'})`}
+          </button>
         </div>
-
-        {error && <div className="fs-error-box">{error}</div>}
-
-        {/* Row 4: Submit */}
-        <button
-          type="submit"
-          className="fs-submit-btn"
-          disabled={!isFormValid || isSubmitting}
-        >
-          {isSubmitting
-            ? 'Submitting...'
-            : `Submit Trade ($${!isNaN(collateral) ? collateral.toFixed(0) : '0'})`}
-        </button>
       </form>
     </div>
   );

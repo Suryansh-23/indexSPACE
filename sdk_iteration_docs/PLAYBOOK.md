@@ -193,7 +193,8 @@ Example:
 .fs-binary-panel,
 .fs-bucket-range,
 .fs-bucket-trade-panel,
-.fs-auth-widget {          /* ← add new widget roots here */
+.fs-auth-widget,
+.fs-custom-shape {          /* ← add new widget roots here */
   --fs-background-dark: color-mix(in srgb, var(--fs-background) 70%, black);
   --fs-primary-glow: ...
   /* etc */
@@ -350,6 +351,7 @@ export function MyChart({ data }: { data: any[] }) {
 | `useBucketDistribution(marketId, numBuckets?, numPoints?)` | `{ buckets, loading, error, refetch }` | Probability distribution across equal-width outcome buckets (derived from market + consensus) |
 | `useDistributionState(marketId, config?)` | `{ market, loading, error, refetch, bucketCount, setBucketCount, buckets, percentiles, getBucketsForRange }` | Shared distribution state for bucket-based trading components — state/composition hook |
 | `useAuth()` | `{ user, isAuthenticated, loading, error, login, signup, logout, refreshUser }` | Auth state and actions — state/action hook (no `invalidationCount`) |
+| `useCustomShape(market)` | `{ controlValues, lockedPoints, numPoints, pVector, prediction, setControlValue, toggleLock, setNumPoints, resetToDefault, startDrag, handleDrag, endDrag, isDragging, draggingIndex }` | Custom shape editing state — state/action hook (no `invalidationCount`). Accepts `market` from `useMarket`. |
 
 ### Server State vs Preview State
 
@@ -415,7 +417,7 @@ The belief construction system lives in `packages/core/src/math/builders.ts` and
 
 The **universal constructor**. ALL belief vector creation MUST route through this function. It:
 1. Takes an array of `Region` objects
-2. Generates a raw kernel for each region (`pointKernel` for PointRegion, `rangeKernel` for RangeRegion)
+2. Generates a raw kernel for each region (`pointKernel` for PointRegion, `rangeKernel` for RangeRegion, `splineKernel` for SplineRegion)
 3. Combines them with weights
 4. Normalizes the result (private `normalize()` function — guarantees output sums to 1)
 
@@ -424,6 +426,7 @@ buildBelief(regions, K, L, H)
   for each region:
     if type === 'point' → pointKernel(region, K, L, H)  → raw K+1 array
     if type === 'range' → rangeKernel(region, K, L, H)  → raw K+1 array
+    if type === 'spline' → splineKernel(region, K, L, H) → raw K+1 array
     combined[k] += raw[k] * weight
   return normalize(combined)
 ```
@@ -445,11 +448,12 @@ Thin wrappers that construct the correct `Region` array and delegate to `buildBe
 | `buildDip(center, spread, K, L, H)` | `[{ type: 'point', center, spread: spread*1.5, inverted: true }]` |
 | `buildLeftSkew(center, spread, K, L, H, skewAmount?)` | `[{ type: 'point', center, spread, skew: -skewAmount }]` |
 | `buildRightSkew(center, spread, K, L, H, skewAmount?)` | `[{ type: 'point', center, spread, skew: skewAmount }]` |
+| `buildCustomShape(controlValues, K, L, H)` | `[{ type: 'spline', controlX: evenly-spaced, controlY: controlValues }]` — spline interpolation of user control points |
 
 ### Region Types
 
 ```typescript
-type Region = PointRegion | RangeRegion;
+type Region = PointRegion | RangeRegion | SplineRegion;
 
 interface PointRegion {
   type: 'point';
@@ -466,6 +470,13 @@ interface RangeRegion {
   high: number;      // End of flat-top region
   weight?: number;   // Relative weight (default 1)
   sharpness?: number; // Edge sharpness: 0 = smooth cosine taper (default), 1 = hard cliff edges
+}
+
+interface SplineRegion {
+  type: 'spline';
+  controlX: number[];  // X positions in outcome space [L..H], must be sorted ascending
+  controlY: number[];  // Y values (unnormalized, e.g. [0, 25])
+  weight?: number;     // Relative weight (default 1)
 }
 ```
 
@@ -495,7 +506,7 @@ When `sharpness = 1`, the coefficient vector has a hard step function at the ran
 ```
 Widget (e.g. TradePanel, ShapeCutter)
   → L2 builder or buildBelief directly
-    → pointKernel / rangeKernel (private, internal)
+    → pointKernel / rangeKernel / splineKernel (private, internal)
       → normalize (private, internal)
         → BeliefVector (number[], K+1 elements, sums to 1)
 
@@ -560,6 +571,8 @@ Peaks beyond 4x are clipped visually but remain in the tooltip data. This ensure
 - `buildDip(center, spread, K, L, H)` → belief vector (L2)
 - `buildLeftSkew(center, spread, K, L, H, skewAmount?)` → belief vector (L2)
 - `buildRightSkew(center, spread, K, L, H, skewAmount?)` → belief vector (L2)
+- `buildCustomShape(controlValues, K, L, H)` → belief vector (L2 — spline interpolation of user control points)
+- `generateBellShape(numPoints, peakPosition?, spread?, zeroTailPercent?)` → `number[]` (utility — default bell-shaped control values for custom shape editor)
 
 ### Math/Density & Statistics (L0 pure math)
 - `evaluateDensityCurve(belief, L, H, numPoints)` → chart points (piecewise-linear interpolation)
@@ -672,6 +685,7 @@ onSuccess?.(result);       // Notify parent
 | `BucketTradePanel` | Composed chart + range selector | Composes `DistributionChart` + `BucketRangeSelector` with shared `useDistributionState` (see shared state composition below) |
 | `PositionTable` | Data table | Tabbed views (Open Orders / Trade History / Market Positions), per-tab columns, pagination, row selection → chart overlay, sell actions |
 | `TimeSales` | Time & sales ticker | Uses `useTradeHistory` with `pollInterval` (default 5s), read-only market activity feed |
+| `CustomShapeEditor` | Custom shape trade input | Uses `useCustomShape` for control point state, draggable scatter dots + vertical sliders, spline interpolation via `buildCustomShape`, three-phase trade pattern |
 
 **TimelineChart data-fetching pattern:** Unlike Consensus/Distribution (which receive shared `market` + `consensus` data as props from `MarketCharts`), `TimelineChartContent` calls `useMarketHistory` internally. This avoids fetching history data when the timeline tab isn't active. The `timeFilter` state is lifted to `MarketCharts` so it persists across tab switches.
 
@@ -702,6 +716,7 @@ When adding a new tabbed widget, follow this exact pattern — do not invent a d
 - [ ] Styles added to `base.css`
 - [ ] Exported from category and root `index.ts`
 - [ ] Error and loading states handled
+- [ ] **Add widget smoke tests** (see [Widget Component Testing Guide](../Docs/widget-component-testing-guide.md)) — at minimum: provider guard, loading state, error state, primary action, unmount cleanup
 - [ ] **Run `npx vitest run` — all tests pass**
 - [ ] **Update `architecture.test.ts` if new exports or prop patterns**
 - [ ] **Update PLAYBOOK.md** — Widget Reference table, File Locations tree, derived-variables selector if new root class

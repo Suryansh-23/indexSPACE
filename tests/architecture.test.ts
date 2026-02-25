@@ -86,15 +86,16 @@ describe('SDK Architecture', () => {
 
     it('data-fetching hooks react to invalidationCount', () => {
       const reactDir = path.join(__dirname, '../packages/react/src');
+      const stateHooks = ['useAuth', 'useCustomShape'];
       const hookFiles = getFiles(reactDir, /^use.*\.ts$/).filter(
-        f => !path.basename(f).startsWith('useAuth')
+        f => !stateHooks.some(h => path.basename(f).startsWith(h))
       );
 
       for (const file of hookFiles) {
         const content = fs.readFileSync(file, 'utf-8');
 
         // Should reference invalidationCount for cache busting
-        // (useAuth is excluded — it's a state/action hook, not data-fetching)
+        // (state/action hooks like useAuth and useCustomShape are excluded — they don't fetch data)
         expect(content).toMatch(/ctx\.invalidationCount/);
       }
     });
@@ -171,6 +172,7 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('useMarketHistory');
       expect(indexContent).toContain('useDistributionState');
       expect(indexContent).toContain('useAuth');
+      expect(indexContent).toContain('useCustomShape');
     });
 
     it('react index exports new theme presets and types', () => {
@@ -229,6 +231,7 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('TimeSales');
       expect(indexContent).toContain('BucketRangeSelector');
       expect(indexContent).toContain('BucketTradePanel');
+      expect(indexContent).toContain('CustomShapeEditor');
     });
 
     it('AuthWidget is exported from ui package', () => {
@@ -315,6 +318,17 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('MarketHistory');
       expect(indexContent).toContain('PercentileSet');
       expect(indexContent).toContain('FanChartPoint');
+    });
+
+    it('custom shape core functions are exported from core', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/core/src/index.ts'),
+        'utf-8'
+      );
+
+      expect(indexContent).toContain('buildCustomShape');
+      expect(indexContent).toContain('generateBellShape');
+      expect(indexContent).toContain('SplineRegion');
     });
   });
 

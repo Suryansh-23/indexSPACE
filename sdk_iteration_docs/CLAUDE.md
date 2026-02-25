@@ -72,7 +72,7 @@ Every new function must be classifiable by both layer AND category. This keeps t
 | ALL belief shapes route through `buildBelief` (L1) | Single normalization path, single point of change |
 | New widget root classes must be added to derived-variables selector near the top of `base.css` | Derived vars (`--fs-background-dark` etc.) won't resolve otherwise — breaks silently |
 | Widgets must check `FunctionSpaceContext` | Throws helpful error if provider missing |
-| Data-fetching hooks return `{ <named>, loading, error, refetch }` | Named property matches hook purpose. State/action hooks (e.g. `useAuth`) return context fields directly. |
+| Data-fetching hooks return `{ <named>, loading, error, refetch }` | Named property matches hook purpose. State/action hooks (e.g. `useAuth`, `useCustomShape`) return context fields directly. |
 | Export types separately | `export type { Props }` for proper tree-shaking |
 | Chart content components can fetch their own data | TimelineChartContent calls `useMarketHistory` internally — avoids wasteful fetches when tab is hidden |
 
@@ -108,6 +108,9 @@ cd demo-app && npx vite build   # Build verification (required)
 | `tests/shapes.test.ts` | Belief shape validation (vector properties, shape characteristics) | Adding new L2 builders or modifying kernel functions |
 | `tests/themes.test.ts` | Theme preset validation, resolveTheme behavior | Adding/modifying presets or theme resolution logic |
 | `tests/binary.test.ts` | Binary panel-specific tests | Changing BinaryPanel behavior or x-point modes |
+| `tests/components.test.tsx` | Widget smoke tests (provider guard, loading, error, primary action, cleanup) | Adding or modifying UI widgets — see [Widget Component Testing Guide](../Docs/widget-component-testing-guide.md) |
+
+**When adding UI widgets:** Add 5 smoke tests to `components.test.tsx` (provider guard, loading state, error state, primary action, unmount cleanup).
 
 **When changing UI components:** Update `architecture.test.ts` if adding new exports or changing prop patterns.
 
@@ -190,6 +193,14 @@ If a change touches both architecture (hooks, imports, exports) AND theming (CSS
 Use this skill when adding a new data-fetching hook to `packages/react/src/`. It contains the exact pattern, a reference implementation (`useMarket`), and a full checklist covering: core function, hook file, exports, architecture tests, hook behavior tests, and doc updates.
 
 This skill should be invoked automatically when the task involves adding a hook — it is not restricted to manual invocation.
+
+### implement (`.claude/skills/implement/SKILL.md`)
+
+Unified skill for implementing new features. Enforces a 6-phase workflow: read living docs → understand input → ask clarifying questions → plan → implement → verify → update docs. Accepts a handoff document path or verbal description.
+
+### implementation-review (`.claude/skills/implementation-review/SKILL.md`)
+
+Multi-agent adversarial review of recent implementation work. Invoked manually with `/implementation-review <handoff-doc-path>`. Dispatches 7 parallel review agents (plan compliance, architecture, theme, SDK best practices, error handling, test quality, code quality catch-all) plus 1 sequential consolidation agent. Produces a detailed improvements document at `Docs/reviews/<feature-name>/review-<feature-name>.md` that can be handed to another agent with `/implement` for remediation. Also produces `doc-updates-draft.md` with proposed edits to the living docs.
 
 ## Commit Style
 

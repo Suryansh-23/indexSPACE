@@ -8,4 +8,6 @@ export { BucketRangeSelector } from './BucketRangeSelector.js';
 export type { BucketRangeSelectorProps } from './BucketRangeSelector.js';
 export { BucketTradePanel } from './BucketTradePanel.js';
 export type { BucketTradePanelProps } from './BucketTradePanel.js';
+export { CustomShapeEditor } from './CustomShapeEditor.js';
+export type { CustomShapeEditorProps } from './CustomShapeEditor.js';
 export type { TradeInputBaseProps } from './types.js';

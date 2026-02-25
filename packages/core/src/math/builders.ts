@@ -2,7 +2,7 @@ import type { BeliefVector } from '../types.js';
 
 // ── Region types ──
 
-export type Region = PointRegion | RangeRegion;
+export type Region = PointRegion | RangeRegion | SplineRegion;
 
 export interface PointRegion {
   type: 'point';
@@ -19,6 +19,13 @@ export interface RangeRegion {
   high: number;
   weight?: number;
   sharpness?: number;  // 0 = smooth cosine taper (default), 1 = hard cliff edges
+}
+
+export interface SplineRegion {
+  type: 'spline';
+  controlX: number[];  // X positions in outcome space [L..H], must be sorted ascending
+  controlY: number[];  // Y values (unnormalized, e.g. [0, 25])
+  weight?: number;
 }
 
 // ── Internal helpers ──
@@ -107,6 +114,108 @@ function rangeKernel(
   return raw;
 }
 
+/**
+ * Fritsch-Carlson monotonic piecewise cubic Hermite spline interpolation.
+ * Produces a smooth, overshoot-free curve through the control points.
+ * Negative output values are clamped to 0.
+ */
+function splineKernel(
+  region: SplineRegion,
+  K: number,
+  L: number,
+  H: number,
+): number[] {
+  const { controlX, controlY } = region;
+  const n = controlX.length;
+
+  // Degenerate: single point → flat
+  if (n <= 1) {
+    const val = n === 1 ? Math.max(0, controlY[0]) : 0;
+    return new Array<number>(K + 1).fill(val);
+  }
+
+  // Step 1: Compute interval widths (h) and slopes (delta)
+  const h = new Array<number>(n - 1);
+  const delta = new Array<number>(n - 1);
+  for (let i = 0; i < n - 1; i++) {
+    h[i] = controlX[i + 1] - controlX[i];
+    delta[i] = h[i] > 0 ? (controlY[i + 1] - controlY[i]) / h[i] : 0;
+  }
+
+  // Step 2: Compute initial tangents
+  const m = new Array<number>(n);
+  m[0] = delta[0];
+  m[n - 1] = delta[n - 2];
+  for (let i = 1; i < n - 1; i++) {
+    m[i] = (delta[i - 1] + delta[i]) / 2;
+  }
+
+  // Step 3: Fritsch-Carlson monotonicity correction
+  for (let i = 0; i < n - 1; i++) {
+    if (Math.abs(delta[i]) < 1e-10) {
+      // Flat segment — zero tangents at both endpoints
+      m[i] = 0;
+      m[i + 1] = 0;
+    } else {
+      const alpha = m[i] / delta[i];
+      const beta = m[i + 1] / delta[i];
+      const tau = alpha * alpha + beta * beta;
+      if (tau > 9) {
+        const tauScale = 3 / Math.sqrt(tau);
+        m[i] = tauScale * alpha * delta[i];
+        m[i + 1] = tauScale * beta * delta[i];
+      }
+    }
+  }
+
+  // Step 4: Zero tangents at local extrema
+  for (let i = 1; i < n - 1; i++) {
+    if (delta[i - 1] * delta[i] <= 0) {
+      m[i] = 0;
+    }
+  }
+
+  // Step 5: Evaluate at K+1 uniformly spaced output points
+  const raw = new Array<number>(K + 1);
+  for (let k = 0; k <= K; k++) {
+    const x = L + (k / K) * (H - L);
+
+    // Clamp to control range — flat extension outside
+    if (x <= controlX[0]) {
+      raw[k] = Math.max(0, controlY[0]);
+      continue;
+    }
+    if (x >= controlX[n - 1]) {
+      raw[k] = Math.max(0, controlY[n - 1]);
+      continue;
+    }
+
+    // Find interval: controlX[seg] <= x < controlX[seg+1]
+    let seg = 0;
+    for (let i = n - 2; i >= 0; i--) {
+      if (x >= controlX[i]) { seg = i; break; }
+    }
+
+    // Hermite basis interpolation
+    const t = (x - controlX[seg]) / h[seg];
+    const t2 = t * t;
+    const t3 = t2 * t;
+    const h00 = 2 * t3 - 3 * t2 + 1;
+    const h10 = t3 - 2 * t2 + t;
+    const h01 = -2 * t3 + 3 * t2;
+    const h11 = t3 - t2;
+
+    const value = h00 * controlY[seg]
+      + h10 * h[seg] * m[seg]
+      + h01 * controlY[seg + 1]
+      + h11 * h[seg] * m[seg + 1];
+
+    raw[k] = Math.max(0, value);
+  }
+
+  return raw;
+}
+
 // ── Public API ──
 
 /**
@@ -123,9 +232,10 @@ export function buildBelief(
 
   for (const region of regions) {
     const weight = region.weight ?? 1;
-    const raw = region.type === 'point'
-      ? pointKernel(region, K, L, H)
-      : rangeKernel(region, K, L, H);
+    let raw: number[];
+    if (region.type === 'point') raw = pointKernel(region, K, L, H);
+    else if (region.type === 'range') raw = rangeKernel(region, K, L, H);
+    else raw = splineKernel(region, K, L, H);
 
     for (let k = 0; k <= K; k++) {
       combined[k] += raw[k] * weight;
@@ -251,4 +361,50 @@ export function buildRightSkew(
   skewAmount: number = 1,
 ): BeliefVector {
   return buildBelief([{ type: 'point', center, spread, skew: skewAmount }], K, L, H);
+}
+
+/**
+ * L2: Custom shape builder using cubic spline interpolation.
+ * Converts N control point values into a belief vector via Fritsch-Carlson spline.
+ * Control points are uniformly spaced from L to H.
+ * Resolves through buildBelief with a single SplineRegion.
+ */
+export function buildCustomShape(
+  controlValues: number[],
+  K: number,
+  L: number,
+  H: number,
+): BeliefVector {
+  const N = controlValues.length;
+  const controlX = controlValues.map((_, i) =>
+    N === 1 ? (L + H) / 2 : L + (i / (N - 1)) * (H - L),
+  );
+  return buildBelief(
+    [{ type: 'spline', controlX, controlY: controlValues }],
+    K, L, H,
+  );
+}
+
+/**
+ * Generate initial bell-shaped control values for the custom shape editor.
+ * Outer tails (zeroTailPercent on each end) are set to 0.
+ * Inner values follow a Gaussian bell curve centered at peakPosition.
+ */
+export function generateBellShape(
+  numPoints: number,
+  peakPosition: number = 0.5,
+  spread: number = 4,
+  zeroTailPercent: number = 0.30,
+): number[] {
+  const values: number[] = [];
+  for (let i = 0; i < numPoints; i++) {
+    const t = numPoints === 1 ? 0.5 : i / (numPoints - 1);
+    if (t < zeroTailPercent || t > 1 - zeroTailPercent) {
+      values.push(0);
+    } else {
+      const d = (t - peakPosition) * spread;
+      values.push(Math.exp(-(d * d)));
+    }
+  }
+  return values;
 }

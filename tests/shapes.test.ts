@@ -7,6 +7,8 @@ import {
   buildDip,
   buildLeftSkew,
   buildRightSkew,
+  buildCustomShape,
+  generateBellShape,
   SHAPE_DEFINITIONS,
 } from '../packages/core/src/index.js';
 import type { ShapeId, ShapeDefinition, BeliefVector, Region, RangeInput } from '../packages/core/src/index.js';
@@ -390,5 +392,123 @@ describe('SHAPE_DEFINITIONS', () => {
       expect(def.svgPath.length).toBeGreaterThan(0);
       expect(def.svgPath).toMatch(/^[MLQCZmlqcz0-9,.\s]+$/);
     }
+  });
+});
+
+// ── Custom shape (spline interpolation) ──
+
+describe('Custom shape (spline)', () => {
+  it('produces valid belief vector from bell-shaped control values', () => {
+    const controlValues = [0.1, 0.3, 0.6, 1.0, 1.5, 1.8, 1.5, 1.0, 0.6, 0.2];
+    const belief = buildCustomShape(controlValues, K, L, H);
+    assertValidBelief(belief, 'custom-bell');
+  });
+
+  it('uniform control values produce roughly uniform belief', () => {
+    const controlValues = new Array(20).fill(1.0);
+    const belief = buildCustomShape(controlValues, K, L, H);
+    assertValidBelief(belief, 'custom-uniform');
+    const expected = 1 / (K + 1);
+    for (const v of belief) {
+      expect(v).toBeCloseTo(expected, 1);
+    }
+  });
+
+  it('peaked control values produce peaked belief near center', () => {
+    const N = 20;
+    const mid = (N - 1) / 2;
+    const controlValues = new Array(N).fill(0).map((_, i) => {
+      const d = (i - mid) / 3;
+      return Math.max(0.1, 2.0 * Math.exp(-0.5 * d * d));
+    });
+    const belief = buildCustomShape(controlValues, K, L, H);
+    assertValidBelief(belief, 'custom-peaked');
+    const centerIdx = Math.round(K / 2);
+    expect(Math.abs(peakIndex(belief) - centerIdx)).toBeLessThanOrEqual(3);
+  });
+
+  it('buildCustomShape matches buildBelief with equivalent SplineRegion', () => {
+    const controlValues = [0.2, 0.5, 1.0, 1.5, 1.0, 0.5, 0.2];
+    const N = controlValues.length;
+    const controlX = controlValues.map((_, i) => L + (i / (N - 1)) * (H - L));
+    const viaL2 = buildCustomShape(controlValues, K, L, H);
+    const viaL1 = buildBelief(
+      [{ type: 'spline', controlX, controlY: controlValues }],
+      K, L, H,
+    );
+    expect(viaL2).toEqual(viaL1);
+  });
+
+  it('handles minimum control points (2)', () => {
+    const belief = buildCustomShape([0.5, 1.5], K, L, H);
+    assertValidBelief(belief, 'custom-2pts');
+  });
+
+  it('handles maximum control points (25)', () => {
+    const controlValues = new Array(25).fill(0).map((_, i) => 0.5 + Math.sin(i / 4) * 0.5);
+    const belief = buildCustomShape(controlValues, K, L, H);
+    assertValidBelief(belief, 'custom-25pts');
+  });
+
+  it('negative interpolation values are clamped', () => {
+    const controlValues = [2.0, 0.0, 2.0, 0.0, 2.0];
+    const belief = buildCustomShape(controlValues, K, L, H);
+    assertValidBelief(belief, 'custom-oscillating');
+    for (const v of belief) {
+      expect(v).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('single control point produces uniform-ish belief', () => {
+    const belief = buildCustomShape([1.0], K, L, H);
+    assertValidBelief(belief, 'custom-1pt');
+  });
+});
+
+// ── generateBellShape ──
+
+describe('generateBellShape', () => {
+  it('returns correct number of points', () => {
+    expect(generateBellShape(10)).toHaveLength(10);
+    expect(generateBellShape(20)).toHaveLength(20);
+    expect(generateBellShape(5)).toHaveLength(5);
+  });
+
+  it('has zero tails', () => {
+    const values = generateBellShape(20);
+    // Outer 15% on each side should be 0
+    expect(values[0]).toBe(0);
+    expect(values[1]).toBe(0);
+    expect(values[2]).toBe(0);
+    expect(values[19]).toBe(0);
+    expect(values[18]).toBe(0);
+    expect(values[17]).toBe(0);
+  });
+
+  it('peaks near center', () => {
+    const values = generateBellShape(20);
+    let maxIdx = 0;
+    for (let i = 1; i < values.length; i++) {
+      if (values[i] > values[maxIdx]) maxIdx = i;
+    }
+    // Peak should be near midpoint (index ~9-10 for 20 points)
+    expect(Math.abs(maxIdx - 9.5)).toBeLessThanOrEqual(2);
+  });
+
+  it('all values are non-negative', () => {
+    const values = generateBellShape(20);
+    for (const v of values) {
+      expect(v).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('custom peakPosition shifts the peak', () => {
+    const values = generateBellShape(20, 0.75);
+    let maxIdx = 0;
+    for (let i = 1; i < values.length; i++) {
+      if (values[i] > values[maxIdx]) maxIdx = i;
+    }
+    // Peak should be right of center
+    expect(maxIdx).toBeGreaterThan(10);
   });
 });

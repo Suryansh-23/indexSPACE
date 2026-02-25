@@ -20,6 +20,12 @@ vi.mock('@functionspace/core', () => ({
   mapPosition: vi.fn((p) => p),
   calculateBucketDistribution: vi.fn(),
   computePercentiles: vi.fn(),
+  buildCustomShape: vi.fn().mockImplementation((controlValues: number[], K: number) => {
+    const len = K + 1;
+    return new Array(len).fill(1 / len);
+  }),
+  generateBellShape: vi.fn().mockImplementation((n: number) => new Array(n).fill(0.5)),
+  computeStatistics: vi.fn().mockReturnValue({ mode: 100, mean: 100, median: 100, variance: 25, stdDev: 5 }),
   loginUser: vi.fn().mockResolvedValue({
     token: 'mock-token',
     user: { userId: 1, username: 'testuser', walletValue: 1000, role: 'trader' },
@@ -32,7 +38,7 @@ vi.mock('@functionspace/core', () => ({
   }),
 }));
 
-import { FunctionSpaceProvider, useMarket, useConsensus, usePositions, useTradeHistory, useBucketDistribution, useMarketHistory, useDistributionState, useAuth } from '../packages/react/src';
+import { FunctionSpaceProvider, useMarket, useConsensus, usePositions, useTradeHistory, useBucketDistribution, useMarketHistory, useDistributionState, useAuth, useCustomShape } from '../packages/react/src';
 import { queryMarketState, getConsensusCurve, queryMarketPositions, queryTradeHistory, queryMarketHistory, calculateBucketDistribution, computePercentiles, FSClient, loginUser } from '@functionspace/core';
 
 const mockConfig = {
@@ -914,5 +920,200 @@ describe('useAuth hook', () => {
     expect(result.current.isAuthenticated).toBe(false);
     expect(result.current.user).toBe(null);
     expect(loginUser).not.toHaveBeenCalled();
+  });
+});
+
+// ── useCustomShape (state management hook) ──
+
+const mockMarket = {
+  config: { K: 50, L: 50, H: 150 },
+  consensus: new Array(51).fill(1 / 51),
+  alpha: new Array(51).fill(1),
+} as any;
+
+describe('useCustomShape hook', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('throws error when used outside provider', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => {
+      renderHook(() => useCustomShape(null));
+    }).toThrow('useCustomShape must be used within FunctionSpaceProvider');
+    spy.mockRestore();
+  });
+
+  it('returns all expected state and actions', async () => {
+    const { result } = renderHook(() => useCustomShape(mockMarket), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => expect(result.current).not.toBeNull());
+
+    expect(result.current).toHaveProperty('controlValues');
+    expect(result.current).toHaveProperty('lockedPoints');
+    expect(result.current).toHaveProperty('numPoints');
+    expect(result.current).toHaveProperty('pVector');
+    expect(result.current).toHaveProperty('prediction');
+    expect(result.current).toHaveProperty('setControlValue');
+    expect(result.current).toHaveProperty('toggleLock');
+    expect(result.current).toHaveProperty('setNumPoints');
+    expect(result.current).toHaveProperty('resetToDefault');
+    expect(result.current).toHaveProperty('startDrag');
+    expect(result.current).toHaveProperty('handleDrag');
+    expect(result.current).toHaveProperty('endDrag');
+    expect(result.current).toHaveProperty('isDragging');
+    expect(result.current).toHaveProperty('draggingIndex');
+    expect(typeof result.current.setControlValue).toBe('function');
+    expect(typeof result.current.toggleLock).toBe('function');
+  });
+
+  it('initializes with 20 control points', async () => {
+    const { result } = renderHook(() => useCustomShape(mockMarket), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => expect(result.current).not.toBeNull());
+    expect(result.current.numPoints).toBe(20);
+    expect(result.current.controlValues).toHaveLength(20);
+  });
+
+  it('setControlValue updates a control point', async () => {
+    const { result } = renderHook(() => useCustomShape(mockMarket), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => expect(result.current).not.toBeNull());
+    act(() => {
+      result.current.setControlValue(5, 1.8);
+    });
+    expect(result.current.controlValues[5]).toBe(1.8);
+  });
+
+  it('setControlValue clamps to [0, 25]', async () => {
+    const { result } = renderHook(() => useCustomShape(mockMarket), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => expect(result.current).not.toBeNull());
+    act(() => {
+      result.current.setControlValue(5, 30.0);
+    });
+    expect(result.current.controlValues[5]).toBe(25);
+    act(() => {
+      result.current.setControlValue(5, -1.0);
+    });
+    expect(result.current.controlValues[5]).toBe(0);
+  });
+
+  it('locked points cannot be changed via setControlValue', async () => {
+    const { result } = renderHook(() => useCustomShape(mockMarket), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => expect(result.current).not.toBeNull());
+    const original = result.current.controlValues[3];
+    act(() => {
+      result.current.toggleLock(3);
+    });
+    act(() => {
+      result.current.setControlValue(3, 0.1);
+    });
+    expect(result.current.controlValues[3]).toBe(original);
+  });
+
+  it('toggleLock adds and removes locks', async () => {
+    const { result } = renderHook(() => useCustomShape(mockMarket), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => expect(result.current).not.toBeNull());
+    expect(result.current.lockedPoints).toHaveLength(0);
+    act(() => {
+      result.current.toggleLock(5);
+    });
+    expect(result.current.lockedPoints).toContain(5);
+    act(() => {
+      result.current.toggleLock(5);
+    });
+    expect(result.current.lockedPoints).not.toContain(5);
+  });
+
+  it('lock FIFO: max 2 locked points, oldest evicted', async () => {
+    const { result } = renderHook(() => useCustomShape(mockMarket), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => expect(result.current).not.toBeNull());
+    act(() => { result.current.toggleLock(0); });
+    act(() => { result.current.toggleLock(1); });
+    act(() => { result.current.toggleLock(2); }); // evicts 0
+    expect(result.current.lockedPoints).not.toContain(0);
+    expect(result.current.lockedPoints).toContain(1);
+    expect(result.current.lockedPoints).toContain(2);
+  });
+
+  it('setNumPoints clamps to [5, 25]', async () => {
+    const { result } = renderHook(() => useCustomShape(mockMarket), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => expect(result.current).not.toBeNull());
+    act(() => { result.current.setNumPoints(3); });
+    expect(result.current.numPoints).toBe(5);
+    expect(result.current.controlValues).toHaveLength(5);
+    act(() => { result.current.setNumPoints(30); });
+    expect(result.current.numPoints).toBe(25);
+    expect(result.current.controlValues).toHaveLength(25);
+  });
+
+  it('pVector is null when market is null', async () => {
+    const { result } = renderHook(() => useCustomShape(null), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => expect(result.current).not.toBeNull());
+    expect(result.current.pVector).toBe(null);
+  });
+
+  it('pVector is computed when market is provided', async () => {
+    const { result } = renderHook(() => useCustomShape(mockMarket), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => expect(result.current).not.toBeNull());
+    expect(result.current.pVector).not.toBe(null);
+    expect(result.current.pVector).toHaveLength(51);
+  });
+
+  it('drag lifecycle works correctly', async () => {
+    const { result } = renderHook(() => useCustomShape(mockMarket), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => expect(result.current).not.toBeNull());
+    expect(result.current.isDragging).toBe(false);
+    expect(result.current.draggingIndex).toBe(null);
+    act(() => { result.current.startDrag(5); });
+    expect(result.current.isDragging).toBe(true);
+    expect(result.current.draggingIndex).toBe(5);
+    act(() => { result.current.handleDrag(1.5); });
+    expect(result.current.controlValues[5]).toBe(1.5);
+    act(() => { result.current.endDrag(); });
+    expect(result.current.isDragging).toBe(false);
+    expect(result.current.draggingIndex).toBe(null);
+  });
+
+  it('startDrag rejects locked points', async () => {
+    const { result } = renderHook(() => useCustomShape(mockMarket), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => expect(result.current).not.toBeNull());
+    act(() => { result.current.toggleLock(3); });
+    act(() => { result.current.startDrag(3); });
+    expect(result.current.isDragging).toBe(false);
+    expect(result.current.draggingIndex).toBe(null);
+  });
+
+  it('resetToDefault restores initial state', async () => {
+    const { result } = renderHook(() => useCustomShape(mockMarket), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => expect(result.current).not.toBeNull());
+    act(() => { result.current.setControlValue(5, 1.8); });
+    act(() => { result.current.toggleLock(3); });
+    act(() => { result.current.resetToDefault(); });
+    expect(result.current.lockedPoints).toHaveLength(0);
+    expect(result.current.isDragging).toBe(false);
   });
 });
