@@ -36,9 +36,46 @@ vi.mock('@functionspace/core', () => ({
   fetchCurrentUser: vi.fn().mockResolvedValue({
     userId: 1, username: 'testuser', walletValue: 1000, role: 'trader',
   }),
+  pixelToDataX: vi.fn((clientX: number, left: number, right: number, domain: [number, number]) => {
+    const plotWidth = right - left;
+    if (plotWidth <= 0) return domain[0];
+    const ratio = Math.max(0, Math.min(1, (clientX - left) / plotWidth));
+    return domain[0] + ratio * (domain[1] - domain[0]);
+  }),
+  computeZoomedDomain: vi.fn(({ currentDomain, fullDomain, cursorDataX, direction, zoomFactor = 0.15, maxZoomFactor = 50 }: any) => {
+    const [min, max] = currentDomain;
+    const [fullMin, fullMax] = fullDomain;
+    const fullRange = fullMax - fullMin;
+    const range = max - min;
+    const factor = 1 + direction * zoomFactor;
+    const newRange = Math.max(fullRange / maxZoomFactor, Math.min(fullRange, range * factor));
+    if (newRange >= fullRange * 0.99) return null;
+    const cursorRatio = range > 0 ? (cursorDataX - min) / range : 0.5;
+    let newMin = cursorDataX - cursorRatio * newRange;
+    let newMax = cursorDataX + (1 - cursorRatio) * newRange;
+    if (newMin < fullMin) { newMin = fullMin; newMax = newMin + newRange; }
+    if (newMax > fullMax) { newMax = fullMax; newMin = newMax - newRange; }
+    return [newMin, newMax] as [number, number];
+  }),
+  computePannedDomain: vi.fn(({ startDomain, fullDomain, pixelDelta, plotAreaWidth }: any) => {
+    const [min, max] = startDomain;
+    const [fullMin, fullMax] = fullDomain;
+    const range = max - min;
+    if (plotAreaWidth <= 0) return startDomain;
+    const dataDelta = -(pixelDelta / plotAreaWidth) * range;
+    let newMin = min + dataDelta;
+    let newMax = max + dataDelta;
+    if (newMin < fullMin) { newMin = fullMin; newMax = newMin + range; }
+    if (newMax > fullMax) { newMax = fullMax; newMin = newMax - range; }
+    return [newMin, newMax] as [number, number];
+  }),
+  filterVisibleData: vi.fn((data: any[], xKey: string, domain: [number, number]) => {
+    return data.filter((d: any) => d[xKey] >= domain[0] && d[xKey] <= domain[1]);
+  }),
 }));
 
-import { FunctionSpaceProvider, useMarket, useConsensus, usePositions, useTradeHistory, useBucketDistribution, useMarketHistory, useDistributionState, useAuth, useCustomShape } from '../packages/react/src';
+import { FunctionSpaceProvider, useMarket, useConsensus, usePositions, useTradeHistory, useBucketDistribution, useMarketHistory, useDistributionState, useAuth, useCustomShape, useChartZoom } from '../packages/react/src';
+import type { ChartZoomOptions } from '../packages/react/src';
 import { queryMarketState, getConsensusCurve, queryMarketPositions, queryTradeHistory, queryMarketHistory, calculateBucketDistribution, computePercentiles, FSClient, loginUser } from '@functionspace/core';
 
 const mockConfig = {
@@ -1116,4 +1153,127 @@ describe('useCustomShape hook', () => {
     expect(result.current.lockedPoints).toHaveLength(0);
     expect(result.current.isDragging).toBe(false);
   });
+});
+
+// ── useChartZoom (state/action hook — no context dependency) ──
+
+const zoomTestData = [
+  { x: 0, y: 1 },
+  { x: 25, y: 2 },
+  { x: 50, y: 3 },
+  { x: 75, y: 4 },
+  { x: 100, y: 5 },
+];
+const zoomFullXDomain: [number, number] = [0, 100];
+const zoomGetPlotArea = (rect: DOMRect) => ({ left: rect.left + 70, right: rect.right - 15 });
+
+describe('useChartZoom hook', () => {
+  it('does NOT require FunctionSpaceProvider (no context)', () => {
+    // Renders without wrapper — should not throw
+    const { result } = renderHook(() =>
+      useChartZoom({ data: zoomTestData, xKey: 'x', fullXDomain: zoomFullXDomain, getPlotArea: zoomGetPlotArea }),
+    );
+    expect(result.current).toBeDefined();
+  });
+
+  it('returns correct shape (all fields + containerProps sub-fields)', () => {
+    const { result } = renderHook(() =>
+      useChartZoom({ data: zoomTestData, xKey: 'x', fullXDomain: zoomFullXDomain, getPlotArea: zoomGetPlotArea }),
+    );
+
+    expect(result.current).toHaveProperty('containerRef');
+    expect(result.current).toHaveProperty('xDomain');
+    expect(result.current).toHaveProperty('yDomain');
+    expect(result.current).toHaveProperty('isZoomed');
+    expect(result.current).toHaveProperty('isPanning');
+    expect(result.current).toHaveProperty('containerProps');
+    expect(result.current).toHaveProperty('reset');
+    expect(typeof result.current.reset).toBe('function');
+
+    // containerProps sub-fields
+    const cp = result.current.containerProps;
+    expect(typeof cp.onMouseDown).toBe('function');
+    expect(typeof cp.onMouseMove).toBe('function');
+    expect(typeof cp.onMouseUp).toBe('function');
+    expect(typeof cp.onMouseLeave).toBe('function');
+    expect(typeof cp.onDoubleClick).toBe('function');
+    expect(cp.style).toBeDefined();
+  });
+
+  it('starts unzoomed (isZoomed=false, xDomain=fullXDomain, isPanning=false)', () => {
+    const { result } = renderHook(() =>
+      useChartZoom({ data: zoomTestData, xKey: 'x', fullXDomain: zoomFullXDomain, getPlotArea: zoomGetPlotArea }),
+    );
+
+    expect(result.current.isZoomed).toBe(false);
+    expect(result.current.xDomain).toEqual(zoomFullXDomain);
+    expect(result.current.isPanning).toBe(false);
+  });
+
+  it('disabled mode (enabled=false) returns static full domain', () => {
+    const { result } = renderHook(() =>
+      useChartZoom({ data: zoomTestData, xKey: 'x', fullXDomain: zoomFullXDomain, getPlotArea: zoomGetPlotArea, enabled: false }),
+    );
+
+    expect(result.current.isZoomed).toBe(false);
+    expect(result.current.xDomain).toEqual(zoomFullXDomain);
+    expect(result.current.containerProps.style).toEqual({});
+  });
+
+  it('yDomain is undefined when no computeYDomain provided', () => {
+    const { result } = renderHook(() =>
+      useChartZoom({ data: zoomTestData, xKey: 'x', fullXDomain: zoomFullXDomain, getPlotArea: zoomGetPlotArea }),
+    );
+
+    expect(result.current.yDomain).toBeUndefined();
+  });
+
+  it('yDomain is computed from full data when unzoomed and computeYDomain is provided', () => {
+    const computeYDomain = (visible: any[], full: any[]) => {
+      const vals = visible.map((d: any) => d.y);
+      return [Math.min(...vals), Math.max(...vals)] as [number, number];
+    };
+
+    const { result } = renderHook(() =>
+      useChartZoom({ data: zoomTestData, xKey: 'x', fullXDomain: zoomFullXDomain, getPlotArea: zoomGetPlotArea, computeYDomain }),
+    );
+
+    expect(result.current.yDomain).toEqual([1, 5]);
+  });
+
+  it('reset() is idempotent from unzoomed state', () => {
+    const { result } = renderHook(() =>
+      useChartZoom({ data: zoomTestData, xKey: 'x', fullXDomain: zoomFullXDomain, getPlotArea: zoomGetPlotArea }),
+    );
+    act(() => { result.current.reset(); });
+    expect(result.current.isZoomed).toBe(false);
+    expect(result.current.xDomain).toEqual(zoomFullXDomain);
+    expect(result.current.isPanning).toBe(false);
+  });
+
+  it('onDoubleClick in containerProps resets to full domain', () => {
+    const { result } = renderHook(() =>
+      useChartZoom({ data: zoomTestData, xKey: 'x', fullXDomain: zoomFullXDomain, getPlotArea: zoomGetPlotArea }),
+    );
+    act(() => { result.current.containerProps.onDoubleClick(); });
+    expect(result.current.isZoomed).toBe(false);
+    expect(result.current.xDomain).toEqual(zoomFullXDomain);
+  });
+
+  it('resetTrigger change resets zoom state', () => {
+    const { result, rerender } = renderHook(
+      ({ t }) => useChartZoom({ data: zoomTestData, xKey: 'x', fullXDomain: zoomFullXDomain, getPlotArea: zoomGetPlotArea, resetTrigger: t }),
+      { initialProps: { t: 'initial' } },
+    );
+    expect(result.current.isZoomed).toBe(false);
+    rerender({ t: 'changed' });
+    expect(result.current.isZoomed).toBe(false);
+    expect(result.current.xDomain).toEqual(zoomFullXDomain);
+    expect(result.current.isPanning).toBe(false);
+  });
+
+  // Note: Testing isZoomed=true requires simulating wheel events with a real DOM container
+  // and getBoundingClientRect, which JSDOM does not support. The zoomed-state behavior
+  // (filterVisibleData, yDomain narrowing, cursor styles) is covered by the pure function
+  // tests in chart-zoom.test.ts. Full interaction testing should use a browser-based runner.
 });

@@ -18,7 +18,7 @@ export default function App_CustomShapeLayout() {
         </div>
 
         <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
-          <CustomShapeEditor marketId={MARKET_ID} />
+          <CustomShapeEditor marketId={MARKET_ID} zoomable />
         </div>
 
         <div>

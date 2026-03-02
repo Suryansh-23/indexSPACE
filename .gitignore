@@ -4,3 +4,4 @@ dist/
 *.tsbuildinfo
 .vite/
 Docs/
+sdk_iteration_docs/ui_images/

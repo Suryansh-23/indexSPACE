@@ -54,7 +54,7 @@ export function MyWidget({ marketId }: MyWidgetProps) {
 /* packages/ui/src/styles/base.css */
 
 .fs-mywidget {
-  background: linear-gradient(to bottom right, var(--fs-background), var(--fs-background-dark));
+  background: linear-gradient(to bottom right, var(--fs-background), var(--fs-bg-secondary));
   border: var(--fs-border-width) solid var(--fs-border);
   border-radius: var(--fs-radius-lg);
   padding: 1.5rem;
@@ -172,7 +172,6 @@ Example:
 ### Derived Variables (set in base.css)
 
 ```css
---fs-background-dark    /* Darker bg for gradients */
 --fs-primary-glow       /* Focus rings, shadows */
 --fs-primary-light      /* Hover states */
 --fs-header-gradient    /* Header accent gradients */
@@ -195,14 +194,15 @@ Example:
 .fs-bucket-trade-panel,
 .fs-auth-widget,
 .fs-custom-shape {          /* ← add new widget roots here */
-  --fs-background-dark: color-mix(in srgb, var(--fs-background) 70%, black);
-  --fs-primary-glow: ...
+  --fs-primary-glow: color-mix(in srgb, var(--fs-primary) 20%, transparent);
+  --fs-primary-light: color-mix(in srgb, var(--fs-primary) 80%, white);
+  --fs-header-gradient: color-mix(in srgb, var(--fs-primary) 15%, transparent);
   /* etc */
   font-family: var(--fs-font-family, inherit);
 }
 ```
 
-Without this, the widget's `var(--fs-background-dark)` etc. will resolve to nothing and all gradient backgrounds will break silently.
+Without this, the widget's `var(--fs-primary-glow)` etc. will resolve to nothing and all focus rings, header gradients, and hover states will break silently.
 
 ### Never Hardcode Colors
 
@@ -352,6 +352,9 @@ export function MyChart({ data }: { data: any[] }) {
 | `useDistributionState(marketId, config?)` | `{ market, loading, error, refetch, bucketCount, setBucketCount, buckets, percentiles, getBucketsForRange }` | Shared distribution state for bucket-based trading components — state/composition hook |
 | `useAuth()` | `{ user, isAuthenticated, loading, error, login, signup, logout, refreshUser }` | Auth state and actions — state/action hook (no `invalidationCount`) |
 | `useCustomShape(market)` | `{ controlValues, lockedPoints, numPoints, pVector, prediction, setControlValue, toggleLock, setNumPoints, resetToDefault, startDrag, handleDrag, endDrag, isDragging, draggingIndex }` | Custom shape editing state — state/action hook (no `invalidationCount`). Accepts `market` from `useMarket`. |
+| `useChartZoom(options)` | `{ containerRef, xDomain, yDomain, isZoomed, isPanning, containerProps, reset }` | Chart zoom/pan state — state/action hook (no context dependency, no `invalidationCount`). Use with `rechartsPlotArea()` helper for Recharts integration. |
+
+**useChartZoom invariants:** The hook cancels any pending `requestAnimationFrame` before applying a reset (via `resetTrigger` change, `fullXDomain` value change, `reset()`, or `onDoubleClick`). This prevents a race where a wheel event fired milliseconds before a reset would re-apply the zoomed domain one frame later. Pass a stable (memoized) `fullXDomain` — the hook resets zoom when its value changes. When the chart container has a second ref (Pattern B, e.g. `CustomShapeEditor`), create a callback ref that assigns to both refs and spread individual handlers from `containerProps` rather than using `{...containerProps}`.
 
 ### Server State vs Preview State
 
@@ -604,6 +607,13 @@ Peaks beyond 4x are clipped visually but remain in the tooltip data. This ensure
 - `signupUser(client, username, password, options?)` → `{ user: UserProfile }` (no token — caller must login after)
 - `fetchCurrentUser(client)` → `UserProfile` (uses client.get, requires token)
 - `validateUsername(name)` → `{ valid: boolean, error?: string }` (3-32 chars, alphanumeric + dots/dashes/underscores)
+
+### Chart Interaction (L0 Pure Math)
+- `pixelToDataX(clientX, plotAreaLeft, plotAreaRight, xDomain)` → data-space X value (linear interpolation, clamped)
+- `computeZoomedDomain(params: ZoomParams)` → `[number, number] | null` (cursor-centered zoom, null = reset to full)
+- `computePannedDomain(params: PanParams)` → `[number, number]` (drag-to-pan, boundary clamped)
+- `filterVisibleData(data, xKey, domain)` → filtered array (inclusive boundaries)
+- `generateEvenTicks(domain, count)` → `number[]` (evenly spaced tick values)
 
 ### Transactions
 - `buy(client, marketId, belief, collateral)` → BuyResult

@@ -16,3 +16,7 @@ export type { DistributionState, DistributionStateConfig } from './useDistributi
 export { useAuth } from './useAuth.js';
 export { useCustomShape } from './useCustomShape.js';
 export type { UseCustomShapeReturn } from './useCustomShape.js';
+export { useChartZoom } from './useChartZoom.js';
+export type { ChartZoomOptions, ChartZoomResult } from './useChartZoom.js';
+export { rechartsPlotArea } from './rechartsHelpers.js';
+

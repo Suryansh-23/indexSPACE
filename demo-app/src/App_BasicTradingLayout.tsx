@@ -22,7 +22,7 @@ export default function App_BasicTradingLayout() {
 
         <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', marginBottom: '1rem', minHeight: '520px' }}>
           <div style={{ flex: CHART_RATIO, minWidth: 0 }}>
-            <ConsensusChart marketId={MARKET_ID} height={655} />
+            <ConsensusChart marketId={MARKET_ID} height={655} zoomable />
           </div>
           <div style={{ flex: PANEL_RATIO, minWidth: 0 }}>
             <TradePanel marketId={MARKET_ID} modes={['gaussian', 'plateau']} />

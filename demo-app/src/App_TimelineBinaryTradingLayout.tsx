@@ -18,7 +18,7 @@ export default function App_TimelineBinaryTradingLayout() {
         </div>
 
         <div style={{ marginTop: '1rem' }}>
-          <TimelineChart marketId={MARKET_ID} height={500} />
+          <TimelineChart marketId={MARKET_ID} height={500} zoomable />
         </div>
 
         <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>

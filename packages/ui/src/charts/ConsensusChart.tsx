@@ -11,7 +11,7 @@ import {
 } from 'recharts';
 import { evaluateDensityCurve } from '@functionspace/core';
 import type { MarketState, ConsensusCurve } from '@functionspace/core';
-import { FunctionSpaceContext, useMarket, useConsensus } from '@functionspace/react';
+import { FunctionSpaceContext, useMarket, useConsensus, useChartZoom, rechartsPlotArea } from '@functionspace/react';
 import type { OverlayCurve } from './types.js';
 import '../styles/base.css';
 
@@ -30,6 +30,7 @@ export interface ConsensusChartContentProps {
   consensus: ConsensusCurve;
   height: number;
   overlayCurves?: OverlayCurve[];
+  zoomable?: boolean;
 }
 
 export function ConsensusChartContent({
@@ -37,6 +38,7 @@ export function ConsensusChartContent({
   consensus,
   height,
   overlayCurves,
+  zoomable,
 }: ConsensusChartContentProps) {
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('ConsensusChartContent must be used within FunctionSpaceProvider');
@@ -133,6 +135,22 @@ export function ConsensusChartContent({
     return [0, Math.max(max * 1.1, 10)];
   }, [chartData]);
 
+  // Zoom support
+  const fullXDomain = useMemo<[number, number]>(() => {
+    if (!chartData.length) return [0, 1];
+    return [chartData[0].x, chartData[chartData.length - 1].x];
+  }, [chartData]);
+
+  const getPlotArea = useMemo(() => rechartsPlotArea({ left: 10, right: 15 }, 60), []);
+
+  const zoom = useChartZoom({
+    data: chartData,
+    xKey: 'x',
+    fullXDomain,
+    getPlotArea,
+    enabled: zoomable,
+  });
+
   const hasPreview = ctx.previewBelief !== null;
   const hasSelected = ctx.selectedPosition !== null;
   const hasPayout = chartData.some((d) => d.payout !== undefined);
@@ -187,7 +205,7 @@ export function ConsensusChartContent({
   };
 
   return (
-    <div className="fs-chart-body" style={{ height }}>
+    <div className="fs-chart-body" ref={zoom.containerRef} {...zoom.containerProps} style={{ height, ...zoom.containerProps.style }}>
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={chartData} margin={{ top: 25, right: 15, left: 10, bottom: 30 }}>
           <defs>
@@ -217,7 +235,8 @@ export function ConsensusChartContent({
           <XAxis
             dataKey="x"
             type="number"
-            domain={['dataMin', 'dataMax']}
+            domain={zoomable ? zoom.xDomain : ['dataMin', 'dataMax']}
+            allowDataOverflow={zoomable && zoom.isZoomed}
             tick={{ fill: ctx.chartColors.axisText, fontSize: 12 }}
             tickFormatter={(v: number) => v.toFixed(1)}
             label={{
@@ -356,12 +375,14 @@ export interface ConsensusChartProps {
   marketId: string | number;
   height?: number;
   overlayCurves?: OverlayCurve[];
+  zoomable?: boolean;
 }
 
 export function ConsensusChart({
   marketId,
   height = 300,
   overlayCurves,
+  zoomable,
 }: ConsensusChartProps) {
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('ConsensusChart must be used within FunctionSpaceProvider');
@@ -408,6 +429,7 @@ export function ConsensusChart({
         consensus={consensus}
         height={height}
         overlayCurves={overlayCurves}
+        zoomable={zoomable}
       />
     </div>
   );

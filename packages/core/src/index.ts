@@ -56,5 +56,9 @@ export { projectPayoutCurve } from './projections/projectPayoutCurve.js';
 // Auth
 export { loginUser, signupUser, fetchCurrentUser, validateUsername } from './auth/auth.js';
 
+// Chart Interaction
+export { pixelToDataX, computeZoomedDomain, computePannedDomain, filterVisibleData, generateEvenTicks } from './chart/zoom.js';
+export type { ZoomParams, PanParams } from './chart/zoom.js';
+
 // Discovery
 export { discoverMarkets } from './discovery/markets.js';

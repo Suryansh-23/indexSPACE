@@ -17,7 +17,7 @@ import {
   buy,
 } from '@functionspace/core';
 import type { BuyResult } from '@functionspace/core';
-import { FunctionSpaceContext, useMarket, useConsensus, useCustomShape } from '@functionspace/react';
+import { FunctionSpaceContext, useMarket, useConsensus, useCustomShape, useChartZoom, rechartsPlotArea } from '@functionspace/react';
 import '../styles/base.css';
 
 export interface CustomShapeEditorProps {
@@ -25,7 +25,10 @@ export interface CustomShapeEditorProps {
   onBuy?: (result: BuyResult) => void;
   onError?: (error: Error) => void;
   defaultNumPoints?: number;
+  zoomable?: boolean;
 }
+
+const ZOOM_PAN_EXCLUDE_SELECTORS = ['circle', '.recharts-active-dot'];
 
 interface ChartPoint {
   x: number;
@@ -47,6 +50,7 @@ export function CustomShapeEditor({
   onBuy,
   onError,
   defaultNumPoints = 20,
+  zoomable,
 }: CustomShapeEditorProps) {
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('CustomShapeEditor must be used within FunctionSpaceProvider');
@@ -166,6 +170,29 @@ export function CustomShapeEditor({
 
     return points;
   }, [consensus, market, shape.pVector, ctx.selectedPosition, ctx.previewPayout]);
+
+  // Zoom support
+  const csFullXDomain = useMemo<[number, number]>(() => {
+    if (!chartData.length) return [0, 1];
+    return [chartData[0].x, chartData[chartData.length - 1].x];
+  }, [chartData]);
+
+  const csGetPlotArea = useMemo(() => rechartsPlotArea({ left: 10, right: 15 }, 60), []);
+
+  const zoom = useChartZoom({
+    data: chartData,
+    xKey: 'x',
+    fullXDomain: csFullXDomain,
+    getPlotArea: csGetPlotArea,
+    panExcludeSelectors: ZOOM_PAN_EXCLUDE_SELECTORS,
+    enabled: zoomable,
+  });
+
+  // Merge refs — both chartContainerRef (control-point coords) and zoom.containerRef (scroll zoom)
+  const mergedChartRef = useCallback((node: HTMLDivElement | null) => {
+    chartContainerRef.current = node;
+    zoom.containerRef.current = node;
+  }, [zoom.containerRef]);
 
   // Control point positions for chart scatter dots
   const controlDots = useMemo<ControlDot[]>(() => {
@@ -425,7 +452,16 @@ export function CustomShapeEditor({
         </div>
 
         {/* Chart */}
-        <div className="fs-cs-chart-area" ref={chartContainerRef}>
+        <div
+          className="fs-cs-chart-area"
+          ref={mergedChartRef}
+          onMouseDown={zoom.containerProps.onMouseDown}
+          onMouseMove={zoom.containerProps.onMouseMove}
+          onMouseUp={zoom.containerProps.onMouseUp}
+          onMouseLeave={zoom.containerProps.onMouseLeave}
+          onDoubleClick={zoom.containerProps.onDoubleClick}
+          style={zoom.containerProps.style}
+        >
           <ResponsiveContainer width="100%" height={280}>
             <ComposedChart data={chartData} margin={{ top: 25, right: 15, left: 10, bottom: 30 }}>
               <defs>
@@ -448,7 +484,8 @@ export function CustomShapeEditor({
               <XAxis
                 dataKey="x"
                 type="number"
-                domain={['dataMin', 'dataMax']}
+                domain={zoomable ? zoom.xDomain : ['dataMin', 'dataMax']}
+                allowDataOverflow={zoomable && zoom.isZoomed}
                 tick={{ fill: ctx.chartColors.axisText, fontSize: 12 }}
                 tickFormatter={(v: number) => v.toFixed(1)}
                 label={{

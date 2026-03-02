@@ -14,6 +14,7 @@ export interface MarketChartsProps {
   overlayCurves?: OverlayCurve[];
   defaultBucketCount?: number;
   distributionState?: DistributionState;
+  zoomable?: boolean;
 }
 
 export function MarketCharts({
@@ -23,6 +24,7 @@ export function MarketCharts({
   overlayCurves,
   defaultBucketCount = 12,
   distributionState,
+  zoomable,
 }: MarketChartsProps) {
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('MarketCharts must be used within FunctionSpaceProvider');
@@ -100,6 +102,7 @@ export function MarketCharts({
           consensus={consensus}
           height={height}
           overlayCurves={overlayCurves}
+          zoomable={zoomable}
         />
       )}
 
@@ -120,6 +123,7 @@ export function MarketCharts({
           height={height}
           timeFilter={timeFilter}
           onTimeFilterChange={setTimeFilter}
+          zoomable={zoomable}
         />
       )}
     </div>

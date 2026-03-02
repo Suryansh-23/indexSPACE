@@ -70,7 +70,7 @@ Every new function must be classifiable by both layer AND category. This keeps t
 |------|-----|
 | Use CSS variables for ALL colors | Theming breaks otherwise |
 | ALL belief shapes route through `buildBelief` (L1) | Single normalization path, single point of change |
-| New widget root classes must be added to derived-variables selector near the top of `base.css` | Derived vars (`--fs-background-dark` etc.) won't resolve otherwise — breaks silently |
+| New widget root classes must be added to derived-variables selector near the top of `base.css` | Derived vars (`--fs-primary-glow`, `--fs-primary-light`, `--fs-header-gradient`) won't resolve otherwise — breaks silently |
 | Widgets must check `FunctionSpaceContext` | Throws helpful error if provider missing |
 | Data-fetching hooks return `{ <named>, loading, error, refetch }` | Named property matches hook purpose. State/action hooks (e.g. `useAuth`, `useCustomShape`) return context fields directly. |
 | Export types separately | `export type { Props }` for proper tree-shaking |
@@ -88,6 +88,7 @@ Every new function must be classifiable by both layer AND category. This keeps t
 | Modify chart colors | `packages/react/src/themes.ts` (ChartColors, resolveChartColors, preset overrides) |
 | Add/modify belief shapes | `packages/core/src/shapes/definitions.ts` + `packages/core/src/math/builders.ts` |
 | Add auth functions | `packages/core/src/auth/auth.ts` |
+| Add chart zoom/pan math | `packages/core/src/chart/zoom.ts` |
 | Add internal UI primitives | `packages/ui/src/components/` (not exported from package root) |
 
 ## Testing Requirements
@@ -106,6 +107,7 @@ cd demo-app && npx vite build   # Build verification (required)
 | `tests/stage1.test.ts` | Core math functions | Changing belief builders or curve evaluation |
 | `tests/stage2.test.ts` | API/transaction functions | Changing buy, sell, or query functions |
 | `tests/shapes.test.ts` | Belief shape validation (vector properties, shape characteristics) | Adding new L2 builders or modifying kernel functions |
+| `tests/chart-zoom.test.ts` | Chart zoom/pan math functions | Changing pixelToDataX, zoom/pan domain computation, data filtering |
 | `tests/themes.test.ts` | Theme preset validation, resolveTheme behavior | Adding/modifying presets or theme resolution logic |
 | `tests/binary.test.ts` | Binary panel-specific tests | Changing BinaryPanel behavior or x-point modes |
 | `tests/components.test.tsx` | Widget smoke tests (provider guard, loading, error, primary action, cleanup) | Adding or modifying UI widgets — see [Widget Component Testing Guide](../Docs/widget-component-testing-guide.md) |

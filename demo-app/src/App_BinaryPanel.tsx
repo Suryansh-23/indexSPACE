@@ -9,9 +9,13 @@ export default function App_BinaryPanel() {
   return (
     <ArticlePage>
       <FunctionSpaceProvider config={config} theme={widgetTheme}>
-        <AuthWidget />
-        <div style={{ marginTop: '1rem' }}>
-          <MarketStats marketId={MARKET_ID} />
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <div style={{ flex: 7, minWidth: 0 }}>
+            <MarketStats marketId={MARKET_ID} />
+          </div>
+          <div style={{ flex: 3, minWidth: 0 }}>
+            <AuthWidget />
+          </div>
         </div>
 
         <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
@@ -19,6 +23,7 @@ export default function App_BinaryPanel() {
             marketId={MARKET_ID}
             height={400}
             views={['consensus', 'distribution']}
+            zoomable
           />
         </div>
 

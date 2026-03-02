@@ -57,8 +57,11 @@ describe('SDK Architecture', () => {
   describe('Hook Patterns', () => {
     it('all data-fetching hooks check for context', () => {
       const reactDir = path.join(__dirname, '../packages/react/src');
+      // useChartZoom has no context dependency — it's a pure state/action hook
+      const noContextHooks = ['useChartZoom'];
       const hookFiles = getFiles(reactDir, /^use.*\.ts$/).filter(f =>
-        fs.statSync(f).isFile() && f.includes('use')
+        fs.statSync(f).isFile() && f.includes('use') &&
+        !noContextHooks.some(h => path.basename(f).startsWith(h))
       );
 
       for (const file of hookFiles) {
@@ -72,7 +75,11 @@ describe('SDK Architecture', () => {
 
     it('data-fetching hooks return loading and error states', () => {
       const reactDir = path.join(__dirname, '../packages/react/src');
-      const hookFiles = getFiles(reactDir, /^use.*\.ts$/);
+      // State/action hooks don't follow the data-fetching pattern
+      const nonDataHooks = ['useAuth', 'useCustomShape', 'useChartZoom'];
+      const hookFiles = getFiles(reactDir, /^use.*\.ts$/).filter(
+        f => !nonDataHooks.some(h => path.basename(f).startsWith(h))
+      );
 
       for (const file of hookFiles) {
         const content = fs.readFileSync(file, 'utf-8');
@@ -86,7 +93,7 @@ describe('SDK Architecture', () => {
 
     it('data-fetching hooks react to invalidationCount', () => {
       const reactDir = path.join(__dirname, '../packages/react/src');
-      const stateHooks = ['useAuth', 'useCustomShape'];
+      const stateHooks = ['useAuth', 'useCustomShape', 'useChartZoom'];
       const hookFiles = getFiles(reactDir, /^use.*\.ts$/).filter(
         f => !stateHooks.some(h => path.basename(f).startsWith(h))
       );
@@ -173,6 +180,18 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('useDistributionState');
       expect(indexContent).toContain('useAuth');
       expect(indexContent).toContain('useCustomShape');
+      expect(indexContent).toContain('useChartZoom');
+    });
+
+    it('chart zoom types and helper are exported from react package', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/react/src/index.ts'),
+        'utf-8'
+      );
+
+      expect(indexContent).toContain('ChartZoomOptions');
+      expect(indexContent).toContain('ChartZoomResult');
+      expect(indexContent).toContain('rechartsPlotArea');
     });
 
     it('react index exports new theme presets and types', () => {
@@ -330,6 +349,21 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('generateBellShape');
       expect(indexContent).toContain('SplineRegion');
     });
+
+    it('chart zoom functions and types are exported from core', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/core/src/index.ts'),
+        'utf-8'
+      );
+
+      expect(indexContent).toContain('pixelToDataX');
+      expect(indexContent).toContain('computeZoomedDomain');
+      expect(indexContent).toContain('computePannedDomain');
+      expect(indexContent).toContain('filterVisibleData');
+      expect(indexContent).toContain('generateEvenTicks');
+      expect(indexContent).toContain('ZoomParams');
+      expect(indexContent).toContain('PanParams');
+    });
   });
 
   describe('Component Props Patterns', () => {
@@ -428,6 +462,26 @@ describe('SDK Architecture', () => {
 
       expect(indexContent).toContain('buildRange');
       expect(indexContent).toContain('RangeInput');
+    });
+
+    it('zoomable charts accept zoomable prop', () => {
+      const consensus = fs.readFileSync(
+        path.join(__dirname, '../packages/ui/src/charts/ConsensusChart.tsx'), 'utf-8'
+      );
+      const timeline = fs.readFileSync(
+        path.join(__dirname, '../packages/ui/src/charts/TimelineChart.tsx'), 'utf-8'
+      );
+      const marketCharts = fs.readFileSync(
+        path.join(__dirname, '../packages/ui/src/charts/MarketCharts.tsx'), 'utf-8'
+      );
+      const customShape = fs.readFileSync(
+        path.join(__dirname, '../packages/ui/src/trading/CustomShapeEditor.tsx'), 'utf-8'
+      );
+
+      expect(consensus).toContain('zoomable');
+      expect(timeline).toContain('zoomable');
+      expect(marketCharts).toContain('zoomable');
+      expect(customShape).toContain('zoomable');
     });
 
     it('DistributionState type is exported from react package', () => {

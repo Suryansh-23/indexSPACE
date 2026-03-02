@@ -18,7 +18,7 @@ export default function App_ShapeCutterTradingLayout() {
         </div>
 
         <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
-          <MarketCharts marketId={MARKET_ID} height={350} views={['consensus', 'distribution', 'timeline']} />
+          <MarketCharts marketId={MARKET_ID} height={350} views={['consensus', 'distribution', 'timeline']} zoomable />
         </div>
 
         <div style={{ marginBottom: '1rem' }}>

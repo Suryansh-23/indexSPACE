@@ -1,4 +1,4 @@
-import React, { useContext, useMemo, useState } from 'react';
+import React, { useContext, useMemo, useState, useCallback } from 'react';
 import {
   ComposedChart,
   Area,
@@ -11,7 +11,7 @@ import {
 } from 'recharts';
 import { transformHistoryToFanChart } from '@functionspace/core';
 import type { MarketState, FanChartPoint } from '@functionspace/core';
-import { FunctionSpaceContext, useMarket, useMarketHistory } from '@functionspace/react';
+import { FunctionSpaceContext, useMarket, useMarketHistory, useChartZoom, rechartsPlotArea } from '@functionspace/react';
 import '../styles/base.css';
 
 // ── Band configuration (static metadata, colors resolved at render time) ──
@@ -57,6 +57,7 @@ export interface TimelineChartContentProps {
   height: number;
   timeFilter: string;
   onTimeFilterChange: (filter: string) => void;
+  zoomable?: boolean;
 }
 
 export function TimelineChartContent({
@@ -65,6 +66,7 @@ export function TimelineChartContent({
   height,
   timeFilter,
   onTimeFilterChange,
+  zoomable,
 }: TimelineChartContentProps) {
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('TimelineChartContent must be used within FunctionSpaceProvider');
@@ -142,6 +144,37 @@ export function TimelineChartContent({
     ];
   }, [chartData, L, H]);
 
+  // Zoom support
+  const fullXDomain = useMemo<[number, number]>(() => {
+    if (!chartData.length) return [0, 1];
+    return [chartData[0].timestamp, chartData[chartData.length - 1].timestamp];
+  }, [chartData]);
+
+  const getPlotArea = useMemo(() => rechartsPlotArea({ left: 10, right: 15 }, 60), []);
+
+  const zoomComputeYDomain = useCallback((visible: any[], _full: any[]) => {
+    if (!visible.length) return [L, H] as [number, number];
+    let min = Infinity, max = -Infinity;
+    for (const d of visible) {
+      if (d.band95[0] < min) min = d.band95[0];
+      if (d.band95[1] > max) max = d.band95[1];
+    }
+    const padding = (max - min) * 0.05;
+    return [Math.max(L, min - padding), Math.min(H, max + padding)] as [number, number];
+  }, [L, H]);
+
+  const zoom = useChartZoom({
+    data: chartData,
+    xKey: 'timestamp',
+    fullXDomain,
+    getPlotArea,
+    computeYDomain: zoomComputeYDomain,
+    resetTrigger: timeFilter,
+    enabled: zoomable,
+  });
+
+  const effectiveYDomain = (zoomable && zoom.isZoomed && zoom.yDomain) ? zoom.yDomain : yDomain;
+
   // X-axis tick formatter
   const formatTimestamp = (ts: number) => {
     const d = new Date(ts);
@@ -214,7 +247,7 @@ export function TimelineChartContent({
         </div>
       </div>
 
-      <div className="fs-chart-body" style={{ height, position: 'relative' }}>
+      <div className="fs-chart-body" ref={zoom.containerRef} {...zoom.containerProps} style={{ height, position: 'relative', ...zoom.containerProps.style }}>
         {loading ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--fs-text-secondary)' }}>
             Loading history data...
@@ -231,7 +264,8 @@ export function TimelineChartContent({
               <XAxis
                 dataKey="timestamp"
                 type="number"
-                domain={['dataMin', 'dataMax']}
+                domain={zoomable ? zoom.xDomain : ['dataMin', 'dataMax']}
+                allowDataOverflow={zoomable && zoom.isZoomed}
                 tick={{ fill: ctx.chartColors.axisText, fontSize: 11 }}
                 tickFormatter={formatTimestamp}
                 label={{
@@ -244,7 +278,7 @@ export function TimelineChartContent({
               />
 
               <YAxis
-                domain={yDomain}
+                domain={effectiveYDomain}
                 tick={{ fill: ctx.chartColors.axisText, fontSize: 10 }}
                 tickFormatter={(v: number) => v.toFixed(decimals)}
                 label={{
@@ -331,11 +365,13 @@ export function TimelineChartContent({
 export interface TimelineChartProps {
   marketId: string | number;
   height?: number;
+  zoomable?: boolean;
 }
 
 export function TimelineChart({
   marketId,
   height = 300,
+  zoomable,
 }: TimelineChartProps) {
   const { market, loading, error } = useMarket(marketId);
   const [timeFilter, setTimeFilter] = useState('all');
@@ -374,6 +410,7 @@ export function TimelineChart({
         height={height}
         timeFilter={timeFilter}
         onTimeFilterChange={setTimeFilter}
+        zoomable={zoomable}
       />
     </div>
   );

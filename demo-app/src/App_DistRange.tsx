@@ -9,13 +9,17 @@ function DistRangeContent() {
 
   return (
     <>
-      <AuthWidget />
-      <div style={{ marginTop: '1rem' }}>
-        <MarketStats marketId={MARKET_ID} />
-      </div>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <div style={{ flex: 7, minWidth: 0 }}>
+            <MarketStats marketId={MARKET_ID} />
+          </div>
+          <div style={{ flex: 3, minWidth: 0 }}>
+            <AuthWidget />
+          </div>
+        </div>
 
       <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
-        <MarketCharts marketId={MARKET_ID} height={350} views={['consensus', 'distribution']} distributionState={distState} />
+        <MarketCharts marketId={MARKET_ID} height={350} views={['consensus', 'distribution']} distributionState={distState} zoomable />
       </div>
 
       <div style={{ marginBottom: '1rem' }}>
