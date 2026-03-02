@@ -1,27 +1,93 @@
 /**
- * render_ui_pngs.ts
+ * render_ui_pngs.ts — Automated UI screenshot capture for SDK documentation
  *
- * Captures pixel-perfect screenshots of UI components and starter kit layouts.
+ * Uses Playwright to capture pixel-perfect, retina-quality PNGs of every SDK
+ * UI component and starter kit layout. Output goes to sdk_iteration_docs/ui_images/.
  *
- * Modes:
- *   components  — Capture individual UI components (requires App_AllComponents in main.tsx)
- *   kits        — Capture full-page starter kit layouts (requires App_StarterKitCapture in main.tsx)
- *   all         — Both (requires App_AllComponents first, then App_StarterKitCapture — or run separately)
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * ARCHITECTURE
+ * ═══════════════════════════════════════════════════════════════════════════════
  *
- * Prerequisites:
- *   1. npm install playwright (from repo root)
- *   2. npx playwright install chromium
- *   3. Set the correct App import in demo-app/src/main.tsx
- *   4. Start backend + demo app (cd demo-app && npm run dev)
+ * This script works with two companion React apps in demo-app/src/:
  *
- * Usage:
+ *   App_AllComponents.tsx        — Renders every UI component on one page.
+ *                                  Each component is wrapped in a <div data-capture="ComponentName">
+ *                                  so this script can target and screenshot them individually.
+ *
+ *   App_StarterKitCapture.tsx    — Hash-routed app that renders each starter kit layout.
+ *                                  Navigate to #basic, #binary, #custom-shape, etc.
+ *                                  Each layout is wrapped in <div data-capture="StarterKit_Name">.
+ *                                  Uses noAuthConfig so AuthWidget renders logged-out.
+ *
+ * Only one app can be active at a time in demo-app/src/main.tsx. You must set
+ * the correct import before running each mode (see usage below).
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * MODES
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ *   components — Captures individual UI components (14 components + 2 AuthWidget states).
+ *                Requires: `import App from './App_AllComponents'` in main.tsx.
+ *
+ *   kits       — Captures full starter kit layouts (6 layouts, logged-out state).
+ *                Requires: `import App from './App_StarterKitCapture'` in main.tsx.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * PREREQUISITES
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ *   1. Install deps (one-time):
+ *        npm install playwright && npx playwright install chromium
+ *
+ *   2. Set the correct App import in demo-app/src/main.tsx (see modes above)
+ *
+ *   3. Start the backend API server
+ *
+ *   4. Start the demo app:
+ *        cd demo-app && npm run dev
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * USAGE
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ *   # Activate the conda environment (required for node/npx access)
+ *   conda activate python-313
+ *
+ *   # Capture individual component screenshots
+ *   #   (main.tsx must import App_AllComponents)
  *   npx tsx sdk_iteration_docs/render_ui_pngs.ts components
- *   npx tsx sdk_iteration_docs/render_ui_pngs.ts kits
- *   npx tsx sdk_iteration_docs/render_ui_pngs.ts           # defaults to "kits"
  *
- * Options:
- *   DEV_URL  — override the demo app URL (default: http://localhost:5173)
- *   SCALE    — device scale factor for retina (default: 2)
+ *   # Capture starter kit layout screenshots
+ *   #   (main.tsx must import App_StarterKitCapture)
+ *   npx tsx sdk_iteration_docs/render_ui_pngs.ts kits
+ *
+ *   # Default (no argument) runs "kits" mode
+ *   npx tsx sdk_iteration_docs/render_ui_pngs.ts
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * ENVIRONMENT VARIABLES
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ *   DEV_URL  — Demo app URL (default: http://localhost:5173)
+ *   SCALE    — Device scale factor for retina (default: 2, use 1 for standard)
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * OUTPUT FILES — sdk_iteration_docs/ui_images/
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ *   "components" mode produces:
+ *     MarketStats.png, ConsensusChart.png, DistributionChart.png,
+ *     TimelineChart.png, MarketCharts.png, TradePanel.png, ShapeCutter.png,
+ *     BinaryPanel.png, BucketRangeSelector.png, BucketTradePanel.png,
+ *     CustomShapeEditor.png, PositionTable.png, TimeSales.png,
+ *     AuthWidget_LoggedIn.png, AuthWidget_LoggedOut.png
+ *
+ *   "kits" mode produces:
+ *     StarterKit_BasicTrading.png, StarterKit_BinaryPanel.png,
+ *     StarterKit_CustomShape.png, StarterKit_DistRange.png,
+ *     StarterKit_ShapeCutter.png, StarterKit_TimelineBinary.png
+ *
+ *   All images use fs-dark theme at 2x retina resolution.
  */
 
 import { chromium, type Page } from 'playwright';
@@ -36,7 +102,16 @@ const DEV_URL = process.env.DEV_URL || 'http://localhost:5173';
 const SCALE = Number(process.env.SCALE) || 2;
 const OUTPUT_DIR = path.resolve(__dirname, 'ui_images');
 
-// ── Component capture config (App_AllComponents) ──
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPONENT CAPTURE CONFIG
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// Each entry maps to a <div data-capture="Name"> in App_AllComponents.tsx.
+// - name:    Output filename (without .png extension)
+// - selector: CSS selector targeting the wrapper div
+// - waitFor:  Optional inner selector to wait for before capturing — ensures
+//             the component has finished loading/rendering (e.g., Recharts SVG
+//             elements appear only after data fetches complete)
 
 const COMPONENTS: {
   name: string;
@@ -59,7 +134,15 @@ const COMPONENTS: {
   { name: 'TimeSales',           selector: '[data-capture="TimeSales"]',           waitFor: '.fs-time-sales' },
 ];
 
-// ── Starter kit capture config (App_StarterKitCapture with hash routing) ──
+// ═══════════════════════════════════════════════════════════════════════════════
+// STARTER KIT CAPTURE CONFIG
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// Each entry maps to a hash route in App_StarterKitCapture.tsx.
+// The app uses a simple hash router: navigating to /#basic renders the
+// BasicTradingLayout, which wraps its content in <div data-capture="StarterKit_BasicTrading">.
+// - name: Output filename (without .png) — must match the data-capture attribute
+// - hash: URL hash fragment to navigate to
 
 const STARTER_KITS: {
   name: string;
@@ -73,7 +156,18 @@ const STARTER_KITS: {
   { name: 'StarterKit_TimelineBinary',   hash: 'timeline-binary' },
 ];
 
-// ── Component capture ──
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPONENT CAPTURE
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// Navigates to the App_AllComponents page (single URL, all components stacked)
+// and screenshots each one by its data-capture selector.
+//
+// AuthWidget special handling:
+//   The demo app may auto-authenticate (if .env has credentials). This script
+//   captures the initial state, then toggles to the opposite state:
+//   - If auto-authenticated: renames initial capture to _LoggedIn, signs out, captures _LoggedOut
+//   - If not authenticated: renames initial capture to _LoggedOut, signs in, captures _LoggedIn
 
 async function captureComponents(page: Page) {
   console.log('\n=== Capturing individual components ===\n');
@@ -81,6 +175,7 @@ async function captureComponents(page: Page) {
   console.log(`Navigating to ${DEV_URL}...`);
   await page.goto(DEV_URL, { waitUntil: 'networkidle' });
 
+  // Wait for all components to fetch data and render (charts need time for Recharts SVG)
   console.log('Waiting for components to hydrate...');
   await page.waitForTimeout(4000);
 
@@ -96,6 +191,7 @@ async function captureComponents(page: Page) {
         });
       }
 
+      // Let CSS transitions and animations settle
       await page.waitForTimeout(500);
 
       const element = await page.$(comp.selector);
@@ -111,13 +207,14 @@ async function captureComponents(page: Page) {
     }
   }
 
-  // AuthWidget: capture both states
+  // --- AuthWidget: capture both logged-in and logged-out states ---
   console.log('\nCapturing AuthWidget alternate state...');
   try {
     const authSelector = '[data-capture="AuthWidget"]';
     const userBar = await page.$(`${authSelector} .fs-auth-user-bar`);
 
     if (userBar) {
+      // Already logged in — rename initial capture and sign out for logged-out capture
       const loggedInPath = path.join(OUTPUT_DIR, 'AuthWidget_LoggedIn.png');
       const originalPath = path.join(OUTPUT_DIR, 'AuthWidget.png');
       if (fs.existsSync(originalPath)) {
@@ -135,6 +232,7 @@ async function captureComponents(page: Page) {
         }
       }
     } else {
+      // Not logged in — rename initial capture and sign in for logged-in capture
       const loggedOutPath = path.join(OUTPUT_DIR, 'AuthWidget_LoggedOut.png');
       const originalPath = path.join(OUTPUT_DIR, 'AuthWidget.png');
       if (fs.existsSync(originalPath)) {
@@ -167,7 +265,14 @@ async function captureComponents(page: Page) {
   }
 }
 
-// ── Starter kit capture ──
+// ═══════════════════════════════════════════════════════════════════════════════
+// STARTER KIT CAPTURE
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// Navigates to each hash route in App_StarterKitCapture and captures the
+// widget wrapper element. Each layout renders with noAuthConfig (logged-out)
+// and fs-dark theme. The hash router re-renders the layout without a full
+// page reload, but we use page.goto() per kit to ensure clean state.
 
 async function captureStarterKits(page: Page) {
   console.log('\n=== Capturing starter kit layouts ===\n');
@@ -181,10 +286,9 @@ async function captureStarterKits(page: Page) {
       console.log(`  Navigating to ${url}...`);
       await page.goto(url, { waitUntil: 'networkidle' });
 
-      // Wait for data to load and charts to render
+      // Wait for data fetches + chart renders (TimelineChart needs history data)
       await page.waitForTimeout(5000);
 
-      // Capture just the widget wrapper element
       await page.waitForSelector(selector, { timeout: 10000 });
       const element = await page.$(selector);
       if (!element) {
@@ -200,14 +304,23 @@ async function captureStarterKits(page: Page) {
   }
 }
 
-// ── Main ──
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN
+// ═══════════════════════════════════════════════════════════════════════════════
 
 async function main() {
   const mode = process.argv[2] || 'kits';
 
-  if (!['components', 'kits', 'all'].includes(mode)) {
-    console.error(`Unknown mode: ${mode}`);
-    console.error('Usage: npx tsx render_ui_pngs.ts [components|kits|all]');
+  if (!['components', 'kits'].includes(mode)) {
+    console.error(`Unknown mode: "${mode}"`);
+    console.error('');
+    console.error('Usage: npx tsx sdk_iteration_docs/render_ui_pngs.ts [components|kits]');
+    console.error('');
+    console.error('  components  Capture individual UI component screenshots');
+    console.error('              Requires App_AllComponents in main.tsx');
+    console.error('');
+    console.error('  kits        Capture starter kit layout screenshots (default)');
+    console.error('              Requires App_StarterKitCapture in main.tsx');
     process.exit(1);
   }
 
@@ -221,11 +334,9 @@ async function main() {
   });
   const page = await context.newPage();
 
-  if (mode === 'components' || mode === 'all') {
+  if (mode === 'components') {
     await captureComponents(page);
-  }
-
-  if (mode === 'kits' || mode === 'all') {
+  } else {
     await captureStarterKits(page);
   }
 
