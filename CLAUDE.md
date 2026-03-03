@@ -1,5 +1,7 @@
 # STOP — Read the SDK docs before doing anything
 
+**This file and the files references in this document are specific to the developement OF the sdk NOT the consumption**
+
 **You MUST read both of these files before making ANY changes to this codebase.** Do not skip this. Do not skim. Do not assume you know the patterns. Read them fully every session.
 
 1. **`sdk_iteration_docs/CLAUDE.md`** — Architecture, constraints, testing requirements, automated reviewers, skills

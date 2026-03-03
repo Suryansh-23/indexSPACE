@@ -1,5 +1,5 @@
 # FunctionSpace Trading SDK
-
+**This file and the files references in this document are specific to the developement OF the sdk NOT the consumption**
 ## What This Is
 
 A TypeScript SDK for embedding prediction market trading widgets into web applications. Developers install the packages via npm and drop in themed, interactive components.

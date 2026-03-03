@@ -1,5 +1,5 @@
 # FunctionSpace SDK Developer Playbook
-
+**This file and the files references in this document are specific to the developement OF the sdk NOT the consumption**
 ## Overview
 
 This playbook documents how to add new widgets and expand the SDK. All widgets must integrate with the theme system and follow established patterns.
