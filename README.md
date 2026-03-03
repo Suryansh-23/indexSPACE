@@ -47,9 +47,9 @@ Pure TypeScript with zero dependencies. Use this layer directly if you don't nee
 
 **API Client** — `FSClient` handles authentication (token-based with auto-retry on 401), request building, and guest mode for unauthenticated browsing.
 
-**Math / Belief Building** — Two-layer architecture for constructing belief vectors:
-- **L1**: `buildBelief(regions, K, L, H)` — universal constructor. All belief vectors route through this single normalization path.
-- **L2**: Convenience builders — `buildGaussian`, `buildPlateau`, `buildDip`, `buildLeftSkew`, `buildRightSkew`. Thin wrappers that construct Region arrays and delegate to L1.
+**Math / Position Generation** — Two-layer architecture for constructing belief vectors:
+- **L1**: `generateBelief(regions, K, L, H)` — universal constructor. All belief vectors route through this single normalization path.
+- **L2**: Convenience generators — `generateGaussian`, `generatePlateau`, `generateDip`, `generateLeftSkew`, `generateRightSkew`. Thin wrappers that construct Region arrays and delegate to L1.
 
 **Density Evaluation** — `evaluateDensityCurve` (multi-point for charts) and `evaluateDensityPiecewise` (single-point) use piecewise-linear interpolation over Bernstein coefficient arrays.
 
@@ -62,11 +62,11 @@ Pure TypeScript with zero dependencies. Use this layer directly if you don't nee
 **Types** — `MarketState`, `Position`, `FSConfig`, `PayoutCurve`, `BeliefVector`, `TradeEntry`, `MarketHistory`, `FanChartPoint`, and more.
 
 ```typescript
-import { FSClient, queryMarketState, buildGaussian, buy } from '@functionspace/core';
+import { FSClient, queryMarketState, generateGaussian, buy } from '@functionspace/core';
 
 const client = new FSClient({ baseUrl: 'https://api.example.com', username: 'alice', password: 'secret' });
 const market = await queryMarketState(client, 1);
-const belief = buildGaussian(50, 5, market.config.K, market.config.L, market.config.H);
+const belief = generateGaussian(50, 5, market.config.K, market.config.L, market.config.H);
 const result = await buy(client, 1, belief, 100);
 ```
 
@@ -311,7 +311,7 @@ npx vitest run
 | `tests/themes.test.ts` | Theme presets, resolveTheme, resolveChartColors, chart color derivation |
 | `tests/shapes.test.ts` | Belief shape validation (vector properties, shape characteristics) |
 | `tests/binary.test.ts` | Binary panel-specific tests |
-| `tests/stage1.test.ts` | Core math functions (belief builders, density evaluation) |
+| `tests/stage1.test.ts` | Core math functions (position generators, density evaluation) |
 | `tests/stage2.test.ts` | API / transaction functions |
 
 ### Build Verification
@@ -328,7 +328,7 @@ packages/
 │   ├── index.ts              All exports
 │   ├── types.ts              Type definitions
 │   ├── client.ts             FSClient (auth, requests)
-│   ├── math/builders.ts      Belief vector construction (L1/L2)
+│   ├── math/generators.ts    Belief vector construction (L1/L2)
 │   ├── math/density.ts       Density evaluation, statistics
 │   ├── math/fanChart.ts      History → fan chart transform
 │   ├── queries/              Read operations (market, positions, history)

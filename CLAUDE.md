@@ -19,3 +19,4 @@ This is a strict 3-layer monorepo (`core` → `react` → `ui`) with enforced ar
 - **Tests must pass** before and after: `npx vitest run` + `cd demo-app && npx vite build`
 - **Update the docs** after every implementation — if it's not in the docs, it's not done
 - **No `Co-Authored-By`** in git commits
+- **Never Use Em Dashes** every anywhere ever

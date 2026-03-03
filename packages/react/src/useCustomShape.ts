@@ -1,5 +1,5 @@
 import { useState, useCallback, useContext, useMemo } from 'react';
-import { buildCustomShape, generateBellShape, computeStatistics } from '@functionspace/core';
+import { generateCustomShape, generateBellShape, computeStatistics } from '@functionspace/core';
 import type { BeliefVector, MarketState } from '@functionspace/core';
 import { FunctionSpaceContext } from './context.js';
 
@@ -47,7 +47,7 @@ export function useCustomShape(market: MarketState | null): UseCustomShapeReturn
   const pVector = useMemo<BeliefVector | null>(() => {
     if (!market) return null;
     const { K, L, H } = market.config;
-    return buildCustomShape(controlValues, K, L, H);
+    return generateCustomShape(controlValues, K, L, H);
   }, [controlValues, market]);
 
   const prediction = useMemo<number | null>(() => {

@@ -350,7 +350,7 @@ After a user submits a trade, immediately estimate the new consensus and update 
 
 **Where it lives:** React layer. Mutation hooks accept an `onMutate` callback that snapshots the current cache state and applies the optimistic update. On error, the snapshot is restored.
 
-**Design constraint:** The optimistic consensus must be computed client-side using the same math core already provides (`buildBelief` + market state). This keeps the optimistic update accurate rather than a guess.
+**Design constraint:** The optimistic consensus must be computed client-side using the same math core already provides (`generateBelief` + market state). This keeps the optimistic update accurate rather than a guess.
 
 **Established practice:** TanStack Query: `onMutate` → snapshot → manual cache update → `onError` → rollback. Apollo Client: `optimisticResponse` option on `useMutation`.
 
@@ -518,7 +518,7 @@ When reviewing any PR that touches the React layer, verify:
 ### Component Changes
 - [ ] No hardcoded DOM `id` attributes — use `useId()` if identifiers needed
 - [ ] No direct imports from `@functionspace/core` for mutations — use mutation hooks
-- [ ] Pure math imports from core are allowed (builders, density evaluation)
+- [ ] Pure math imports from core are allowed (generators, density evaluation)
 - [ ] Loading/error states handled per existing patterns
 - [ ] CSS uses `var(--fs-*)` variables only
 
@@ -526,7 +526,7 @@ When reviewing any PR that touches the React layer, verify:
 - [ ] Core does not import from React or UI
 - [ ] React does not import from UI
 - [ ] UI does not make API calls directly — data via hooks, mutations via mutation hooks
-- [ ] UI may import pure math functions from core (builders, density evaluation, statistics)
+- [ ] UI may import pure math functions from core (generators, density evaluation, statistics)
 
 ---
 

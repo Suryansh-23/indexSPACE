@@ -20,7 +20,7 @@ vi.mock('@functionspace/core', () => ({
   mapPosition: vi.fn((p) => p),
   calculateBucketDistribution: vi.fn(),
   computePercentiles: vi.fn(),
-  buildCustomShape: vi.fn().mockImplementation((controlValues: number[], K: number) => {
+  generateCustomShape: vi.fn().mockImplementation((controlValues: number[], K: number) => {
     const len = K + 1;
     return new Array(len).fill(1 / len);
   }),

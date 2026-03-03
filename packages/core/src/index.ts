@@ -30,8 +30,8 @@ export { FSClient } from './client.js';
 
 // Math
 export { evaluateDensityPiecewise, evaluateDensityCurve, computeStatistics, computePercentiles } from './math/density.js';
-export { buildGaussian, buildRange, buildPlateau, buildBelief, buildDip, buildLeftSkew, buildRightSkew, buildCustomShape, generateBellShape } from './math/builders.js';
-export type { Region, PointRegion, RangeRegion, SplineRegion, RangeInput } from './math/builders.js';
+export { generateGaussian, generateRange, generatePlateau, generateBelief, generateDip, generateLeftSkew, generateRightSkew, generateCustomShape, generateBellShape } from './math/generators.js';
+export type { Region, PointRegion, RangeRegion, SplineRegion, RangeInput } from './math/generators.js';
 export { calculateBucketDistribution } from './math/distribution.js';
 export { transformHistoryToFanChart } from './math/fanChart.js';
 

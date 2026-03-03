@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useContext, useCallback, useMemo } from 'react';
 import {
-  buildRange,
+  generateRange,
   projectPayoutCurve,
   buy,
 } from '@functionspace/core';
@@ -124,7 +124,7 @@ export function BucketRangeSelector({
     setCustomMax('');
   }, []);
 
-  // Build belief from selections
+  // Generate belief from selections
   const belief = useMemo(() => {
     if (!market || activeBuckets.length === 0) return null;
 
@@ -142,7 +142,7 @@ export function BucketRangeSelector({
     if (ranges.length === 0) return null;
 
     const { K, L, H } = market.config;
-    return buildRange(ranges, K, L, H);
+    return generateRange(ranges, K, L, H);
   }, [market, activeBuckets, selectedBuckets, customSelection]);
 
   // Phase 1: Instant preview

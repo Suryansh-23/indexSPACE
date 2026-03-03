@@ -412,11 +412,11 @@ These are accessed via `market.config.K`, `market.config.L`, `market.config.H` f
 
 ---
 
-## Belief Builder Architecture
+## Position Generator Architecture
 
-The belief construction system lives in `packages/core/src/math/builders.ts` and uses a strict two-layer architecture. Understanding this is essential before adding new shapes or modifying trade inputs.
+The belief construction system lives in `packages/core/src/math/generators.ts` and uses a strict two-layer architecture. Understanding this is essential before adding new shapes or modifying trade inputs.
 
-### L1 — `buildBelief(regions, K, L, H)` → `BeliefVector`
+### L1 — `generateBelief(regions, K, L, H)` → `BeliefVector`
 
 The **universal constructor**. ALL belief vector creation MUST route through this function. It:
 1. Takes an array of `Region` objects
@@ -425,7 +425,7 @@ The **universal constructor**. ALL belief vector creation MUST route through thi
 4. Normalizes the result (private `normalize()` function — guarantees output sums to 1)
 
 ```
-buildBelief(regions, K, L, H)
+generateBelief(regions, K, L, H)
   for each region:
     if type === 'point' → pointKernel(region, K, L, H)  → raw K+1 array
     if type === 'range' → rangeKernel(region, K, L, H)  → raw K+1 array
@@ -436,22 +436,22 @@ buildBelief(regions, K, L, H)
 
 Both kernel functions accept the full `Region` object (not individual scalars), following the same pattern.
 
-**`normalize` is private and stays private.** It is called exclusively by `buildBelief`. Since every shape goes through `buildBelief`, there is exactly one normalization code path — no duplication. Never export it, never duplicate it.
+**`normalize` is private and stays private.** It is called exclusively by `generateBelief`. Since every shape goes through `generateBelief`, there is exactly one normalization code path — no duplication. Never export it, never duplicate it.
 
-### L2 — Convenience builders
+### L2 — Convenience generators
 
-Thin wrappers that construct the correct `Region` array and delegate to `buildBelief`. They contain **zero math** — only shape semantics (what "gaussian" or "dip" means in terms of regions).
+Thin wrappers that construct the correct `Region` array and delegate to `generateBelief`. They contain **zero math** — only shape semantics (what "gaussian" or "dip" means in terms of regions).
 
-| L2 Function | What it passes to `buildBelief` |
+| L2 Function | What it passes to `generateBelief` |
 |-------------|--------------------------------|
-| `buildGaussian(center, spread, K, L, H)` | `[{ type: 'point', center, spread }]` |
-| `buildRange(low, high, K, L, H, sharpness?)` | `[{ type: 'range', low, high, sharpness: sharpness ?? 0.5 }]` — single range |
-| `buildRange(ranges[], K, L, H)` | Multiple `RangeRegion` entries with per-range sharpness/weight — multi-range composition |
-| `buildPlateau(low, high, K, L, H, sharpness?)` | **Deprecated alias** for single-range `buildRange`. Default sharpness = 0.5. |
-| `buildDip(center, spread, K, L, H)` | `[{ type: 'point', center, spread: spread*1.5, inverted: true }]` |
-| `buildLeftSkew(center, spread, K, L, H, skewAmount?)` | `[{ type: 'point', center, spread, skew: -skewAmount }]` |
-| `buildRightSkew(center, spread, K, L, H, skewAmount?)` | `[{ type: 'point', center, spread, skew: skewAmount }]` |
-| `buildCustomShape(controlValues, K, L, H)` | `[{ type: 'spline', controlX: evenly-spaced, controlY: controlValues }]` — spline interpolation of user control points |
+| `generateGaussian(center, spread, K, L, H)` | `[{ type: 'point', center, spread }]` |
+| `generateRange(low, high, K, L, H, sharpness?)` | `[{ type: 'range', low, high, sharpness: sharpness ?? 0.5 }]` — single range |
+| `generateRange(ranges[], K, L, H)` | Multiple `RangeRegion` entries with per-range sharpness/weight — multi-range composition |
+| `generatePlateau(low, high, K, L, H, sharpness?)` | **Deprecated alias** for single-range `generateRange`. Default sharpness = 0.5. |
+| `generateDip(center, spread, K, L, H)` | `[{ type: 'point', center, spread: spread*1.5, inverted: true }]` |
+| `generateLeftSkew(center, spread, K, L, H, skewAmount?)` | `[{ type: 'point', center, spread, skew: -skewAmount }]` |
+| `generateRightSkew(center, spread, K, L, H, skewAmount?)` | `[{ type: 'point', center, spread, skew: skewAmount }]` |
+| `generateCustomShape(controlValues, K, L, H)` | `[{ type: 'spline', controlX: evenly-spaced, controlY: controlValues }]` — spline interpolation of user control points |
 
 ### Region Types
 
@@ -495,20 +495,20 @@ When `sharpness = 1`, the coefficient vector has a hard step function at the ran
 
 | Scenario | What to do | Example |
 |----------|-----------|---------|
-| Simple shape with one region | Create L2 if it will be reused | `buildGaussian`, `buildDip` |
-| Shape that's just existing L2 with different params | Call existing L2 with modified params — **no new function** | Spike = `buildGaussian(center, spread * 0.2, K, L, H)` |
-| Shape with multiple regions | Call `buildBelief` directly from the widget | Bimodal = two PointRegions with different centers/weights |
-| Shape that is a special case of existing L2 | Call existing L2 with boundary params | Uniform = `buildPlateau(L, H, K, L, H)` |
+| Simple shape with one region | Create L2 if it will be reused | `generateGaussian`, `generateDip` |
+| Shape that's just existing L2 with different params | Call existing L2 with modified params — **no new function** | Spike = `generateGaussian(center, spread * 0.2, K, L, H)` |
+| Shape with multiple regions | Call `generateBelief` directly from the widget | Bimodal = two PointRegions with different centers/weights |
+| Shape that is a special case of existing L2 | Call existing L2 with boundary params | Uniform = `generatePlateau(L, H, K, L, H)` |
 
-**Rule of thumb:** Create a new L2 only when the shape has unique Region parameters that encode a distinct shape concept (like inversion or skew). If it's just "same builder, different numbers," let the widget pass different numbers.
+**Rule of thumb:** Create a new L2 only when the shape has unique Region parameters that encode a distinct shape concept (like inversion or skew). If it's just "same generator, different numbers," let the widget pass different numbers.
 
-**Multi-range composition:** For non-contiguous range selections (e.g., `BucketRangeSelector`), use `buildRange(ranges[], K, L, H)` which accepts an array of `RangeInput` objects, each with its own `low`, `high`, `weight`, and `sharpness`. This composes multiple range regions into a single belief vector via `buildBelief`.
+**Multi-range composition:** For non-contiguous range selections (e.g., `BucketRangeSelector`), use `generateRange(ranges[], K, L, H)` which accepts an array of `RangeInput` objects, each with its own `low`, `high`, `weight`, and `sharpness`. This composes multiple range regions into a single belief vector via `generateBelief`.
 
 ### End-to-End Belief Flow
 
 ```
 Widget (e.g. TradePanel, ShapeCutter)
-  → L2 builder or buildBelief directly
+  → L2 generator or generateBelief directly
     → pointKernel / rangeKernel / splineKernel (private, internal)
       → normalize (private, internal)
         → BeliefVector (number[], K+1 elements, sums to 1)
@@ -544,7 +544,7 @@ Same math as `evaluateDensityCurve` but for one x value. Used internally by `com
 
 **Invariants:**
 - Coefficients are non-negative (guaranteed by kernel functions)
-- Coefficients sum to 1 (guaranteed by `normalize` in `buildBelief`)
+- Coefficients sum to 1 (guaranteed by `normalize` in `generateBelief`)
 - Density scaling is `(K+1)/(H-L)`
 - Preview and consensus use the same evaluation — what the user sees before submitting matches what they see after
 
@@ -565,16 +565,16 @@ Peaks beyond 4x are clipped visually but remain in the tooltip data. This ensure
 
 ## Core Functions (from @functionspace/core)
 
-### Math/Belief Building (Builders category)
-- `buildBelief(regions, K, L, H)` → belief vector (L1 — universal constructor, see above)
-- `buildGaussian(center, spread, K, L, H)` → belief vector (L2)
-- `buildRange(low, high, K, L, H, sharpness?)` → belief vector (L2, single range)
-- `buildRange(ranges[], K, L, H)` → belief vector (L2, multi-range composition)
-- `buildPlateau(low, high, K, L, H, sharpness?)` → belief vector (L2, **deprecated** — alias for single-range `buildRange`)
-- `buildDip(center, spread, K, L, H)` → belief vector (L2)
-- `buildLeftSkew(center, spread, K, L, H, skewAmount?)` → belief vector (L2)
-- `buildRightSkew(center, spread, K, L, H, skewAmount?)` → belief vector (L2)
-- `buildCustomShape(controlValues, K, L, H)` → belief vector (L2 — spline interpolation of user control points)
+### Math/Position Generation (Positions category)
+- `generateBelief(regions, K, L, H)` → belief vector (L1 — universal constructor, see above)
+- `generateGaussian(center, spread, K, L, H)` → belief vector (L2)
+- `generateRange(low, high, K, L, H, sharpness?)` → belief vector (L2, single range)
+- `generateRange(ranges[], K, L, H)` → belief vector (L2, multi-range composition)
+- `generatePlateau(low, high, K, L, H, sharpness?)` → belief vector (L2, **deprecated** — alias for single-range `generateRange`)
+- `generateDip(center, spread, K, L, H)` → belief vector (L2)
+- `generateLeftSkew(center, spread, K, L, H, skewAmount?)` → belief vector (L2)
+- `generateRightSkew(center, spread, K, L, H, skewAmount?)` → belief vector (L2)
+- `generateCustomShape(controlValues, K, L, H)` → belief vector (L2 — spline interpolation of user control points)
 - `generateBellShape(numPoints, peakPosition?, spread?, zeroTailPercent?)` → `number[]` (utility — default bell-shaped control values for custom shape editor)
 
 ### Math/Density & Statistics (L0 pure math)
@@ -691,11 +691,11 @@ onSuccess?.(result);       // Notify parent
 | `TradePanel` | Form input | Debouncing, preview sync, three-phase pattern |
 | `ShapeCutter` | Shape-based trade input | Shape definitions, two-column layout, skew/confidence sliders |
 | `BinaryPanel` | Binary yes/no trade input | X-point modes (static/variable/dynamic-mode/dynamic-mean), extends `TradeInputBaseProps`, three-phase pattern |
-| `BucketRangeSelector` | Bucket-based range selection with trade | Uses `useDistributionState` (shared or own), multi-range `buildRange`, bucket selection UI |
+| `BucketRangeSelector` | Bucket-based range selection with trade | Uses `useDistributionState` (shared or own), multi-range `generateRange`, bucket selection UI |
 | `BucketTradePanel` | Composed chart + range selector | Composes `DistributionChart` + `BucketRangeSelector` with shared `useDistributionState` (see shared state composition below) |
 | `PositionTable` | Data table | Tabbed views (Open Orders / Trade History / Market Positions), per-tab columns, pagination, row selection → chart overlay, sell actions |
 | `TimeSales` | Time & sales ticker | Uses `useTradeHistory` with `pollInterval` (default 5s), read-only market activity feed |
-| `CustomShapeEditor` | Custom shape trade input | Uses `useCustomShape` for control point state, draggable scatter dots + vertical sliders, spline interpolation via `buildCustomShape`, three-phase trade pattern |
+| `CustomShapeEditor` | Custom shape trade input | Uses `useCustomShape` for control point state, draggable scatter dots + vertical sliders, spline interpolation via `generateCustomShape`, three-phase trade pattern |
 
 **TimelineChart data-fetching pattern:** Unlike Consensus/Distribution (which receive shared `market` + `consensus` data as props from `MarketCharts`), `TimelineChartContent` calls `useMarketHistory` internally. This avoids fetching history data when the timeline tab isn't active. The `timeFilter` state is lifted to `MarketCharts` so it persists across tab switches.
 
@@ -743,28 +743,28 @@ When adding a new tabbed widget, follow this exact pattern — do not invent a d
 
 ### Adding a New Belief Shape
 
-Before creating anything, decide the correct approach (see "When to Create a New L2" in the Belief Builder Architecture section):
+Before creating anything, decide the correct approach (see "When to Create a New L2" in the Position Generator Architecture section):
 
 **If the shape needs new Region parameters (e.g., a new kernel behavior):**
 - [ ] Extend `PointRegion` or `RangeRegion` with optional fields — do NOT create new region types
-- [ ] Update the corresponding kernel function (`pointKernel` or `rangeKernel`) in `builders.ts` to handle new fields
+- [ ] Update the corresponding kernel function (`pointKernel` or `rangeKernel`) in `generators.ts` to handle new fields
 - [ ] Ensure existing callers without the new fields produce identical output (backward compatible)
 
-**If the shape needs a new L2 builder:**
-- [ ] Add L2 function to `builders.ts` — one line of logic constructing a Region array and passing to `buildBelief`
+**If the shape needs a new L2 generator:**
+- [ ] Add L2 function to `generators.ts` — one line of logic constructing a Region array and passing to `generateBelief`
 - [ ] Export from `packages/core/src/index.ts`
 - [ ] Add tests to `tests/shapes.test.ts` — valid vector (K+1 elements, all >= 0, sums to ~1) + shape-specific assertions
 
-**If the shape is just existing builder with different params:**
-- [ ] No new function needed — widget passes different params to existing L2 or calls `buildBelief` directly
-- [ ] Document the parameter mapping in the widget code (e.g., `spike = buildGaussian with spread * 0.2`)
+**If the shape is just existing generator with different params:**
+- [ ] No new function needed — widget passes different params to existing L2 or calls `generateBelief` directly
+- [ ] Document the parameter mapping in the widget code (e.g., `spike = generateGaussian with spread * 0.2`)
 
 **For any new shape:**
 - [ ] Add shape metadata to `SHAPE_DEFINITIONS` in `packages/core/src/shapes/definitions.ts` (id, name, description, parameters, svgPath)
-- [ ] Add routing case in the trade input widget's `buildCurrentBelief` switch
+- [ ] Add routing case in the trade input widget's `generateCurrentBelief` switch
 - [ ] Add prediction calculation in the widget's `getPrediction` function
 - [ ] **Run `npx vitest run` — all tests pass, no regressions on existing shapes**
-- [ ] **Update PLAYBOOK.md** — L2 builders table if new builder, Region Types if new fields, Core Functions list
+- [ ] **Update PLAYBOOK.md** — L2 generators table if new generator, Region Types if new fields, Core Functions list
 
 ### Adding a New Core Function
 - [ ] Function in appropriate `packages/core/src/` module
@@ -865,20 +865,20 @@ useEffect(() => {
 Every trade input widget follows this exact pattern (see `TradePanel.tsx` as reference):
 
 **Phase 1 — Instant preview (no debounce):**
-Build the belief vector on every parameter change and write it to context immediately. The chart updates in real-time.
+Generate the belief vector on every parameter change and write it to context immediately. The chart updates in real-time.
 ```typescript
-const buildCurrentBelief = useCallback(() => {
+const generateCurrentBelief = useCallback(() => {
   if (!market) return null;
   const { K, L, H } = market.config;
-  // Call appropriate builder based on current inputs
-  return buildGaussian(prediction, stdDev, K, L, H);
+  // Call appropriate generator based on current inputs
+  return generateGaussian(prediction, stdDev, K, L, H);
 }, [market, prediction, stdDev, /* other deps */]);
 
 useEffect(() => {
-  const belief = buildCurrentBelief();
+  const belief = generateCurrentBelief();
   ctx.setPreviewBelief(belief);
   if (!belief) { setPotentialPayout(null); ctx.setPreviewPayout(null); }
-}, [buildCurrentBelief]);
+}, [generateCurrentBelief]);
 ```
 
 **Phase 2 — Debounced payout projection (500ms):**
@@ -886,7 +886,7 @@ Project the payout curve via API. Debounced because this hits the server.
 ```typescript
 useEffect(() => {
   if (debounceRef.current) clearTimeout(debounceRef.current);
-  const belief = buildCurrentBelief();
+  const belief = generateCurrentBelief();
   const collateral = parseFloat(amount);
   if (!belief || isNaN(collateral) || collateral <= 0) { setPotentialPayout(null); return; }
   debounceRef.current = setTimeout(async () => {
@@ -896,7 +896,7 @@ useEffect(() => {
     ctx.setPreviewPayout(result);
   }, 500);
   return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-}, [buildCurrentBelief, amount, market, marketId]);
+}, [generateCurrentBelief, amount, market, marketId]);
 ```
 
 **Phase 3 — Trade submission:**
@@ -911,7 +911,7 @@ ctx.invalidate(marketId);
 
 ### Confidence → Spread Conversion
 
-Trade input widgets that offer a "confidence" slider (0-100%) convert it to a `spread` value for the builders. This is a UI concern, not a core math concern — each trade input widget owns its own conversion formula:
+Trade input widgets that offer a "confidence" slider (0-100%) convert it to a `spread` value for the generators. This is a UI concern, not a core math concern — each trade input widget owns its own conversion formula:
 
 ```typescript
 const getSpreadFromConfidence = useCallback((conf: number): number => {
@@ -956,7 +956,7 @@ packages/
 │   ├── index.ts              # All exports
 │   ├── types.ts              # Type definitions
 │   ├── client.ts             # FSClient class
-│   ├── math/builders.ts      # Belief vector math (buildBelief, buildGaussian, buildRange, etc.)
+│   ├── math/generators.ts    # Belief vector math (generateBelief, generateGaussian, generateRange, etc.)
 │   ├── math/density.ts       # Density evaluation, statistics, percentiles
 │   ├── math/distribution.ts  # calculateBucketDistribution
 │   ├── math/fanChart.ts      # History → FanChartPoint[] transform

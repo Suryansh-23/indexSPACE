@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useContext, useCallback } from 'react';
 import {
-  buildGaussian,
-  buildPlateau,
-  buildBelief,
-  buildDip,
-  buildLeftSkew,
-  buildRightSkew,
+  generateGaussian,
+  generatePlateau,
+  generateBelief,
+  generateDip,
+  generateLeftSkew,
+  generateRightSkew,
   projectPayoutCurve,
   buy,
   SHAPE_DEFINITIONS,
@@ -44,7 +44,7 @@ export function ShapeCutter({
   const [confidence, setConfidence] = useState(50);
   const [rangeValues, setRangeValues] = useState<[number, number] | null>(null);
   const [peakBias, setPeakBias] = useState(50); // 0-100, displayed as percentage
-  const [skewAmount, setSkewAmount] = useState(50); // 0-100, mapped to 0-1 for builders
+  const [skewAmount, setSkewAmount] = useState(50); // 0-100, mapped to 0-1 for generators
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [potentialPayout, setPotentialPayout] = useState<number | null>(null);
@@ -91,8 +91,8 @@ export function ShapeCutter({
     return maxSigma - ((conf / 100) * (maxSigma - minSigma));
   }, [market]);
 
-  // Build belief from current shape + parameters
-  const buildCurrentBelief = useCallback(() => {
+  // Generate belief from current shape + parameters
+  const generateCurrentBelief = useCallback(() => {
     if (!market) return null;
     const { K, L, H } = market.config;
     const spread = getSpreadFromConfidence(confidence);
@@ -100,41 +100,41 @@ export function ShapeCutter({
     switch (selectedShape) {
       case 'gaussian':
         if (targetOutcome === null) return null;
-        return buildGaussian(targetOutcome, spread, K, L, H);
+        return generateGaussian(targetOutcome, spread, K, L, H);
 
       case 'spike': {
         if (targetOutcome === null) return null;
         // Dynamic multiplier: 0.4x at low confidence → 0.02x at high confidence
         // Gives the spike ~20x more dynamic range than gaussian across confidence levels
         const spikeMul = 0.4 - (confidence / 100) * 0.38;
-        return buildGaussian(targetOutcome, spread * spikeMul, K, L, H);
+        return generateGaussian(targetOutcome, spread * spikeMul, K, L, H);
       }
 
       case 'plateau':
         if (!rangeValues) return null;
-        return buildPlateau(rangeValues[0], rangeValues[1], K, L, H, 1);
+        return generatePlateau(rangeValues[0], rangeValues[1], K, L, H, 1);
 
       case 'bimodal':
         if (!rangeValues) return null;
-        return buildBelief([
+        return generateBelief([
           { type: 'point', center: rangeValues[0], spread: spread * 0.8, weight: 1 - (peakBias / 100) },
           { type: 'point', center: rangeValues[1], spread: spread * 0.8, weight: peakBias / 100 },
         ], K, L, H);
 
       case 'dip':
         if (targetOutcome === null) return null;
-        return buildDip(targetOutcome, spread, K, L, H);
+        return generateDip(targetOutcome, spread, K, L, H);
 
       case 'leftskew':
         if (targetOutcome === null) return null;
-        return buildLeftSkew(targetOutcome, spread, K, L, H, skewAmount / 100);
+        return generateLeftSkew(targetOutcome, spread, K, L, H, skewAmount / 100);
 
       case 'rightskew':
         if (targetOutcome === null) return null;
-        return buildRightSkew(targetOutcome, spread, K, L, H, skewAmount / 100);
+        return generateRightSkew(targetOutcome, spread, K, L, H, skewAmount / 100);
 
       case 'uniform':
-        return buildPlateau(L, H, K, L, H, 1);
+        return generatePlateau(L, H, K, L, H, 1);
 
       default:
         return null;
@@ -143,20 +143,20 @@ export function ShapeCutter({
 
   // Instant preview update
   useEffect(() => {
-    const belief = buildCurrentBelief();
+    const belief = generateCurrentBelief();
     ctx.setPreviewBelief(belief);
 
     if (!belief) {
       setPotentialPayout(null);
       ctx.setPreviewPayout(null);
     }
-  }, [buildCurrentBelief]);
+  }, [generateCurrentBelief]);
 
   // Debounced payout projection
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
-    const belief = buildCurrentBelief();
+    const belief = generateCurrentBelief();
     const collateral = parseFloat(amount);
     if (!belief || isNaN(collateral) || collateral <= 0 || !market) {
       setPotentialPayout(null);
@@ -179,7 +179,7 @@ export function ShapeCutter({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [buildCurrentBelief, amount, market, marketId]);
+  }, [generateCurrentBelief, amount, market, marketId]);
 
   // Prediction value for trade submission
   const getPrediction = (): number => {
@@ -216,7 +216,7 @@ export function ShapeCutter({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const belief = buildCurrentBelief();
+    const belief = generateCurrentBelief();
     const collateral = parseFloat(amount);
     if (!belief || isNaN(collateral) || collateral < 1) return;
 
@@ -245,7 +245,7 @@ export function ShapeCutter({
   const isFormValid = (() => {
     const collateral = parseFloat(amount);
     if (isNaN(collateral) || collateral < 1) return false;
-    return buildCurrentBelief() !== null;
+    return generateCurrentBelief() !== null;
   })();
 
   const getStep = () => {

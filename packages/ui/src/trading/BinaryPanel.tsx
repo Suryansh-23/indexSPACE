@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useContext, useMemo } from 'react';
 import {
-  buildPlateau,
+  generatePlateau,
   computeStatistics,
   projectPayoutCurve,
   buy,
@@ -118,9 +118,9 @@ export function BinaryPanel({
     if (!market || !side || resolvedX === null) return null;
     const { K, L, H } = market.config;
     if (side === 'yes') {
-      return buildPlateau(resolvedX, H, K, L, H, 1);
+      return generatePlateau(resolvedX, H, K, L, H, 1);
     } else {
-      return buildPlateau(L, resolvedX, K, L, H, 1);
+      return generatePlateau(L, resolvedX, K, L, H, 1);
     }
   }, [market, side, resolvedX]);
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useContext, useCallback } from 'react';
 import {
-  buildGaussian,
-  buildPlateau,
+  generateGaussian,
+  generatePlateau,
   projectPayoutCurve,
   buy,
 } from '@functionspace/core';
@@ -68,8 +68,8 @@ export function TradePanel({ marketId, modes = ['gaussian', 'plateau'], onBuy }:
     return maxSigma - ((conf / 100) * (maxSigma - minSigma));
   }, [market]);
 
-  // Build belief from current inputs
-  const buildCurrentBelief = useCallback(() => {
+  // Generate belief from current inputs
+  const generateCurrentBelief = useCallback(() => {
     if (!market) return null;
     const { K, L, H } = market.config;
 
@@ -77,32 +77,32 @@ export function TradePanel({ marketId, modes = ['gaussian', 'plateau'], onBuy }:
       if (prediction === null) return null;
       const stdDev = getStdDevFromConfidence(confidence);
       if (prediction < L || prediction > H) return null;
-      return buildGaussian(prediction, stdDev, K, L, H);
+      return generateGaussian(prediction, stdDev, K, L, H);
     } else {
       if (!rangeValues) return null;
       const [lo, hi] = rangeValues;
       if (lo >= hi) return null;
       if (lo < L || hi > H) return null;
-      return buildPlateau(lo, hi, K, L, H, 1);
+      return generatePlateau(lo, hi, K, L, H, 1);
     }
   }, [market, activeMode, prediction, confidence, rangeValues, getStdDevFromConfidence]);
 
   // Instant preview update (no debounce)
   useEffect(() => {
-    const belief = buildCurrentBelief();
+    const belief = generateCurrentBelief();
     ctx.setPreviewBelief(belief);
 
     if (!belief) {
       setPotentialPayout(null);
       ctx.setPreviewPayout(null);
     }
-  }, [buildCurrentBelief]);
+  }, [generateCurrentBelief]);
 
   // Debounced payout projection
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
-    const belief = buildCurrentBelief();
+    const belief = generateCurrentBelief();
     const collateral = parseFloat(amount);
     if (!belief || isNaN(collateral) || collateral <= 0 || !market) {
       setPotentialPayout(null);
@@ -125,11 +125,11 @@ export function TradePanel({ marketId, modes = ['gaussian', 'plateau'], onBuy }:
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [buildCurrentBelief, amount, market, marketId]);
+  }, [generateCurrentBelief, amount, market, marketId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const belief = buildCurrentBelief();
+    const belief = generateCurrentBelief();
     const collateral = parseFloat(amount);
     if (!belief || isNaN(collateral) || collateral < 1) return;
 
@@ -170,7 +170,7 @@ export function TradePanel({ marketId, modes = ['gaussian', 'plateau'], onBuy }:
   const isFormValid = (() => {
     const collateral = parseFloat(amount);
     if (isNaN(collateral) || collateral < 1) return false;
-    return buildCurrentBelief() !== null;
+    return generateCurrentBelief() !== null;
   })();
 
   const showTabs = modes.length > 1;

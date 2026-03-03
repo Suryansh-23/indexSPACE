@@ -111,7 +111,7 @@ export interface BucketData {
   percentage: number;
 }
 
-// ── Builder Types ──
+// ── Position Generator Types ──
 
 export type BeliefVector = number[];
 

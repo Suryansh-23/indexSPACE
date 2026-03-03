@@ -345,7 +345,7 @@ describe('SDK Architecture', () => {
         'utf-8'
       );
 
-      expect(indexContent).toContain('buildCustomShape');
+      expect(indexContent).toContain('generateCustomShape');
       expect(indexContent).toContain('generateBellShape');
       expect(indexContent).toContain('SplineRegion');
     });
@@ -454,13 +454,13 @@ describe('SDK Architecture', () => {
       expect(file).toContain('distributionState');
     });
 
-    it('buildRange and RangeInput are exported from core', () => {
+    it('generateRange and RangeInput are exported from core', () => {
       const indexContent = fs.readFileSync(
         path.join(__dirname, '../packages/core/src/index.ts'),
         'utf-8'
       );
 
-      expect(indexContent).toContain('buildRange');
+      expect(indexContent).toContain('generateRange');
       expect(indexContent).toContain('RangeInput');
     });
 

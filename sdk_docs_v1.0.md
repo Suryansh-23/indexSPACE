@@ -50,8 +50,8 @@ Every function also belongs to a functional category:
 
 | Category | What It Does | State |
 |----------|-------------|-------|
-| **Builders** | Pure computation — transforms inputs into belief vectors | Read-only (no network) |
-| **Queries** | Reads and interprets current server state | Read-only |
+| **Positions** | Pure computation — transforms inputs into belief vectors (`generateBelief`, `generateGaussian`, etc.) | Read-only (no network) |
+| **Queries** | Reads and interprets current server state (markets, positions, history, trades) | Read-only |
 | **Projections** | Computes hypothetical outcomes without modifying state | Read-only |
 | **Transactions** | State-changing operations (buy, sell) | Write |
 | **Discovery** | Find and filter available markets | Read-only |
@@ -136,16 +136,16 @@ That's it. The chart and trade panel automatically coordinate — moving sliders
 
 Functions for constructing beliefs, executing trades, and projecting outcomes.
 
-#### Belief Builders
+#### Position Generators
 
-Builders construct normalized probability vectors ("beliefs") that express a trader's view of where an outcome will land. A belief vector is the core data structure of the SDK. It's what gets sent to the API when opening a position, and what gets rendered on charts as a preview overlay.
+Generators construct normalized probability vectors ("beliefs") that express a trader's view of where an outcome will land. A belief vector is the core data structure of the SDK. It's what gets sent to the API when opening a position, and what gets rendered on charts as a preview overlay.
 
-##### `buildBelief(regions, K, L, H)`: Universal Belief Constructor
+##### `generateBelief(regions, K, L, H)`: Universal Belief Constructor
 
-**Layer:** L1 (Core). Every other builder (`buildGaussian`, `buildRange`, `buildDip`, etc.) delegates to this function. Use the convenience builders for common single-shape beliefs. Use `buildBelief` directly when you need multi-region composition or fine-grained control.
+**Layer:** L1 (Core). Every other generator (`generateGaussian`, `generateRange`, `generateDip`, etc.) delegates to this function. Use the convenience generators for common single-shape beliefs. Use `generateBelief` directly when you need multi-region composition or fine-grained control.
 
 ```typescript
-function buildBelief(
+function generateBelief(
   regions: Region[],
   K: number,
   L: number,
@@ -218,7 +218,7 @@ interface SplineRegion {
 
 Uses Fritsch-Carlson monotonic cubic Hermite interpolation to produce a smooth, overshoot-free curve through the control points. Negative outputs are clamped to 0. This is what powers the `CustomShapeEditor` UI widget.
 
-**`RangeInput`** (For multi-range `buildRange` overload):
+**`RangeInput`** (For multi-range `generateRange` overload):
 
 ```typescript
 interface RangeInput {
@@ -229,11 +229,11 @@ interface RangeInput {
 }
 ```
 
-Used by the `buildRange(ranges[], K, L, H)` overload to pass multiple range specifications. Each `RangeInput` becomes a `RangeRegion` internally.
+Used by the `generateRange(ranges[], K, L, H)` overload to pass multiple range specifications. Each `RangeInput` becomes a `RangeRegion` internally.
 
 ##### How Composition Works
 
-When you pass multiple regions, `buildBelief` processes each into a raw kernel array, scales by `weight`, sums them element-wise, then normalizes the combined array to sum to 1:
+When you pass multiple regions, `generateBelief` processes each into a raw kernel array, scales by `weight`, sums them element-wise, then normalizes the combined array to sum to 1:
 
 ```
 for each region:
@@ -251,14 +251,14 @@ Regions are **additive, not multiplicative**. Two peaks at different locations c
 ```typescript
 const { K, L, H } = market.config;
 
-const belief = buildBelief([
+const belief = generateBelief([
   { type: 'point', center: 75, spread: 5 }
 ], K, L, H);
 ```
 
 **Bimodal, "I think it'll be either 60 or 90, leaning toward 90":**
 ```typescript
-const belief = buildBelief([
+const belief = generateBelief([
   { type: 'point', center: 60, spread: 4, weight: 0.3 },
   { type: 'point', center: 90, spread: 4, weight: 0.7 },
 ], K, L, H);
@@ -266,14 +266,14 @@ const belief = buildBelief([
 
 **Range, "I think it'll land somewhere between 70 and 85":**
 ```typescript
-const belief = buildBelief([
+const belief = generateBelief([
   { type: 'range', low: 70, high: 85, sharpness: 0.5 }
 ], K, L, H);
 ```
 
 **Non-contiguous ranges, "Either 50-60 or 80-90, but not the middle":**
 ```typescript
-const belief = buildBelief([
+const belief = generateBelief([
   { type: 'range', low: 50, high: 60 },
   { type: 'range', low: 80, high: 90 },
 ], K, L, H);
@@ -281,28 +281,28 @@ const belief = buildBelief([
 
 **Skewed peak, "Around 75 but could be higher":**
 ```typescript
-const belief = buildBelief([
+const belief = generateBelief([
   { type: 'point', center: 75, spread: 5, skew: 0.8 }
 ], K, L, H);
 ```
 
 **Dip, "Anything but 75":**
 ```typescript
-const belief = buildBelief([
+const belief = generateBelief([
   { type: 'point', center: 75, spread: 5, inverted: true }
 ], K, L, H);
 ```
 
 **Custom shape, freeform from control points:**
 ```typescript
-const belief = buildBelief([
+const belief = generateBelief([
   { type: 'spline', controlX: [50, 65, 75, 85, 100], controlY: [0, 10, 25, 10, 0] }
 ], K, L, H);
 ```
 
 **Mixed, Gaussian peak + range floor:**
 ```typescript
-const belief = buildBelief([
+const belief = generateBelief([
   { type: 'point', center: 80, spread: 3, weight: 2 },
   { type: 'range', low: 60, high: 100, weight: 0.5 },
 ], K, L, H);
@@ -326,20 +326,20 @@ const result = await buy(client, marketId, belief, collateral);
 // result = { positionId, belief, claims, collateral }
 ```
 
-##### Convenience Builders
+##### Convenience Generators
 
-All L2 builders are thin wrappers around `buildBelief`. Use them for common single-shape beliefs:
+All L2 generators are thin wrappers around `generateBelief`. Use them for common single-shape beliefs:
 
-| Function | Equivalent `buildBelief` Call |
+| Function | Equivalent `generateBelief` Call |
 |---|---|
-| `buildGaussian(center, spread, K, L, H)` | `buildBelief([{ type: 'point', center, spread }], K, L, H)` |
-| `buildRange(low, high, K, L, H, sharpness?)` | `buildBelief([{ type: 'range', low, high, sharpness: sharpness ?? 0.5 }], K, L, H)` — note: defaults to `0.5`, not `0` |
-| `buildRange(ranges: RangeInput[], K, L, H)` | `buildBelief(ranges.map(r => ({ type: 'range', ...r })), K, L, H)` — uses each range's own `sharpness` (defaults to `0` at kernel level) |
-| `buildPlateau(low, high, K, L, H, sharpness?)` | Deprecated alias for `buildRange` (single-range form). `sharpness` defaults to `0.5`. |
-| `buildDip(center, spread, K, L, H)` | `buildBelief([{ type: 'point', center, spread: spread * 1.5, inverted: true }], K, L, H)` |
-| `buildLeftSkew(center, spread, K, L, H, skewAmount?)` | `buildBelief([{ type: 'point', center, spread, skew: -skewAmount }], K, L, H)` — `skewAmount` defaults to `1` |
-| `buildRightSkew(center, spread, K, L, H, skewAmount?)` | `buildBelief([{ type: 'point', center, spread, skew: skewAmount }], K, L, H)` — `skewAmount` defaults to `1` |
-| `buildCustomShape(controlValues, K, L, H)` | `buildBelief([{ type: 'spline', controlX: [evenly spaced L..H], controlY: controlValues }], K, L, H)` |
+| `generateGaussian(center, spread, K, L, H)` | `generateBelief([{ type: 'point', center, spread }], K, L, H)` |
+| `generateRange(low, high, K, L, H, sharpness?)` | `generateBelief([{ type: 'range', low, high, sharpness: sharpness ?? 0.5 }], K, L, H)` — note: defaults to `0.5`, not `0` |
+| `generateRange(ranges: RangeInput[], K, L, H)` | `generateBelief(ranges.map(r => ({ type: 'range', ...r })), K, L, H)` — uses each range's own `sharpness` (defaults to `0` at kernel level) |
+| `generatePlateau(low, high, K, L, H, sharpness?)` | Deprecated alias for `generateRange` (single-range form). `sharpness` defaults to `0.5`. |
+| `generateDip(center, spread, K, L, H)` | `generateBelief([{ type: 'point', center, spread: spread * 1.5, inverted: true }], K, L, H)` |
+| `generateLeftSkew(center, spread, K, L, H, skewAmount?)` | `generateBelief([{ type: 'point', center, spread, skew: -skewAmount }], K, L, H)` — `skewAmount` defaults to `1` |
+| `generateRightSkew(center, spread, K, L, H, skewAmount?)` | `generateBelief([{ type: 'point', center, spread, skew: skewAmount }], K, L, H)` — `skewAmount` defaults to `1` |
+| `generateCustomShape(controlValues, K, L, H)` | `generateBelief([{ type: 'spline', controlX: [evenly spaced L..H], controlY: controlValues }], K, L, H)` |
 | `generateBellShape(numPoints, peakPosition?, spread?, zeroTailPercent?)` | Not a belief. Generates raw Y-values for `CustomShapeEditor` initialization. Defaults: `peakPosition = 0.5`, `spread = 4`, `zeroTailPercent = 0.30`. |
 
 #### Transactions
@@ -364,9 +364,9 @@ async function buy(
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `client` | `FSClient` | Authenticated API client. In React, get this from `useFunctionSpace().client`. |
+| `client` | `FSClient` | Authenticated API client. In React, access via `useContext(FunctionSpaceContext).client` or use a trading widget that handles this internally. |
 | `marketId` | `string \| number` | The market to trade in. |
-| `belief` | `BeliefVector` | The probability distribution to trade on. Built with `buildBelief` or any convenience builder. |
+| `belief` | `BeliefVector` | The probability distribution to trade on. Generated with `generateBelief` or any convenience generator. |
 | `collateral` | `number` | Amount of currency to put up. Minimum is typically 1. |
 | `options.prediction` | `number?` | Optional center-of-mass hint for the API. UI components pass the trader's target outcome value here. Not required for the trade to execute. |
 
@@ -383,14 +383,14 @@ interface BuyResult {
 
 **Example (standalone core usage):**
 ```typescript
-import { FSClient, loginUser, buy, buildGaussian, queryMarketState } from '@functionspace/core';
+import { FSClient, loginUser, buy, generateGaussian, queryMarketState } from '@functionspace/core';
 
 const client = new FSClient({ baseUrl: 'https://api.example.com' });
 await loginUser(client, 'user', 'pass');
 
 const market = await queryMarketState(client, 42);
 const { K, L, H } = market.config;
-const belief = buildGaussian(75, 5, K, L, H);
+const belief = generateGaussian(75, 5, K, L, H);
 
 const result = await buy(client, 42, belief, 100);
 console.log(`Opened position ${result.positionId}, claims: ${result.claims}`);
@@ -398,16 +398,29 @@ console.log(`Opened position ${result.positionId}, claims: ${result.claims}`);
 
 **Example (inside a React component):**
 ```typescript
-const ctx = useFunctionSpace();
+const ctx = useContext(FunctionSpaceContext);
 const { market } = useMarket(marketId);
 const { K, L, H } = market.config;
 
-const belief = buildGaussian(75, 5, K, L, H);
+const belief = generateGaussian(75, 5, K, L, H);
 const result = await buy(ctx.client, marketId, belief, 100, { prediction: 75 });
 
 // After a successful buy, invalidate so other components (charts, position tables) refetch
 ctx.invalidate(marketId);
 ```
+
+**Error handling:**
+
+`buy()` throws on failure. The error message varies by cause:
+
+| Cause | Error message pattern |
+|-------|-----------------------|
+| Not authenticated (guest mode) | `"Authentication required. Please sign in to perform this action."` |
+| HTTP error (e.g., 400, 500) | `"API error: {status} {statusText} on POST /api/market/buy"` |
+| API-level failure (`success: false`) | `"API error: {message}"` (message from server response) |
+| 401 (expired token) | Auto-retries once by re-authenticating. If retry fails, throws the HTTP error. |
+
+Always wrap `buy()` in a try/catch. The SDK's trading UI widgets handle this internally — they catch errors, display them inline, and reset state.
 
 ##### `sell(client, positionId, marketId)`
 
@@ -495,7 +508,7 @@ interface PayoutCurve {
 
 **Example:**
 ```typescript
-const belief = buildGaussian(75, 5, K, L, H);
+const belief = generateGaussian(75, 5, K, L, H);
 const curve = await projectPayoutCurve(ctx.client, marketId, belief, 100);
 
 console.log(`Best case: $${curve.maxPayout} if outcome = ${curve.maxPayoutOutcome}`);
@@ -915,7 +928,7 @@ const fanData = transformHistoryToFanChart(history.snapshots, L, H);
 
 Pure math functions with no network dependency. All are L0 (Pure Math) unless noted. These operate on coefficient vectors (belief vectors, consensus vectors, alpha vectors) and return computed results. They have no awareness of markets, clients, or React.
 
-The `coefficients` parameter in these functions accepts any normalized probability vector, meaning you can pass `market.consensus`, a belief vector from `buildBelief`, or `position.belief`. They all share the same shape: a `number[]` of length `K + 1` summing to 1.
+The `coefficients` parameter in these functions accepts any normalized probability vector, meaning you can pass `market.consensus`, a belief vector from `generateBelief`, or `position.belief`. They all share the same shape: a `number[]` of length `K + 1` summing to 1.
 
 #### Density Evaluation
 
@@ -942,7 +955,7 @@ const curvePoints = evaluateDensityCurve(consensus, L, H, 200);
 // curvePoints = [{ x: 50, y: 0.001 }, { x: 50.35, y: 0.003 }, ..., { x: 120, y: 0.0 }]
 
 // Render a belief preview with the same resolution
-const belief = buildGaussian(75, 5, K, L, H);
+const belief = generateGaussian(75, 5, K, L, H);
 const beliefCurve = evaluateDensityCurve(belief, L, H, curvePoints.length);
 ```
 
@@ -1255,7 +1268,7 @@ guest.setToken(token);
 // Now guest is authenticated for mutations
 ```
 
-**In React:** You don't create `FSClient` directly. `FunctionSpaceProvider` creates and manages it. Access it via `useFunctionSpace().client`.
+**In React:** You don't create `FSClient` directly. `FunctionSpaceProvider` creates and manages it. Access it via `useContext(FunctionSpaceContext).client`, or use hooks and trading widgets that access the client internally.
 
 ### Auth
 
@@ -1954,7 +1967,7 @@ function useCustomShape(market: MarketState | null): UseCustomShapeReturn
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `pVector` | `BeliefVector \| null` | Normalized belief vector derived from control values via `buildCustomShape`. `null` when `market` is `null`. |
+| `pVector` | `BeliefVector \| null` | Normalized belief vector derived from control values via `generateCustomShape`. `null` when `market` is `null`. |
 | `prediction` | `number \| null` | Mode (peak) of the derived distribution via `computeStatistics`. `null` when `market` is `null`. |
 
 *Action fields:*
@@ -1986,7 +1999,7 @@ function useCustomShape(market: MarketState | null): UseCustomShapeReturn
 - `resetToDefault` regenerates the bell shape at the current `numPoints` (does not reset `numPoints` to 20) and clears both locks and drag state.
 - `pVector` recomputes whenever `controlValues` or `market` changes. `prediction` recomputes whenever `pVector` or `market` changes.
 
-**Delegates to:** `buildCustomShape`, `generateBellShape`, `computeStatistics` from core.
+**Delegates to:** `generateCustomShape`, `generateBellShape`, `computeStatistics` from core.
 
 **Example:**
 
@@ -2406,6 +2419,8 @@ The Provider injects all 30 theme tokens as CSS custom properties on a wrapper d
 
 All UI components must be rendered inside a `FunctionSpaceProvider`. They handle their own loading and error states, communicate through context (not props), and inherit theming automatically.
 
+> **Deprecated export:** `@functionspace/ui` also exports `CHART_COLORS` from `./theme.js`. This is a legacy static color object hardcoded to the FS Dark theme. Use `ctx.chartColors` from `FunctionSpaceContext` instead — it responds to theme changes and supports all presets.
+
 ### Trading
 
 Trading components that support error callbacks implement the `TradeInputBaseProps` contract:
@@ -2424,7 +2439,7 @@ Every trading component follows the **three-phase trade pattern**:
 
 | Phase | Timing | What Happens | Chart Effect |
 |-------|--------|-------------|--------------|
-| **1. Preview** | Instant (on every input change) | Builds belief via `buildBelief()` or convenience builder → writes `ctx.setPreviewBelief(belief)` | Dashed overlay appears on ConsensusChart |
+| **1. Preview** | Instant (on every input change) | Generates belief via `generateBelief()` or convenience generator → writes `ctx.setPreviewBelief(belief)` | Dashed overlay appears on ConsensusChart |
 | **2. Payout** | Debounced (500ms after last input change) | Calls `projectPayoutCurve()` → writes `ctx.setPreviewPayout(result)` | Payout column appears in chart tooltip |
 | **3. Submit** | On button click | Calls `buy()` → resets inputs to defaults → clears preview state → calls `ctx.invalidate(marketId)` | Preview clears, all data hooks refetch |
 
@@ -2454,8 +2469,8 @@ import { TradePanel } from '@functionspace/ui';
 
 **Behavior:**
 
-- **Gaussian mode:** "My Prediction" slider (L to H, step = range/100) + "Confidence" slider (0–100%). Confidence inversely maps to spread width: 0% = 20% of range (wide), 100% = 1% of range (narrow). Builds via `buildGaussian`.
-- **Range mode:** Two-handle range slider for selecting an outcome range. Initializes to the middle 50% of the market range. Builds via `buildPlateau` with sharpness `1` (hard edges). Tab label displays "Range" (not "Plateau").
+- **Gaussian mode:** "My Prediction" slider (L to H, step = range/100) + "Confidence" slider (0–100%). Confidence inversely maps to spread width: 0% = 20% of range (wide), 100% = 1% of range (narrow). Generates belief via `generateGaussian`.
+- **Range mode:** Two-handle range slider for selecting an outcome range. Initializes to the middle 50% of the market range. Generates belief via `generatePlateau` with sharpness `1` (hard edges). Tab label displays "Range" (not "Plateau").
 - **Amount input:** USDC input (minimum $1), default `'100'`. Displays debounced potential payout as `$X.XX`.
 - **Post-trade reset:** All inputs revert to defaults (prediction to midpoint, confidence to 50, range to 25–75%, amount to '100').
 - **Prediction passed to `buy()`:** In Gaussian mode, the slider value. In Range mode, the midpoint of the selected range.
@@ -2466,7 +2481,7 @@ import { TradePanel } from '@functionspace/ui';
 - **Writes:** `ctx.setPreviewBelief(belief)` on input change, `ctx.setPreviewPayout(result)` after debounced projection, clears both on unmount
 - **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useMarket`, `buildGaussian`, `buildPlateau`, `projectPayoutCurve`, `buy`
+**Internal calls:** `useMarket`, `generateGaussian`, `generatePlateau`, `projectPayoutCurve`, `buy`
 
 **Example:**
 
@@ -2484,7 +2499,7 @@ import { TradePanel } from '@functionspace/ui';
 />
 ```
 
-**Related:** `ConsensusChart` (renders preview from this component's context writes) | `buildGaussian`, `buildPlateau` (core builders)
+**Related:** `ConsensusChart` (renders preview from this component's context writes) | `generateGaussian`, `generatePlateau` (core generators)
 
 ---
 
@@ -2530,8 +2545,8 @@ All resolved thresholds are clamped to `[L, H]`.
 
 **Behavior:**
 
-- **Yes:** Builds `buildPlateau(X, H, K, L, H, 1)` — a hard-edged plateau from the threshold to the market high.
-- **No:** Builds `buildPlateau(L, X, K, L, H, 1)` — a hard-edged plateau from the market low to the threshold.
+- **Yes:** Calls `generatePlateau(X, H, K, L, H, 1)` — a hard-edged plateau from the threshold to the market high.
+- **No:** Calls `generatePlateau(L, X, K, L, H, 1)` — a hard-edged plateau from the market low to the threshold.
 - **Side toggle:** Clicking an already-selected side deselects it. The amount input and submit button only appear after a side is chosen.
 - **Default amount:** Hardcoded `'100'` USDC.
 - **Post-trade reset:** Side resets to `null` (no selection), amount resets to `'100'`. Threshold persists.
@@ -2544,7 +2559,7 @@ All resolved thresholds are clamped to `[L, H]`.
 - **Writes:** `ctx.setPreviewBelief(belief)` on side/threshold change, `ctx.setPreviewPayout(result)` after debounced projection, clears both on unmount
 - **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useMarket`, `buildPlateau`, `computeStatistics`, `projectPayoutCurve`, `buy`
+**Internal calls:** `useMarket`, `generatePlateau`, `computeStatistics`, `projectPayoutCurve`, `buy`
 
 **Example:**
 
@@ -2586,18 +2601,18 @@ import { ShapeCutter } from '@functionspace/ui';
 | `onBuy` | `(result: BuyResult) => void` | -- | Called after successful trade |
 | `onError` | `(error: Error) => void` | -- | Called on trade failure |
 
-**Shape builders:**
+**Shape generators:**
 
-| Shape | Builder | Key Parameters |
+| Shape | Generator | Key Parameters |
 |-------|---------|----------------|
-| Gaussian | `buildGaussian` | Target outcome, confidence |
-| Spike | `buildGaussian` (with dynamic tighter multiplier) | Target outcome, confidence |
-| Plateau | `buildPlateau` (sharpness `1`) | Range (two-handle slider) |
-| Bimodal | `buildBelief` (two `PointRegion`s) | Range (peak positions), confidence, peak balance |
-| The Dip | `buildDip` | Target outcome, confidence |
-| Left Skew | `buildLeftSkew` | Target outcome, confidence, skew intensity |
-| Right Skew | `buildRightSkew` | Target outcome, confidence, skew intensity |
-| Uniform | `buildPlateau(L, H, ...)` (full range) | None |
+| Gaussian | `generateGaussian` | Target outcome, confidence |
+| Spike | `generateGaussian` (with dynamic tighter multiplier) | Target outcome, confidence |
+| Plateau | `generatePlateau` (sharpness `1`) | Range (two-handle slider) |
+| Bimodal | `generateBelief` (two `PointRegion`s) | Range (peak positions), confidence, peak balance |
+| The Dip | `generateDip` | Target outcome, confidence |
+| Left Skew | `generateLeftSkew` | Target outcome, confidence, skew intensity |
+| Right Skew | `generateRightSkew` | Target outcome, confidence, skew intensity |
+| Uniform | `generatePlateau(L, H, ...)` (full range) | None |
 
 **Behavior:**
 
@@ -2613,7 +2628,7 @@ import { ShapeCutter } from '@functionspace/ui';
 - **Writes:** `ctx.setPreviewBelief(belief)` on input change, `ctx.setPreviewPayout(result)` after debounced projection, clears both on unmount
 - **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useMarket`, `buildGaussian`, `buildPlateau`, `buildBelief`, `buildDip`, `buildLeftSkew`, `buildRightSkew`, `SHAPE_DEFINITIONS`, `projectPayoutCurve`, `buy`
+**Internal calls:** `useMarket`, `generateGaussian`, `generatePlateau`, `generateBelief`, `generateDip`, `generateLeftSkew`, `generateRightSkew`, `SHAPE_DEFINITIONS`, `projectPayoutCurve`, `buy`
 
 **Example:**
 
@@ -2665,6 +2680,7 @@ import { CustomShapeEditor } from '@functionspace/ui';
 - **Point count:** Adjustable slider (5–25). Changing the count resets all values to a bell shape and clears locks.
 - **Y-axis capping:** Overlay curves (preview, selected position) are capped at 4x the consensus maximum density to prevent the consensus curve from being visually squished.
 - **Loading/error states:** Renders "Loading..." or "Error: {message}" when market data is unavailable.
+- **Trade form:** Between the chart and the vertical sliders, a trade summary section displays the current prediction, peak payout, and max loss (equal to collateral). Below the sliders, an amount input (default 100 USDC) and submit button complete the trade execution form — the same pattern as other trading widgets.
 - **Post-trade reset:** Calls `resetToDefault()`, regenerating a bell shape and clearing locks.
 - **Prediction:** The mode (peak) of the belief distribution is derived from `useCustomShape` (which internally uses `computeStatistics`) and passed to `buy()`.
 
@@ -2692,7 +2708,7 @@ import { CustomShapeEditor } from '@functionspace/ui';
 />
 ```
 
-**Related:** `useCustomShape` (hook managing control point state) | `ConsensusChart` (shares the same context reads for preview/position overlays) | `buildCustomShape` (core builder)
+**Related:** `useCustomShape` (hook managing control point state) | `ConsensusChart` (shares the same context reads for preview/position overlays) | `generateCustomShape` (core generator)
 
 ---
 
@@ -2723,9 +2739,9 @@ import { BucketRangeSelector } from '@functionspace/ui';
 - **Bucket grid:** Adaptive column layout — 3 columns for ≤9, 4 for ≤16, 5 for ≤25, 6 for >25. Each button shows the outcome range label and probability percentage. Clicking a selected bucket deselects it (toggle).
 - **FIFO selection:** When `maxSelections` is reached, clicking a new bucket drops the oldest. Custom range selections count toward the max, reducing available bucket slots.
 - **Auto mode:** Filters the grid to buckets within the 95% confidence interval (p2.5 to p97.5), focusing on active probability mass.
-- **Custom range panel:** Collapsible inputs for min/max values with apply/clear buttons. Ranges are validated — out-of-bounds values are rejected (not clamped), displaying an inline error.
+- **Custom range panel:** Collapsible inputs for min/max values with apply/clear buttons. Ranges are validated — out-of-bounds values are silently rejected (not clamped). Invalid inputs (NaN, min ≥ max, values outside the effective range) cause the apply action to do nothing.
 - **Selection clearing:** Bucket selections reset automatically when bucket count or auto mode changes (because bucket boundaries shift).
-- **Belief construction:** Builds via `buildRange` from the selected bucket and custom range boundaries.
+- **Belief construction:** Generates belief via `generateRange` from the selected bucket and custom range boundaries.
 - **Prediction:** The average midpoint of all selected ranges is passed to `buy()`.
 - **Loading/error states:** Renders "Loading market data..." or "Error: {message}" when data is unavailable.
 
@@ -2735,7 +2751,7 @@ import { BucketRangeSelector } from '@functionspace/ui';
 - **Writes:** `ctx.setPreviewBelief(belief)` on selection change, `ctx.setPreviewPayout(result)` after debounced projection, clears both on unmount
 - **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useDistributionState`, `buildRange`, `projectPayoutCurve`, `buy`
+**Internal calls:** `useDistributionState`, `generateRange`, `projectPayoutCurve`, `buy`
 
 **Example:**
 
@@ -3073,7 +3089,7 @@ import { PositionTable } from '@functionspace/ui';
 - **Per-tab pagination:** Each tab maintains its own page number independently. Pages auto-reset to 1 when tab data count changes.
 - **Market value lookup:** For visible open positions (current page only), `projectSell` is called via `Promise.allSettled` for resilient fetching. Values are cached and update when the page changes.
 - **Sell flow:** The "Sell" button (open-orders tab, open positions only) calls `sell()`, then `ctx.invalidate(marketId)` and `refetch()`. Shows "Selling..." during the operation. Sell errors display as a banner above the table.
-- **P/L calculation:** Sold/closed positions: `soldPrice - collateral`. Settled or positions with a `settlementPayout` value: `settlementPayout - collateral` (not status-gated — any position with a non-null settlementPayout uses this path). Open: `marketValue - collateral`. P/L% = `(P/L / collateral) * 100`.
+- **P/L calculation (priority order):** 1) Sold/closed positions with a non-null `soldPrice`: `soldPrice - collateral`. 2) Any remaining position with a non-null `settlementPayout`: `settlementPayout - collateral`. 3) Open positions: `marketValue - collateral` (from `projectSell`). Note: sold/closed positions with a `soldPrice` always use path 1, even if they also have a `settlementPayout`. P/L% = `(P/L / collateral) * 100`.
 - **Owner highlighting:** In the `market-positions` tab, the authenticated user's rows show "(you)" next to the username.
 - **Sorting:** All tab data is sorted by position ID descending.
 - **Loading/error:** Renders a spinner with "Loading positions..." or an error message with a "Retry" button. Empty states show contextual messages per tab.
@@ -3138,14 +3154,14 @@ import { TimeSales } from '@functionspace/ui';
 
 **Behavior:**
 
-- **Polling:** Automatically refetches every `pollInterval` ms via `useTradeHistory`. Does not integrate with `ctx.invalidate()` — refreshes are polling-only.
+- **Polling:** Automatically refetches every `pollInterval` ms via `useTradeHistory`. Also responds to `ctx.invalidate()` — calling invalidate after a buy/sell triggers an immediate refetch in addition to the regular polling cycle.
 - **Graceful background refresh:** After the initial load succeeds, subsequent poll failures are silent — the UI never regresses to a loading or error state while stale data remains visible.
 - **Username truncation:** Usernames longer than 12 characters are truncated to `first8...last4`. Null usernames show "Unknown".
 - **Prediction formatting:** Shows `prediction.toFixed(2)` or "N/A" when null.
 - **Currency formatting:** Dollar sign prefix with 2 decimal places, locale-aware.
 - **Loading/error:** Initial-only: "Loading trades..." with spinner, or error message with "Retry" button. Both only display before first successful fetch.
 
-**Context interactions:** None beyond the Provider requirement. All data fetching is delegated to `useTradeHistory`.
+**Context interactions:** Data fetching is delegated to `useTradeHistory`, which reads `ctx.client` and responds to `ctx.invalidationCount` changes (triggering refetches on invalidation).
 
 **Internal calls:** `useTradeHistory` (with `pollInterval`)
 
@@ -3198,7 +3214,7 @@ import { MarketStats } from '@functionspace/ui';
 
 - **Loading state:** Per-stat skeleton placeholders (labels still visible, only values show shimmer).
 - **Error state:** Per-stat inline "Error" text in the negative color.
-- **Status CSS classes:** Market status value receives `status-active` (when state is `'open'`) or `status-resolved` (all other states, including when market data is undefined) class for conditional styling.
+- **Status CSS classes:** Market status value receives `status-active` (when state is `'open'`) or `status-resolved` (all other states, including when market data is undefined) class for conditional styling. Note: when market data is null (briefly during loading), the displayed text falls back to "Active" while the CSS class is `status-resolved` — this mismatch is cosmetic since skeleton placeholders hide the text during loading.
 
 **Context interactions:** None directly. All context access is delegated to `useMarket`.
 
@@ -3297,12 +3313,12 @@ The SDK is designed around **composition through context**. Any combination of U
 ```
 FunctionSpaceProvider
 ├── ctx.previewBelief    ← written by any trading widget
-│                         → read by ConsensusChart / CustomShapeEditor (shows preview overlay)
+│                         → read by ConsensusChart (shows preview overlay)
 ├── ctx.previewPayout    ← written by any trading widget (debounced)
 │                         → read by ConsensusChart tooltip (shows payout data)
 ├── ctx.selectedPosition ← written by PositionTable (row click)
 │                         → read by ConsensusChart / CustomShapeEditor (shows position overlay)
-└── ctx.invalidate()     ← called after buy/sell
+└── ctx.invalidate(marketId) ← called after buy/sell
                           → triggers all data hooks to re-fetch
 ```
 
@@ -3318,7 +3334,7 @@ FunctionSpaceProvider
 
 5. **`DistributionState` syncs chart and selector.** Pass the same `useDistributionState()` result to both `MarketCharts` (or `DistributionChart`) and `BucketRangeSelector`. Changing the bucket count in one updates the other.
 
-6. **Mix and match freely.** Want a `TimelineChart` above a `BinaryPanel`? A `ConsensusChart` next to a `CustomShapeEditor`? A `MarketStats` bar above a `BucketTradePanel`? All valid. All automatic.
+6. **Mix and match freely — with one constraint.** Want a `TimelineChart` above a `BinaryPanel`? A `ConsensusChart` next to a `CustomShapeEditor`? A `MarketStats` bar above a `BucketTradePanel`? All valid. All automatic. **However, only one trading component should be mounted at a time.** Mounting multiple trading components simultaneously causes conflicting `previewBelief` and `previewPayout` writes to context, resulting in flickering previews.
 
 ### Composition Examples
 
@@ -3371,7 +3387,7 @@ Every trading widget follows the same execution pattern:
 
 | Phase | Timing | What Happens | Chart Effect |
 |-------|--------|-------------|--------------|
-| **1. Preview** | Instant (on every input change) | `buildBelief()` → `ctx.setPreviewBelief(belief)` | Dashed overlay appears on consensus chart |
+| **1. Preview** | Instant (on every input change) | `generateBelief()` → `ctx.setPreviewBelief(belief)` | Dashed overlay appears on consensus chart |
 | **2. Payout** | Debounced (500ms after last change) | `projectPayoutCurve()` → `ctx.setPreviewPayout(result)` | Payout column appears in chart tooltip |
 | **3. Submit** | On button click | `buy()` → `ctx.invalidate(marketId)` | Preview clears, all data refreshes |
 
@@ -3382,6 +3398,72 @@ This pattern ensures responsive feedback (phase 1 is synchronous) while avoiding
 ## Starter Kits
 
 The demo app includes six starter kit layouts, each demonstrating a different composition of SDK components for a distinct trading experience. Every starter kit wraps widgets in a simulated editorial article page context, showing how SDK widgets embed into real content.
+
+---
+
+### Quick Start: Minimal Integration
+
+The fastest way to get trading widgets running. The demo app separates config from layout — `App.tsx` exports shared configuration, and layout files (e.g., `App_BasicTradingLayout.tsx`) define the component composition. You can also combine both into a single file as shown below.
+
+> **Environment variables:** The demo app reads `VITE_FS_BASE_URL`, `VITE_FS_USERNAME`, `VITE_FS_PASSWORD`, `VITE_FS_MARKET_ID`, and `VITE_FS_AUTO_AUTH` from a `.env` file. Replace the hardcoded values below with your own or use environment variables.
+
+**Standalone example** — Config + layout in one file. Drop this into any React app to get started.
+
+```tsx
+import { FunctionSpaceProvider } from '@functionspace/react';
+import type { FSThemeInput } from '@functionspace/react';
+import { ConsensusChart, TradePanel, PositionTable, MarketStats, AuthWidget } from '@functionspace/ui';
+
+const config = {
+  baseUrl: 'https://your-api-url.com',
+  username: 'your-username',          // optional — omit for manual auth via AuthWidget
+  password: 'your-password',          // optional — omit for manual auth via AuthWidget
+  autoAuthenticate: true,             // auto-login on mount when username/password provided
+};
+
+const MARKET_ID = 'your-market-id';
+const theme: FSThemeInput = 'fs-dark';  // or 'fs-light', 'native-dark', 'native-light', or custom overrides
+
+export default function App() {
+  return (
+    <FunctionSpaceProvider config={config} theme={theme}>
+      <div style={{ display: 'flex', gap: '1rem' }}>
+        <div style={{ flex: 7, minWidth: 0 }}><MarketStats marketId={MARKET_ID} /></div>
+        <div style={{ flex: 3, minWidth: 0 }}><AuthWidget /></div>
+      </div>
+
+      <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+        <div style={{ flex: 7, minWidth: 0 }}>
+          <ConsensusChart marketId={MARKET_ID} height={500} zoomable />
+        </div>
+        <div style={{ flex: 3, minWidth: 0 }}>
+          <TradePanel marketId={MARKET_ID} />
+        </div>
+      </div>
+
+      <PositionTable marketId={MARKET_ID} username={config.username ?? ''} />
+    </FunctionSpaceProvider>
+  );
+}
+```
+
+**`main.tsx`** — Standard React entry point. No SDK-specific code.
+
+```tsx
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);
+```
+
+That's it. The `FunctionSpaceProvider` handles authentication, theming, and cross-component state. All widgets inside it work automatically.
+
+To use a different layout, replace the component block inside `FunctionSpaceProvider` with any of the starter kit compositions below.
 
 ---
 

@@ -23,15 +23,15 @@ The SDK is organised around two orthogonal principles: **Layers** determine abst
 | Layer | Name | Description | Examples |
 |-------|------|-------------|----------|
 | L0 | Pure Math | Protocol-agnostic math. No awareness of markets or positions. | `evaluateDensityCurve()`, `computeStatistics()`, `computePercentiles()` |
-| L1 | Core | Direct protocol interactions with full parameter control. Unopinionated and explicit. | `buy()`, `sell()`, `queryMarketState()`, `buildBelief()` |
-| L2 | Convenience | Higher-level wrappers with sensible defaults. Named concepts mapping to common use cases. | `buildGaussian()`, `buildRange()`, `projectPayoutCurve()`, `projectSell()` |
+| L1 | Core | Direct protocol interactions with full parameter control. Unopinionated and explicit. | `buy()`, `sell()`, `queryMarketState()`, `generateBelief()` |
+| L2 | Convenience | Higher-level wrappers with sensible defaults. Named concepts mapping to common use cases. | `generateGaussian()`, `generateRange()`, `projectPayoutCurve()`, `projectSell()` |
 | L3 | Intent | Domain-specific functions driven by user intent. May reference live market state and orchestrate across categories. | Composed workflows, multi-step operations |
 
 ### Categories
 
 | Category | What It Does | State | Examples |
 |----------|-------------|-------|----------|
-| Builders | Pure computation — transforms inputs into belief vectors | Read-only (no network) | `buildBelief()`, `buildGaussian()`, `buildRange()` |
+| Positions | Pure computation — transforms inputs into belief vectors | Read-only (no network) | `generateBelief()`, `generateGaussian()`, `generateRange()` |
 | Queries | Reads and interprets current server state | Read-only | `queryMarketState()`, `queryMarketPositions()` |
 | Projections | Computes hypothetical outcomes without modifying state | Read-only | `projectPayoutCurve()`, `projectSell()` |
 | Transactions | State-changing operations | Write | `buy()`, `sell()` |
@@ -39,7 +39,7 @@ The SDK is organised around two orthogonal principles: **Layers** determine abst
 
 ### Layer × Category Rule
 
-Every new function must be classifiable by both layer AND category. This keeps the SDK modular: builders stay pure, queries stay read-only, and only transactions modify state. When adding a function, ask: "Which layer? Which category?" If it doesn't fit cleanly, it likely needs to be split.
+Every new function must be classifiable by both layer AND category. This keeps the SDK modular: position generators stay pure, queries stay read-only, and only transactions modify state. When adding a function, ask: "Which layer? Which category?" If it doesn't fit cleanly, it likely needs to be split.
 
 ## Key Principles
 
@@ -54,7 +54,7 @@ Every new function must be classifiable by both layer AND category. This keeps t
 ## Before Adding Code
 
 **READ `PLAYBOOK.md` FIRST** — It contains:
-- Belief builder architecture (L1/L2 layering, kernel system, Region types)
+- Position generator architecture (L1/L2 layering, kernel system, Region types)
 - How to add new belief shapes (checklist + decision guide)
 - Trade input widget three-phase pattern (instant preview → debounced payout → submit)
 - Step-by-step guide for adding new widgets
@@ -69,7 +69,7 @@ Every new function must be classifiable by both layer AND category. This keeps t
 | Rule | Why |
 |------|-----|
 | Use CSS variables for ALL colors | Theming breaks otherwise |
-| ALL belief shapes route through `buildBelief` (L1) | Single normalization path, single point of change |
+| ALL belief shapes route through `generateBelief` (L1) | Single normalization path, single point of change |
 | New widget root classes must be added to derived-variables selector near the top of `base.css` | Derived vars (`--fs-primary-glow`, `--fs-primary-light`, `--fs-header-gradient`) won't resolve otherwise — breaks silently |
 | Widgets must check `FunctionSpaceContext` | Throws helpful error if provider missing |
 | Data-fetching hooks return `{ <named>, loading, error, refetch }` | Named property matches hook purpose. State/action hooks (e.g. `useAuth`, `useCustomShape`) return context fields directly. |
@@ -86,7 +86,7 @@ Every new function must be classifiable by both layer AND category. This keeps t
 | Add widget styles | `packages/ui/src/styles/base.css` |
 | Modify theme system | `packages/react/src/themes.ts` (types + presets + chart colors), `packages/react/src/FunctionSpaceProvider.tsx` (resolution + provider) |
 | Modify chart colors | `packages/react/src/themes.ts` (ChartColors, resolveChartColors, preset overrides) |
-| Add/modify belief shapes | `packages/core/src/shapes/definitions.ts` + `packages/core/src/math/builders.ts` |
+| Add/modify belief shapes | `packages/core/src/shapes/definitions.ts` + `packages/core/src/math/generators.ts` |
 | Add auth functions | `packages/core/src/auth/auth.ts` |
 | Add chart zoom/pan math | `packages/core/src/chart/zoom.ts` |
 | Add internal UI primitives | `packages/ui/src/components/` (not exported from package root) |
@@ -104,9 +104,9 @@ cd demo-app && npx vite build   # Build verification (required)
 |-----------|---------|----------------|
 | `tests/architecture.test.ts` | Enforces layer boundaries, hook patterns, export completeness | Adding new hooks, components, or changing imports |
 | `tests/hooks.test.tsx` | Verifies hook behavior (loading, error, refetch, context) | Adding or modifying hooks |
-| `tests/stage1.test.ts` | Core math functions | Changing belief builders or curve evaluation |
+| `tests/stage1.test.ts` | Core math functions | Changing position generators or curve evaluation |
 | `tests/stage2.test.ts` | API/transaction functions | Changing buy, sell, or query functions |
-| `tests/shapes.test.ts` | Belief shape validation (vector properties, shape characteristics) | Adding new L2 builders or modifying kernel functions |
+| `tests/shapes.test.ts` | Belief shape validation (vector properties, shape characteristics) | Adding new L2 generators or modifying kernel functions |
 | `tests/chart-zoom.test.ts` | Chart zoom/pan math functions | Changing pixelToDataX, zoom/pan domain computation, data filtering |
 | `tests/themes.test.ts` | Theme preset validation, resolveTheme behavior | Adding/modifying presets or theme resolution logic |
 | `tests/binary.test.ts` | Binary panel-specific tests | Changing BinaryPanel behavior or x-point modes |
@@ -228,7 +228,7 @@ If the implementation introduced anything new or improved on existing patterns, 
 | New widget added | PLAYBOOK.md — Widget Reference table, File Locations tree |
 | New hook added | PLAYBOOK.md — Available Hooks table; CLAUDE.md — test table if new test file |
 | New core function added | PLAYBOOK.md — Core Functions list (correct category + layer) |
-| New belief shape added | PLAYBOOK.md — L2 builders table, Region Types if new fields |
+| New belief shape added | PLAYBOOK.md — L2 generators table, Region Types if new fields |
 | New CSS widget root class | PLAYBOOK.md — derived-variables selector example |
 | New pattern discovered | PLAYBOOK.md — relevant section (e.g., Common Patterns, Trade Input) |
 | New test file added | CLAUDE.md — Testing Requirements table |

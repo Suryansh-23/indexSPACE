@@ -220,9 +220,9 @@ function splineKernel(
 
 /**
  * L1: Universal constructor. Accepts array of regions, combines and normalizes.
- * All other builders resolve through this function.
+ * All other generators resolve through this function.
  */
-export function buildBelief(
+export function generateBelief(
   regions: Region[],
   K: number,
   L: number,
@@ -246,17 +246,17 @@ export function buildBelief(
 }
 
 /**
- * L2: Gaussian (bell curve) builder.
- * Resolves through buildBelief with a single PointRegion.
+ * L2: Gaussian (bell curve) generator.
+ * Resolves through generateBelief with a single PointRegion.
  */
-export function buildGaussian(
+export function generateGaussian(
   center: number,
   spread: number,
   K: number,
   L: number,
   H: number,
 ): BeliefVector {
-  return buildBelief([{ type: 'point', center, spread }], K, L, H);
+  return generateBelief([{ type: 'point', center, spread }], K, L, H);
 }
 
 // ── Range input type (for multi-range L2 convenience) ──
@@ -269,15 +269,15 @@ export interface RangeInput {
 }
 
 /**
- * L2: Range belief builder. Supports single or multiple outcome ranges.
+ * L2: Range belief generator. Supports single or multiple outcome ranges.
  * Each range becomes a RangeRegion with configurable sharpness (0 = smooth taper, 1 = hard cliff).
  * Multiple ranges are composed into one belief vector — e.g., three non-contiguous
  * bucket selections become three plateau regions in a single normalized vector.
- * Resolves through buildBelief with RangeRegion[].
+ * Resolves through generateBelief with RangeRegion[].
  */
-export function buildRange(low: number, high: number, K: number, L: number, H: number, sharpness?: number): BeliefVector;
-export function buildRange(ranges: RangeInput[], K: number, L: number, H: number): BeliefVector;
-export function buildRange(
+export function generateRange(low: number, high: number, K: number, L: number, H: number, sharpness?: number): BeliefVector;
+export function generateRange(ranges: RangeInput[], K: number, L: number, H: number): BeliefVector;
+export function generateRange(
   lowOrRanges: number | RangeInput[],
   highOrK: number,
   KOrL: number,
@@ -293,19 +293,19 @@ export function buildRange(
       weight: r.weight,
       sharpness: r.sharpness,
     }));
-    return buildBelief(regions, highOrK, KOrL, LOrH);
+    return generateBelief(regions, highOrK, KOrL, LOrH);
   }
-  return buildBelief(
+  return generateBelief(
     [{ type: 'range', low: lowOrRanges, high: highOrK, sharpness: sharpness ?? 0.5 }],
     KOrL, LOrH, HOrUndefined!,
   );
 }
 
 /**
- * @deprecated Use buildRange instead.
- * L2: Plateau (flat range) builder. Alias for buildRange with single-range signature.
+ * @deprecated Use generateRange instead.
+ * L2: Plateau (flat range) generator. Alias for generateRange with single-range signature.
  */
-export function buildPlateau(
+export function generatePlateau(
   low: number,
   high: number,
   K: number,
@@ -313,30 +313,30 @@ export function buildPlateau(
   H: number,
   sharpness: number = 0.5,
 ): BeliefVector {
-  return buildRange(low, high, K, L, H, sharpness);
+  return generateRange(low, high, K, L, H, sharpness);
 }
 
 /**
- * L2: Dip (inverted gaussian) builder.
+ * L2: Dip (inverted gaussian) generator.
  * High probability at edges, low at center.
- * Resolves through buildBelief with an inverted PointRegion.
+ * Resolves through generateBelief with an inverted PointRegion.
  */
-export function buildDip(
+export function generateDip(
   center: number,
   spread: number,
   K: number,
   L: number,
   H: number,
 ): BeliefVector {
-  return buildBelief([{ type: 'point', center, spread: spread * 1.5, inverted: true }], K, L, H);
+  return generateBelief([{ type: 'point', center, spread: spread * 1.5, inverted: true }], K, L, H);
 }
 
 /**
- * L2: Left-skewed distribution builder.
+ * L2: Left-skewed distribution generator.
  * Asymmetric: wider tail on the left, sharper drop on the right.
- * Resolves through buildBelief with a negatively-skewed PointRegion.
+ * Resolves through generateBelief with a negatively-skewed PointRegion.
  */
-export function buildLeftSkew(
+export function generateLeftSkew(
   center: number,
   spread: number,
   K: number,
@@ -344,15 +344,15 @@ export function buildLeftSkew(
   H: number,
   skewAmount: number = 1,
 ): BeliefVector {
-  return buildBelief([{ type: 'point', center, spread, skew: -skewAmount }], K, L, H);
+  return generateBelief([{ type: 'point', center, spread, skew: -skewAmount }], K, L, H);
 }
 
 /**
- * L2: Right-skewed distribution builder.
+ * L2: Right-skewed distribution generator.
  * Asymmetric: sharper drop on the left, wider tail on the right.
- * Resolves through buildBelief with a positively-skewed PointRegion.
+ * Resolves through generateBelief with a positively-skewed PointRegion.
  */
-export function buildRightSkew(
+export function generateRightSkew(
   center: number,
   spread: number,
   K: number,
@@ -360,16 +360,16 @@ export function buildRightSkew(
   H: number,
   skewAmount: number = 1,
 ): BeliefVector {
-  return buildBelief([{ type: 'point', center, spread, skew: skewAmount }], K, L, H);
+  return generateBelief([{ type: 'point', center, spread, skew: skewAmount }], K, L, H);
 }
 
 /**
- * L2: Custom shape builder using cubic spline interpolation.
+ * L2: Custom shape generator using cubic spline interpolation.
  * Converts N control point values into a belief vector via Fritsch-Carlson spline.
  * Control points are uniformly spaced from L to H.
- * Resolves through buildBelief with a single SplineRegion.
+ * Resolves through generateBelief with a single SplineRegion.
  */
-export function buildCustomShape(
+export function generateCustomShape(
   controlValues: number[],
   K: number,
   L: number,
@@ -379,7 +379,7 @@ export function buildCustomShape(
   const controlX = controlValues.map((_, i) =>
     N === 1 ? (L + H) / 2 : L + (i / (N - 1)) * (H - L),
   );
-  return buildBelief(
+  return generateBelief(
     [{ type: 'spline', controlX, controlY: controlValues }],
     K, L, H,
   );

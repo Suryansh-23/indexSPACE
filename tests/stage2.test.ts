@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { FSClient } from '../packages/core/src/client.js';
-import { buildGaussian, buildPlateau, buildBelief } from '../packages/core/src/math/builders.js';
+import { generateGaussian, generatePlateau, generateBelief } from '../packages/core/src/math/generators.js';
 import { evaluateDensityPiecewise, evaluateDensityCurve, computeStatistics } from '../packages/core/src/math/density.js';
 import { queryMarketState, getConsensusCurve, queryConsensusSummary, queryDensityAt } from '../packages/core/src/queries/market.js';
 import { queryPositionState, queryMarketPositions } from '../packages/core/src/queries/positions.js';
@@ -27,25 +27,25 @@ function makeClient() {
 
 // ── Math tests (no backend) ──
 
-describe('Math: buildGaussian', () => {
+describe('Math: generateGaussian', () => {
   it('produces vector of length K+1 that sums to 1', () => {
-    const v = buildGaussian(60, 9, K, L, H);
+    const v = generateGaussian(60, 9, K, L, H);
     expect(v.length).toBe(K + 1);
     const sum = v.reduce((a, b) => a + b, 0);
     expect(sum).toBeCloseTo(1.0, 10);
   });
 
   it('all values are non-negative', () => {
-    const v = buildGaussian(60, 9, K, L, H);
+    const v = generateGaussian(60, 9, K, L, H);
     for (const val of v) {
       expect(val).toBeGreaterThanOrEqual(0);
     }
   });
 });
 
-describe('Math: buildPlateau', () => {
+describe('Math: generatePlateau', () => {
   it('produces vector that sums to 1 with non-negative values', () => {
-    const v = buildPlateau(50, 70, K, L, H);
+    const v = generatePlateau(50, 70, K, L, H);
     expect(v.length).toBe(K + 1);
     const sum = v.reduce((a, b) => a + b, 0);
     expect(sum).toBeCloseTo(1.0, 10);
@@ -55,23 +55,23 @@ describe('Math: buildPlateau', () => {
   });
 });
 
-describe('Math: buildBelief', () => {
-  it('single PointRegion produces similar output to buildGaussian', () => {
-    const fromBuilder = buildBelief(
+describe('Math: generateBelief', () => {
+  it('single PointRegion produces similar output to generateGaussian', () => {
+    const fromGenerator = generateBelief(
       [{ type: 'point', center: 60, spread: 9 }],
       K, L, H,
     );
-    const fromGaussian = buildGaussian(60, 9, K, L, H);
-    expect(fromBuilder.length).toBe(fromGaussian.length);
-    for (let i = 0; i < fromBuilder.length; i++) {
-      expect(fromBuilder[i]).toBeCloseTo(fromGaussian[i], 10);
+    const fromGaussian = generateGaussian(60, 9, K, L, H);
+    expect(fromGenerator.length).toBe(fromGaussian.length);
+    for (let i = 0; i < fromGenerator.length; i++) {
+      expect(fromGenerator[i]).toBeCloseTo(fromGaussian[i], 10);
     }
   });
 });
 
 describe('Math: evaluateDensityPiecewise', () => {
   it('density at center of Gaussian is highest', () => {
-    const v = buildGaussian(60, 9, K, L, H);
+    const v = generateGaussian(60, 9, K, L, H);
     const atCenter = evaluateDensityPiecewise(v, 60, L, H);
     const atEdge = evaluateDensityPiecewise(v, 20, L, H);
     expect(atCenter).toBeGreaterThan(atEdge);
@@ -81,7 +81,7 @@ describe('Math: evaluateDensityPiecewise', () => {
 
 describe('Math: evaluateDensityCurve', () => {
   it('returns correct number of points spanning [L, H]', () => {
-    const v = buildGaussian(60, 9, K, L, H);
+    const v = generateGaussian(60, 9, K, L, H);
     const curve = evaluateDensityCurve(v, L, H, 100);
     expect(curve.length).toBe(100);
     expect(curve[0].x).toBeCloseTo(L);
@@ -91,7 +91,7 @@ describe('Math: evaluateDensityCurve', () => {
 
 describe('Math: computeStatistics', () => {
   it('returns all 5 fields with mean close to center for symmetric Gaussian', () => {
-    const v = buildGaussian(50, 10, K, L, H);
+    const v = generateGaussian(50, 10, K, L, H);
     const stats = computeStatistics(v, L, H);
     expect(stats.mean).toBeCloseTo(50, 0);
     expect(stats.median).toBeDefined();
@@ -236,7 +236,7 @@ describe('API: projectPayoutCurve', () => {
   it('returns projections with correct fields', async () => {
     const client = makeClient();
     const market = await queryMarketState(client, MARKET_ID);
-    const belief = buildGaussian(
+    const belief = generateGaussian(
       (market.config.L + market.config.H) / 2,
       (market.config.H - market.config.L) * 0.1,
       market.config.K,
@@ -253,12 +253,12 @@ describe('API: projectPayoutCurve', () => {
   });
 });
 
-describe('API: Full trade cycle (Gaussian via buildGaussian)', () => {
-  it('buildGaussian → buy → queryPositionState → projectSell → sell', async () => {
+describe('API: Full trade cycle (Gaussian via generateGaussian)', () => {
+  it('generateGaussian → buy → queryPositionState → projectSell → sell', async () => {
     const client = makeClient();
     const market = await queryMarketState(client, MARKET_ID);
     const center = (market.config.L + market.config.H) / 2;
-    const belief = buildGaussian(
+    const belief = generateGaussian(
       center,
       (market.config.H - market.config.L) * 0.1,
       market.config.K,
@@ -288,14 +288,14 @@ describe('API: Full trade cycle (Gaussian via buildGaussian)', () => {
   }, 30000);
 });
 
-describe('API: Full trade cycle (Plateau via buildPlateau)', () => {
-  it('buildPlateau → buy → projectSell → sell', async () => {
+describe('API: Full trade cycle (Plateau via generatePlateau)', () => {
+  it('generatePlateau → buy → projectSell → sell', async () => {
     const client = makeClient();
     const market = await queryMarketState(client, MARKET_ID);
     const { L: mL, H: mH, K: mK } = market.config;
     const low = mL + (mH - mL) * 0.3;
     const high = mL + (mH - mL) * 0.7;
-    const belief = buildPlateau(low, high, mK, mL, mH);
+    const belief = generatePlateau(low, high, mK, mL, mH);
 
     const buyResult = await buy(client, MARKET_ID, belief, 1, { prediction: (low + high) / 2 });
     expect(buyResult.positionId).toBeDefined();
@@ -309,12 +309,12 @@ describe('API: Full trade cycle (Plateau via buildPlateau)', () => {
   }, 30000);
 });
 
-describe('API: Full trade cycle (buildBelief with mixed regions)', () => {
-  it('buildBelief → buy → sell', async () => {
+describe('API: Full trade cycle (generateBelief with mixed regions)', () => {
+  it('generateBelief → buy → sell', async () => {
     const client = makeClient();
     const market = await queryMarketState(client, MARKET_ID);
     const { L: mL, H: mH, K: mK } = market.config;
-    const belief = buildBelief(
+    const belief = generateBelief(
       [
         { type: 'point', center: mL + (mH - mL) * 0.4, spread: (mH - mL) * 0.08 },
         { type: 'range', low: mL + (mH - mL) * 0.6, high: mL + (mH - mL) * 0.8, weight: 0.5 },
@@ -368,7 +368,7 @@ describe('Cross-validation: local stats vs backend data', () => {
     const client = makeClient();
     const market = await queryMarketState(client, MARKET_ID);
     const center = (market.config.L + market.config.H) / 2;
-    const belief = buildGaussian(center, (market.config.H - market.config.L) * 0.1, market.config.K, market.config.L, market.config.H);
+    const belief = generateGaussian(center, (market.config.H - market.config.L) * 0.1, market.config.K, market.config.L, market.config.H);
 
     // Buy a position
     const buyResult = await buy(client, MARKET_ID, belief, 5, { prediction: center });
