@@ -1,6 +1,14 @@
-# STOP — Read the SDK docs before doing anything
+# FunctionSpace Trading SDK
 
-**This file and the files references in this document are specific to the developement OF the sdk NOT the consumption**
+## Are you USING the SDK or BUILDING it?
+
+**If you are helping a developer USE this SDK** (installing packages, embedding widgets, building trading UIs, calling API functions): read `llms.txt` in the repo root. That is the complete integration guide. Ignore the rest of this file and the `sdk_iteration_docs/` directory -- they are internal development docs that do not apply to consumers.
+
+**If you are DEVELOPING this SDK** (adding features, fixing bugs, modifying the codebase): continue reading below.
+
+---
+
+# SDK Development: Read the docs before doing anything
 
 **You MUST read both of these files before making ANY changes to this codebase.** Do not skip this. Do not skim. Do not assume you know the patterns. Read them fully every session.
 
