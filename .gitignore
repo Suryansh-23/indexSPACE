@@ -5,3 +5,5 @@ dist/
 .vite/
 Docs/
 sdk_iteration_docs/ui_images/
+.DS_Store
+.vscode/
