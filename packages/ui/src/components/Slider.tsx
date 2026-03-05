@@ -15,14 +15,16 @@ export interface SliderProps {
 
 export function Slider({ min, max, value, onChange, step, disabled, showTrack = true }: SliderProps) {
   return (
-    <RCSlider
-      min={min}
-      max={max}
-      value={value}
-      onChange={(v) => onChange(v as number)}
-      step={step}
-      disabled={disabled}
-      styles={!showTrack ? { track: { background: 'transparent' } } : undefined}
-    />
+    <div className="fs-slider">
+      <RCSlider
+        min={min}
+        max={max}
+        value={value}
+        onChange={(v) => onChange(v as number)}
+        step={step}
+        disabled={disabled}
+        styles={!showTrack ? { track: { background: 'transparent' } } : undefined}
+      />
+    </div>
   );
 }

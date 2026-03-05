@@ -4,16 +4,23 @@ Backend Smoke Test
 Verifies all API endpoints respond correctly before starting SDK development.
 Run with: python tests/smoke-test-api.py
 
-UPDATE THESE VARIABLES before running:
+Set these environment variables before running (or create a root .env file):
+  FS_TEST_URL, FS_TEST_USERNAME, FS_TEST_PASSWORD, FS_TEST_MARKET_ID
 """
+import os
 import sys
 import math
 import requests
 
-BASE_URL = 'http://localhost:8000'
-USERNAME = 'SDK_demo'
-PASSWORD = 'demo_2026_@@'
-MARKET_ID = '15'
+BASE_URL = os.environ.get('FS_TEST_URL', 'http://localhost:8000')
+USERNAME = os.environ.get('FS_TEST_USERNAME', '')
+PASSWORD = os.environ.get('FS_TEST_PASSWORD', '')
+MARKET_ID = os.environ.get('FS_TEST_MARKET_ID', '15')
+
+if not USERNAME or not PASSWORD:
+    print('Missing FS_TEST_USERNAME or FS_TEST_PASSWORD environment variables.')
+    print('Set them in your shell or in a root .env file.')
+    sys.exit(1)
 
 # ─────────────────────────────────────────────
 

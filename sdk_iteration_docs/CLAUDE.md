@@ -204,6 +204,11 @@ Unified skill for implementing new features. Enforces a 6-phase workflow: read l
 
 Multi-agent adversarial review of recent implementation work. Invoked manually with `/implementation-review <handoff-doc-path>`. Dispatches 7 parallel review agents (plan compliance, architecture, theme, SDK best practices, error handling, test quality, code quality catch-all) plus 1 sequential consolidation agent. Produces a detailed improvements document at `Docs/reviews/<feature-name>/review-<feature-name>.md` that can be handed to another agent with `/implement` for remediation. Also produces `doc-updates-draft.md` with proposed edits to the living docs.
 
+## Pending Fixes
+
+- **Race conditions in data hooks.** Hooks that fetch by `marketId` (useMarket, useConsensus, usePositions, useMarketHistory, useDistributionState, useBucketDistribution) do not use an AbortController or generation counter. If `marketId` changes rapidly, an earlier response can overwrite a later one, showing stale data for the wrong market.
+- **Missing mounted guards in data hooks.** The same hooks listed above do not check whether the component is still mounted before calling `setState`. This can cause React "setState on unmounted component" warnings during fast navigation.
+
 ## Commit Style
 
 - Never add `Co-Authored-By` lines to git commits.

@@ -12,8 +12,8 @@ import { projectSell } from '../packages/core/src/projections/projectSell.js';
 import { projectPayoutCurve } from '../packages/core/src/projections/projectPayoutCurve.js';
 
 const BASE_URL = 'http://localhost:8000';
-const USERNAME = 'SDK_demo';
-const PASSWORD = 'demo_2026_@@';
+const USERNAME = '';
+const PASSWORD = '';
 const MARKET_ID = '15';
 
 // Use K=60, L and H from actual market — but for pure math tests use representative values

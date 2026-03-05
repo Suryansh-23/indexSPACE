@@ -22,8 +22,8 @@ import type {
 } from '../packages/core/src/types.js';
 
 const BASE_URL = 'http://localhost:8000';
-const USERNAME = 'SDK_demo';
-const PASSWORD = 'demo_2026_@@';
+const USERNAME = '';
+const PASSWORD = '';
 const MARKET_ID = '15';
 
 describe('Stage 1: Types compile correctly', () => {

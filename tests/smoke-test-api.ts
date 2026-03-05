@@ -4,12 +4,19 @@
  * Verifies all API endpoints respond correctly before starting SDK development.
  * Run with: npx tsx tests/smoke-test-api.ts
  *
- * UPDATE THESE VARIABLES before running:
+ * Set these environment variables before running (or create a root .env file):
+ *   FS_TEST_URL, FS_TEST_USERNAME, FS_TEST_PASSWORD, FS_TEST_MARKET_ID
  */
 const BASE_URL = 'http://localhost:8000';
-const USERNAME = 'SDK_demo';
-const PASSWORD = 'demo_2026_@@';
+const USERNAME = '';
+const PASSWORD =  '';
 const MARKET_ID = '15';
+
+if (!USERNAME || !PASSWORD) {
+  console.error('Missing FS_TEST_USERNAME or FS_TEST_PASSWORD environment variables.');
+  console.error('Set them in your shell or in a root .env file.');
+  process.exit(1);
+}
 
 // ─────────────────────────────────────────────
 

@@ -15,15 +15,17 @@ export interface RangeSliderProps {
 
 export function RangeSlider({ min, max, values, onChange, step, disabled, showTrack = true }: RangeSliderProps) {
   return (
-    <RCSlider
-      range
-      min={min}
-      max={max}
-      value={values}
-      onChange={(v) => onChange(v as [number, number])}
-      step={step}
-      disabled={disabled}
-      styles={!showTrack ? { track: { background: 'transparent' } } : undefined}
-    />
+    <div className="fs-slider">
+      <RCSlider
+        range
+        min={min}
+        max={max}
+        value={values}
+        onChange={(v) => onChange(v as [number, number])}
+        step={step}
+        disabled={disabled}
+        styles={!showTrack ? { track: { background: 'transparent' } } : undefined}
+      />
+    </div>
   );
 }

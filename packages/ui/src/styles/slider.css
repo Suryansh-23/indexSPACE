@@ -1,6 +1,6 @@
 /* rc-slider theme overrides using CSS variables */
 
-.rc-slider {
+.fs-slider .rc-slider {
   height: 8px;
   padding: 5px 0;
   width: 100%;
@@ -9,7 +9,7 @@
   box-sizing: border-box;
 }
 
-.rc-slider-rail {
+.fs-slider .rc-slider-rail {
   position: absolute;
   width: 100%;
   height: 8px;
@@ -17,14 +17,14 @@
   border-radius: var(--fs-radius-sm);
 }
 
-.rc-slider-track {
+.fs-slider .rc-slider-track {
   position: absolute;
   height: 8px;
   background: var(--fs-primary);
   border-radius: var(--fs-radius-sm);
 }
 
-.rc-slider-handle {
+.fs-slider .rc-slider-handle {
   position: absolute;
   width: 20px;
   height: 20px;
@@ -39,34 +39,34 @@
   touch-action: pan-x;
 }
 
-.rc-slider-handle:hover {
+.fs-slider .rc-slider-handle:hover {
   border-color: var(--fs-primary);
 }
 
-.rc-slider-handle:focus {
+.fs-slider .rc-slider-handle:focus {
   outline: none;
   box-shadow: 0 0 0 4px var(--fs-primary-glow);
 }
 
-.rc-slider-handle:focus-visible {
+.fs-slider .rc-slider-handle:focus-visible {
   border-color: var(--fs-primary);
   box-shadow: 0 0 0 4px var(--fs-primary-glow);
 }
 
-.rc-slider-handle-dragging.rc-slider-handle-dragging.rc-slider-handle-dragging {
+.fs-slider .rc-slider-handle-dragging.rc-slider-handle-dragging.rc-slider-handle-dragging {
   border-color: var(--fs-primary);
   box-shadow: 0 0 0 4px var(--fs-primary-glow);
 }
 
-.rc-slider-handle:active {
+.fs-slider .rc-slider-handle:active {
   cursor: grabbing;
 }
 
-.rc-slider-disabled {
+.fs-slider .rc-slider-disabled {
   opacity: 0.5;
 }
 
-.rc-slider-disabled .rc-slider-handle {
+.fs-slider .rc-slider-disabled .rc-slider-handle {
   cursor: not-allowed;
 }
 
