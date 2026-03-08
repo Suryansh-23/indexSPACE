@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { FSClient } from '../packages/core/src/client.js';
+import { passwordlessLoginUser, silentReAuth } from '../packages/core/src/auth/auth.js';
+import { PASSWORD_REQUIRED } from '../packages/core/src/types.js';
 import { generateGaussian, generatePlateau, generateBelief } from '../packages/core/src/math/generators.js';
 import { evaluateDensityPiecewise, evaluateDensityCurve, computeStatistics } from '../packages/core/src/math/density.js';
 import { queryMarketState, getConsensusCurve, queryConsensusSummary, queryDensityAt } from '../packages/core/src/queries/market.js';
@@ -453,5 +455,182 @@ describe('API: queryMarketHistory', () => {
     const client = makeClient();
     const history = await queryMarketHistory(client, MARKET_ID, 5);
     expect(history.snapshots.length).toBeLessThanOrEqual(5);
+  });
+});
+
+// ── Passwordless Auth (mocked fetch, no backend) ──
+
+const mockUserRaw = { user_id: 1, username: 'testuser', wallet_value: 1000, role: 'trader' };
+const mockMappedUser = { userId: 1, username: 'testuser', walletValue: 1000, role: 'trader' };
+const mockToken = 'mock-jwt-token';
+
+function makeMockClient() {
+  return new FSClient({ baseUrl: 'http://localhost:8000' });
+}
+
+describe('passwordlessLoginUser', () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it('returns login result for existing user', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ user: mockUserRaw, access_token: mockToken }),
+    });
+
+    const client = makeMockClient();
+    const result = await passwordlessLoginUser(client, 'testuser');
+
+    expect(result.action).toBe('login');
+    expect(result.user).toEqual(mockMappedUser);
+    expect(result.token).toBe(mockToken);
+  });
+
+  it('auto-signs up when user does not exist', async () => {
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: () => Promise.resolve({ detail: 'Invalid username' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ user: mockUserRaw, access_token: mockToken }),
+      });
+
+    const client = makeMockClient();
+    const result = await passwordlessLoginUser(client, 'newuser');
+
+    expect(result.action).toBe('signup');
+    expect(result.user).toEqual(mockMappedUser);
+    expect(result.token).toBe(mockToken);
+  });
+
+  it('throws PASSWORD_REQUIRED for password-protected accounts', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: () => Promise.resolve({ detail: 'Password required for this account' }),
+    });
+
+    const client = makeMockClient();
+
+    try {
+      await passwordlessLoginUser(client, 'admin');
+      expect.unreachable('Should have thrown');
+    } catch (err: any) {
+      expect(err.code).toBe(PASSWORD_REQUIRED);
+      expect(err.message).toBe('Password required for this account');
+    }
+  });
+
+  it('throws on signup conflict (409 username already exists)', async () => {
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: () => Promise.resolve({ detail: 'Invalid username' }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        json: () => Promise.resolve({ detail: 'Username already exists' }),
+      });
+
+    const client = makeMockClient();
+
+    try {
+      await passwordlessLoginUser(client, 'taken');
+      expect.unreachable('Should have thrown');
+    } catch (err: any) {
+      expect(err.message).toContain('Username already exists');
+    }
+  });
+});
+
+describe('silentReAuth', () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it('returns user and token on success', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ user: mockUserRaw, access_token: mockToken }),
+    });
+
+    const client = makeMockClient();
+    const result = await silentReAuth(client, 'testuser');
+
+    expect(result.user).toEqual(mockMappedUser);
+    expect(result.token).toBe(mockToken);
+  });
+
+  it('throws PASSWORD_REQUIRED for password-protected accounts', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: () => Promise.resolve({ detail: 'Password required for this account' }),
+    });
+
+    const client = makeMockClient();
+
+    try {
+      await silentReAuth(client, 'admin');
+      expect.unreachable('Should have thrown');
+    } catch (err: any) {
+      expect(err.code).toBe(PASSWORD_REQUIRED);
+    }
+  });
+
+  it('throws standard error for other failures', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: () => Promise.resolve({ detail: 'Token expired' }),
+    });
+
+    const client = makeMockClient();
+
+    try {
+      await silentReAuth(client, 'testuser');
+      expect.unreachable('Should have thrown');
+    } catch (err: any) {
+      expect(err.message).toBe('Token expired');
+      expect(err.code).toBeUndefined();
+    }
+  });
+});
+
+describe('FSClient stored username', () => {
+  it('getStoredUsername returns null by default', () => {
+    const client = makeMockClient();
+    expect(client.getStoredUsername()).toBe(null);
+  });
+
+  it('setStoredUsername then getStoredUsername returns the username', () => {
+    const client = makeMockClient();
+    client.setStoredUsername('alice');
+    expect(client.getStoredUsername()).toBe('alice');
+  });
+
+  it('clearStoredUsername resets to null', () => {
+    const client = makeMockClient();
+    client.setStoredUsername('alice');
+    client.clearStoredUsername();
+    expect(client.getStoredUsername()).toBe(null);
   });
 });

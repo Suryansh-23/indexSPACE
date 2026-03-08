@@ -193,6 +193,7 @@ Example:
 .fs-bucket-range,
 .fs-bucket-trade-panel,
 .fs-auth-widget,
+.fs-passwordless-auth,
 .fs-custom-shape {          /* ← add new widget roots here */
   --fs-primary-glow: color-mix(in srgb, var(--fs-primary) 20%, transparent);
   --fs-primary-light: color-mix(in srgb, var(--fs-primary) 80%, white);
@@ -350,7 +351,7 @@ export function MyChart({ data }: { data: any[] }) {
 | `useTradeHistory(marketId, options?)` | `{ trades, loading, error, refetch }` | Trade history entries — supports `pollInterval` for auto-refresh |
 | `useBucketDistribution(marketId, numBuckets?, numPoints?)` | `{ buckets, loading, error, refetch }` | Probability distribution across equal-width outcome buckets (derived from market + consensus) |
 | `useDistributionState(marketId, config?)` | `{ market, loading, error, refetch, bucketCount, setBucketCount, buckets, percentiles, getBucketsForRange }` | Shared distribution state for bucket-based trading components — state/composition hook |
-| `useAuth()` | `{ user, isAuthenticated, loading, error, login, signup, logout, refreshUser }` | Auth state and actions — state/action hook (no `invalidationCount`) |
+| `useAuth()` | `{ user, isAuthenticated, loading, error, login, signup, logout, refreshUser, passwordlessLogin, showAdminLogin, pendingAdminUsername, clearAdminLogin }` | Auth state and actions -- state/action hook (no `invalidationCount`) |
 | `useCustomShape(market)` | `{ controlValues, lockedPoints, numPoints, pVector, prediction, setControlValue, toggleLock, setNumPoints, resetToDefault, startDrag, handleDrag, endDrag, isDragging, draggingIndex }` | Custom shape editing state — state/action hook (no `invalidationCount`). Accepts `market` from `useMarket`. |
 | `useChartZoom(options)` | `{ containerRef, xDomain, yDomain, isZoomed, isPanning, containerProps, reset }` | Chart zoom/pan state — state/action hook (no context dependency, no `invalidationCount`). Use with `rechartsPlotArea()` helper for Recharts integration. |
 
@@ -607,6 +608,8 @@ Peaks beyond 4x are clipped visually but remain in the tooltip data. This ensure
 - `signupUser(client, username, password, options?)` → `{ user: UserProfile }` (no token — caller must login after)
 - `fetchCurrentUser(client)` → `UserProfile` (uses client.get, requires token)
 - `validateUsername(name)` → `{ valid: boolean, error?: string }` (3-32 chars, alphanumeric + dots/dashes/underscores)
+- `passwordlessLoginUser(client, username)` → `PasswordlessLoginResult` (L1 Transaction -- try login, auto-signup on "Invalid username", throw PASSWORD_REQUIRED for password-protected accounts)
+- `silentReAuth(client, username)` → `{ user: UserProfile, token: string }` (L1 Transaction -- silent token re-auth, throws PASSWORD_REQUIRED if password-protected)
 
 ### Chart Interaction (L0 Pure Math)
 - `pixelToDataX(clientX, plotAreaLeft, plotAreaRight, xDomain)` → data-space X value (linear interpolation, clamped)
@@ -683,6 +686,7 @@ onSuccess?.(result);       // Notify parent
 | Widget | Purpose | Key Pattern |
 |--------|---------|-------------|
 | `AuthWidget` | Login/signup/user bar | Uses `useAuth` hook, form state, `validateUsername` from core |
+| `PasswordlessAuthWidget` | Passwordless login/signup with modal | Uses `useAuth` hook, modal overlay, auto-signup, PASSWORD_REQUIRED sentinel, silent re-auth via `storedUsername` prop |
 | `MarketStats` | Stats display | Minimal, read-only |
 | `ConsensusChart` | Consensus PDF visualization | Standalone chart, reads context for overlays |
 | `DistributionChart` | Distribution bar chart | Standalone chart with bucket slider |
@@ -999,7 +1003,8 @@ packages/
     │   └── BucketTradePanel.tsx
     ├── auth/                 # Authentication
     │   ├── index.ts
-    │   └── AuthWidget.tsx
+    │   ├── AuthWidget.tsx
+    │   └── PasswordlessAuthWidget.tsx
     ├── market/               # Read-only market info
     │   ├── index.ts
     │   ├── MarketStats.tsx
@@ -1017,7 +1022,8 @@ tests/
 ├── shapes.test.ts        # Belief shape validation (vector properties, shape characteristics)
 ├── binary.test.ts        # Binary panel-specific tests
 ├── stage1.test.ts        # Core math functions
-└── stage2.test.ts        # API/transaction functions
+├── stage2.test.ts        # API/transaction functions
+└── components.test.tsx   # Widget smoke tests (jsdom)
 ```
 
 ## UI Component Categories
@@ -1027,5 +1033,5 @@ tests/
 | `charts/` | Data visualizations | ConsensusChart, DistributionChart, TimelineChart, MarketCharts |
 | `trading/` | User input/actions | TradePanel, ShapeCutter, BinaryPanel, BucketRangeSelector, BucketTradePanel |
 | `market/` | Read-only market info | MarketStats, PositionTable, TimeSales |
-| `auth/` | Authentication | AuthWidget (login/signup forms, authenticated user bar) |
+| `auth/` | Authentication | AuthWidget (login/signup forms), PasswordlessAuthWidget (username-only login with modal, auto-signup, silent re-auth) |
 | `components/` | Internal UI primitives (not exported from package root) | Slider, RangeSlider (rc-slider wrappers with consistent styling) |

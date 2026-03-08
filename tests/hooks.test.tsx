@@ -9,6 +9,9 @@ vi.mock('@functionspace/core', () => ({
     get: vi.fn(),
     setToken: vi.fn(),
     clearToken: vi.fn(),
+    setStoredUsername: vi.fn(),
+    getStoredUsername: vi.fn().mockReturnValue(null),
+    clearStoredUsername: vi.fn(),
     isAuthenticated: false,
     base: 'https://test.api.com',
   })),
@@ -36,6 +39,16 @@ vi.mock('@functionspace/core', () => ({
   fetchCurrentUser: vi.fn().mockResolvedValue({
     userId: 1, username: 'testuser', walletValue: 1000, role: 'trader',
   }),
+  passwordlessLoginUser: vi.fn().mockResolvedValue({
+    action: 'login',
+    user: { userId: 1, username: 'testuser', walletValue: 1000, role: 'trader' },
+    token: 'mock-passwordless-token',
+  }),
+  silentReAuth: vi.fn().mockResolvedValue({
+    user: { userId: 1, username: 'testuser', walletValue: 1000, role: 'trader' },
+    token: 'mock-reauth-token',
+  }),
+  PASSWORD_REQUIRED: 'PASSWORD_REQUIRED',
   pixelToDataX: vi.fn((clientX: number, left: number, right: number, domain: [number, number]) => {
     const plotWidth = right - left;
     if (plotWidth <= 0) return domain[0];
@@ -76,7 +89,7 @@ vi.mock('@functionspace/core', () => ({
 
 import { FunctionSpaceProvider, useMarket, useConsensus, usePositions, useTradeHistory, useBucketDistribution, useMarketHistory, useDistributionState, useAuth, useCustomShape, useChartZoom } from '../packages/react/src';
 import type { ChartZoomOptions } from '../packages/react/src';
-import { queryMarketState, getConsensusCurve, queryMarketPositions, queryTradeHistory, queryMarketHistory, calculateBucketDistribution, computePercentiles, FSClient, loginUser } from '@functionspace/core';
+import { queryMarketState, getConsensusCurve, queryMarketPositions, queryTradeHistory, queryMarketHistory, calculateBucketDistribution, computePercentiles, FSClient, loginUser, passwordlessLoginUser, silentReAuth } from '@functionspace/core';
 
 const mockConfig = {
   baseUrl: 'https://test.api.com',
@@ -325,6 +338,9 @@ describe('Hook Return Shape', () => {
       get: vi.fn().mockResolvedValue({ positions: [] }),
       setToken: vi.fn(),
       clearToken: vi.fn(),
+      setStoredUsername: vi.fn(),
+      getStoredUsername: vi.fn().mockReturnValue(null),
+      clearStoredUsername: vi.fn(),
       isAuthenticated: false,
       base: 'https://test.api.com',
     }) as any);
@@ -957,6 +973,79 @@ describe('useAuth hook', () => {
     expect(result.current.isAuthenticated).toBe(false);
     expect(result.current.user).toBe(null);
     expect(loginUser).not.toHaveBeenCalled();
+  });
+
+  it('returns passwordlessLogin, showAdminLogin, pendingAdminUsername, clearAdminLogin with correct types', async () => {
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    // Verify the new passwordless auth fields exist
+    expect(result.current).toHaveProperty('passwordlessLogin');
+    expect(result.current).toHaveProperty('showAdminLogin');
+    expect(result.current).toHaveProperty('pendingAdminUsername');
+    expect(result.current).toHaveProperty('clearAdminLogin');
+
+    // Verify correct types
+    expect(typeof result.current.passwordlessLogin).toBe('function');
+    expect(typeof result.current.showAdminLogin).toBe('boolean');
+    // pendingAdminUsername is string | null -- initially null
+    expect(result.current.pendingAdminUsername === null || typeof result.current.pendingAdminUsername === 'string').toBe(true);
+    expect(typeof result.current.clearAdminLogin).toBe('function');
+  });
+
+  it('passwordlessLogin calls passwordlessLoginUser and updates auth state', async () => {
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    // Call passwordlessLogin
+    await act(async () => {
+      const loginResult = await result.current.passwordlessLogin('testuser');
+      expect(loginResult.action).toBe('login');
+      expect(loginResult.user.username).toBe('testuser');
+    });
+
+    // Verify state updated
+    expect(result.current.isAuthenticated).toBe(true);
+    expect(result.current.user).not.toBeNull();
+    expect(result.current.user!.username).toBe('testuser');
+    expect(passwordlessLoginUser).toHaveBeenCalledTimes(1);
+  });
+
+  it('storedUsername prop triggers silentReAuth on mount', async () => {
+    function StoredUsernameWrapper({ children }: { children: React.ReactNode }) {
+      return (
+        <FunctionSpaceProvider
+          config={{ baseUrl: 'https://test.api.com' }}
+          theme="fs-dark"
+          storedUsername="returning-user"
+        >
+          {children}
+        </FunctionSpaceProvider>
+      );
+    }
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: StoredUsernameWrapper,
+    });
+
+    // Wait for silentReAuth to complete
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(silentReAuth).toHaveBeenCalledTimes(1);
+    expect(result.current.isAuthenticated).toBe(true);
+    expect(result.current.user).not.toBeNull();
   });
 });
 

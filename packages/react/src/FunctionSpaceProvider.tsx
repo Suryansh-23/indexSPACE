@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { FSClient, loginUser, signupUser, fetchCurrentUser } from '@functionspace/core';
-import type { PayoutCurve, Position, UserProfile, SignupOptions } from '@functionspace/core';
+import { FSClient, loginUser, signupUser, fetchCurrentUser, passwordlessLoginUser, silentReAuth, PASSWORD_REQUIRED } from '@functionspace/core';
+import type { PayoutCurve, Position, UserProfile, SignupOptions, PasswordlessLoginResult } from '@functionspace/core';
 import { FunctionSpaceContext } from './context.js';
 import {
   FS_DARK, FS_LIGHT, NATIVE_DARK, NATIVE_LIGHT,
@@ -80,10 +80,11 @@ export interface FunctionSpaceProviderProps {
     autoAuthenticate?: boolean;
   };
   theme?: FSThemeInput;
+  storedUsername?: string | null;
   children: React.ReactNode;
 }
 
-export function FunctionSpaceProvider({ config, theme, children }: FunctionSpaceProviderProps) {
+export function FunctionSpaceProvider({ config, theme, storedUsername, children }: FunctionSpaceProviderProps) {
   const clientRef = useRef<FSClient | null>(null);
   const [providerReady, setProviderReady] = useState(false);
   const [authError, setAuthError] = useState<Error | null>(null);
@@ -93,6 +94,8 @@ export function FunctionSpaceProvider({ config, theme, children }: FunctionSpace
   const [previewPayout, setPreviewPayout] = useState<PayoutCurve | null>(null);
   const [invalidationCount, setInvalidationCount] = useState(0);
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [pendingAdminUsername, setPendingAdminUsername] = useState<string | null>(null);
 
   // Create client once
   if (!clientRef.current) {
@@ -119,10 +122,30 @@ export function FunctionSpaceProvider({ config, theme, children }: FunctionSpace
           setProviderReady(true);
         })
         .finally(() => setAuthLoading(false));
+    } else if (storedUsername) {
+      // Stored username: attempt silent re-auth without blocking rendering
+      setProviderReady(true);
+      setAuthLoading(true);
+      silentReAuth(client, storedUsername)
+        .then((result) => {
+          client.setToken(result.token);
+          client.setStoredUsername(storedUsername);
+          setUser(result.user);
+        })
+        .catch((err) => {
+          if ((err as Error & { code: string }).code === PASSWORD_REQUIRED) {
+            setPendingAdminUsername(storedUsername);
+            setShowAdminLogin(true);
+          } else {
+            client.clearStoredUsername();
+          }
+        })
+        .finally(() => setAuthLoading(false));
     } else {
       // Interactive mode: ready immediately, guest browsing enabled
       setProviderReady(true);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount-only effect; config/storedUsername are read once
   }, []);
 
   // Login callback (interactive auth) — returns UserProfile for caller convenience
@@ -132,7 +155,10 @@ export function FunctionSpaceProvider({ config, theme, children }: FunctionSpace
     try {
       const result = await loginUser(client, username, password);
       client.setToken(result.token);
+      client.setStoredUsername(username);
       setUser(result.user);
+      setShowAdminLogin(false);
+      setPendingAdminUsername(null);
       setInvalidationCount((c) => c + 1);
       return result.user;
     } catch (err) {
@@ -168,8 +194,11 @@ export function FunctionSpaceProvider({ config, theme, children }: FunctionSpace
   // Logout callback
   const logout = useCallback(() => {
     client.clearToken();
+    client.clearStoredUsername();
     setUser(null);
     setAuthError(null);
+    setShowAdminLogin(false);
+    setPendingAdminUsername(null);
     setSelectedPosition(null);
     setPreviewBelief(null);
     setPreviewPayout(null);
@@ -186,6 +215,34 @@ export function FunctionSpaceProvider({ config, theme, children }: FunctionSpace
       // silently fail — wallet refresh is best-effort
     }
   }, [client]);
+
+  // Passwordless login callback
+  const passwordlessLogin = useCallback(async (username: string): Promise<PasswordlessLoginResult> => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      const result = await passwordlessLoginUser(client, username);
+      client.setToken(result.token);
+      client.setStoredUsername(username);
+      setUser(result.user);
+      setShowAdminLogin(false);
+      setPendingAdminUsername(null);
+      setInvalidationCount((c) => c + 1);
+      return result;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      setAuthError(error);
+      throw error;
+    } finally {
+      setAuthLoading(false);
+    }
+  }, [client]);
+
+  // Clear admin login state
+  const clearAdminLogin = useCallback(() => {
+    setShowAdminLogin(false);
+    setPendingAdminUsername(null);
+  }, []);
 
   // Invalidate: increment counter + refresh user wallet when authenticated
   const invalidate = useCallback((_marketId: string | number) => {
@@ -261,11 +318,17 @@ export function FunctionSpaceProvider({ config, theme, children }: FunctionSpace
     signup,
     logout,
     refreshUser,
+    passwordlessLogin,
+    showAdminLogin,
+    pendingAdminUsername,
+    clearAdminLogin,
     chartColors: resolvedChartColors,
   }), [
     previewBelief, previewPayout, invalidate, invalidationCount,
     selectedPosition, user, isAuthenticated, authLoading, authError,
-    login, signup, logout, refreshUser, resolvedChartColors,
+    login, signup, logout, refreshUser, passwordlessLogin,
+    showAdminLogin, pendingAdminUsername, clearAdminLogin,
+    resolvedChartColors,
   ]);
 
   if (!providerReady) {

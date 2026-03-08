@@ -11,8 +11,8 @@ export { MarketStats, PositionTable, TimeSales } from './market/index.js';
 export type { MarketStatsProps, PositionTableProps, PositionTabId, TimeSalesProps } from './market/index.js';
 
 // Auth
-export { AuthWidget } from './auth/index.js';
-export type { AuthWidgetProps } from './auth/index.js';
+export { AuthWidget, PasswordlessAuthWidget } from './auth/index.js';
+export type { AuthWidgetProps, PasswordlessAuthWidgetProps } from './auth/index.js';
 
 // Theme
 export { CHART_COLORS } from './theme.js';

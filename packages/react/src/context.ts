@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import type { FSClient, PayoutCurve, Position, UserProfile, SignupOptions } from '@functionspace/core';
+import type { FSClient, PayoutCurve, Position, UserProfile, SignupOptions, PasswordlessLoginResult } from '@functionspace/core';
 import type { ChartColors } from './themes.js';
 
 export interface FSContext {
@@ -23,6 +23,10 @@ export interface FSContext {
   signup: (username: string, password: string, options?: SignupOptions) => Promise<UserProfile>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  passwordlessLogin: (username: string) => Promise<PasswordlessLoginResult>;
+  showAdminLogin: boolean;
+  pendingAdminUsername: string | null;
+  clearAdminLogin: () => void;
   /** Resolved chart colors for the current theme (concrete hex values for Recharts) */
   chartColors: ChartColors;
 }

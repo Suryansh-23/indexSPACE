@@ -14,5 +14,9 @@ export function useAuth() {
     signup: ctx.signup,
     logout: ctx.logout,
     refreshUser: ctx.refreshUser,
+    passwordlessLogin: ctx.passwordlessLogin,
+    showAdminLogin: ctx.showAdminLogin,
+    pendingAdminUsername: ctx.pendingAdminUsername,
+    clearAdminLogin: ctx.clearAdminLogin,
   };
 }

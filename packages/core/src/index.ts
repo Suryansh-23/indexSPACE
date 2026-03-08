@@ -23,7 +23,9 @@ export type {
   AuthResult,
   SignupResult,
   SignupOptions,
+  PasswordlessLoginResult,
 } from './types.js';
+export { PASSWORD_REQUIRED } from './types.js';
 
 // Client
 export { FSClient } from './client.js';
@@ -54,7 +56,7 @@ export { projectSell } from './projections/projectSell.js';
 export { projectPayoutCurve } from './projections/projectPayoutCurve.js';
 
 // Auth
-export { loginUser, signupUser, fetchCurrentUser, validateUsername } from './auth/auth.js';
+export { loginUser, signupUser, fetchCurrentUser, validateUsername, passwordlessLoginUser, silentReAuth } from './auth/auth.js';
 
 // Chart Interaction
 export { pixelToDataX, computeZoomedDomain, computePannedDomain, filterVisibleData, generateEvenTicks } from './chart/zoom.js';

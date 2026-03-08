@@ -14,6 +14,7 @@ export { useMarketHistory } from './useMarketHistory.js';
 export { useDistributionState } from './useDistributionState.js';
 export type { DistributionState, DistributionStateConfig } from './useDistributionState.js';
 export { useAuth } from './useAuth.js';
+export type { PasswordlessLoginResult } from '@functionspace/core';
 export { useCustomShape } from './useCustomShape.js';
 export type { UseCustomShapeReturn } from './useCustomShape.js';
 export { useChartZoom } from './useChartZoom.js';

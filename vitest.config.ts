@@ -11,6 +11,7 @@ export default defineConfig(({ mode }) => {
       // Separate environments: jsdom for React tests, node for others
       environmentMatchGlobs: [
         ['tests/hooks.test.tsx', 'jsdom'],
+        ['tests/components.test.tsx', 'jsdom'],
         ['tests/*.test.ts', 'node'],
       ],
       env: {

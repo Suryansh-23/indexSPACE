@@ -1,5 +1,5 @@
 import { FunctionSpaceProvider } from '@functionspace/react';
-import { MarketCharts, DistributionChart, ShapeCutter, MarketStats, PositionTable, TimeSales, AuthWidget } from '@functionspace/ui';
+import { MarketCharts, DistributionChart, ShapeCutter, MarketStats, PositionTable, TimeSales, PasswordlessAuthWidget } from '@functionspace/ui';
 import { ArticlePage } from './pages/ArticlePage';
 import { config, MARKET_ID, widgetTheme } from './App';
 
@@ -13,7 +13,7 @@ export default function App_ShapeCutterTradingLayout() {
             <MarketStats marketId={MARKET_ID} />
           </div>
           <div style={{ flex: 3, minWidth: 0 }}>
-            <AuthWidget />
+            <PasswordlessAuthWidget />
           </div>
         </div>
 

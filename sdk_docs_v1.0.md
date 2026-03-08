@@ -123,7 +123,8 @@ That's it. The chart and trade panel automatically coordinate — moving sliders
 ### Authentication Modes
 
 - **Auto-authenticate:** Pass `username` and `password` in config. The Provider authenticates on mount.
-- **Interactive:** Omit credentials. Use the `AuthWidget` component or the `useAuth()` hook for login/signup UI.
+- **Interactive:** Omit credentials. Use the `AuthWidget` or `PasswordlessAuthWidget` component, or the `useAuth()` hook for login/signup UI.
+- **Passwordless:** Omit credentials. Use `PasswordlessAuthWidget` for username-only login with auto-signup. Pass `storedUsername` to the provider for silent re-auth on mount.
 - **Guest:** No credentials. Read-only access (charts, market data). Trading operations are blocked.
 
 ---
@@ -1361,6 +1362,50 @@ const profile = await fetchCurrentUser(client);
 console.log(`Wallet balance: $${profile.walletValue}`);
 ```
 
+##### `passwordlessLoginUser(client, username)`
+
+**Layer:** L1. Passwordless login with auto-signup. Tries login with username only. If the user doesn't exist, auto-creates an account. Throws with `code: PASSWORD_REQUIRED` for password-protected accounts.
+
+```typescript
+function passwordlessLoginUser(
+  client: FSClient,
+  username: string,
+): Promise<PasswordlessLoginResult>
+// Returns: { action: 'login' | 'signup', user: UserProfile, token: string }
+```
+
+**Error handling:**
+- Account requires password: throws `Error` with `code: 'PASSWORD_REQUIRED'`
+- User doesn't exist: auto-creates account and returns `action: 'signup'`
+- Other errors: throws with server error message
+
+**Example:**
+```typescript
+import { FSClient, passwordlessLoginUser, PASSWORD_REQUIRED } from '@functionspace/core';
+
+const client = new FSClient({ baseUrl: 'https://api.example.com' });
+try {
+  const result = await passwordlessLoginUser(client, 'username');
+  client.setToken(result.token);
+  console.log(`${result.action}: ${result.user.username}`);
+} catch (err) {
+  if (err instanceof Error && 'code' in err && (err as any).code === PASSWORD_REQUIRED) {
+    // Prompt for password
+  }
+}
+```
+
+##### `silentReAuth(client, username)`
+
+**Layer:** L1. Re-authenticate a returning user by username. Used internally by the provider when `storedUsername` is provided. Throws `PASSWORD_REQUIRED` for password-protected accounts.
+
+```typescript
+function silentReAuth(
+  client: FSClient,
+  username: string,
+): Promise<{ user: UserProfile; token: string }>
+```
+
 ##### `validateUsername(name)`
 
 **Layer:** L0. Client-side username validation. No network call. Use this to validate input before calling `signupUser` to avoid unnecessary API round-trips.
@@ -1435,6 +1480,7 @@ All hooks in `@functionspace/react` require a `FunctionSpaceProvider` ancestor. 
 | `config.password` | `string?` | Password for auto-authentication on mount |
 | `config.autoAuthenticate` | `boolean?` | Controls auto-login behavior. Auto-auth fires when this is not explicitly `false` AND both `username` and `password` are truthy. Set to `false` to suppress auto-auth even when credentials are present. |
 | `theme` | `FSThemeInput?` | Preset name (`"fs-dark"`, `"fs-light"`, `"native-dark"`, `"native-light"`), partial theme object with optional `preset` base, or full `FSTheme`. Defaults to `"fs-dark"`. See Theme System. |
+| `storedUsername` | `string \| null?` | Previously authenticated username for silent re-auth on mount. When provided, the provider attempts `silentReAuth` in the background. |
 | `children` | `ReactNode` | Child component tree |
 
 **Auth modes:**
@@ -1444,6 +1490,8 @@ All hooks in `@functionspace/react` require a `FunctionSpaceProvider` ancestor. 
 2. **Interactive mode** (no credentials, or `autoAuthenticate: false`): Renders children immediately in guest mode (read-only market browsing). The application authenticates later by calling `login()` or `signup()` from `useAuth()`.
 
 3. **Guest mode** (no credentials, no intent to authenticate): Identical to interactive mode at the Provider level. All data hooks work (market data, consensus, distributions), but mutation operations require authentication.
+
+4. **Passwordless mode** (`storedUsername` prop provided, no credentials): Renders children immediately, then attempts `silentReAuth(client, storedUsername)` in the background. On success, sets the token and user. If the account requires a password (`PASSWORD_REQUIRED`), sets `showAdminLogin: true` and `pendingAdminUsername` so the `PasswordlessAuthWidget` can prompt for credentials. On other errors, clears the stored username.
 
 The exact auto-auth condition: `config.autoAuthenticate !== false && !!config.username && !!config.password`.
 
@@ -1462,6 +1510,10 @@ The exact auto-auth condition: `config.autoAuthenticate !== false && !!config.us
 | `signup` | `(username: string, password: string, options?: SignupOptions) => Promise<UserProfile>` | Registers via `signupUser`, then calls `loginUser` (signup returns no token). Stores user, increments `invalidationCount`. Throws on failure. |
 | `logout` | `() => void` | Clears token, user, `authError`, all preview state, and `selectedPosition`. Increments `invalidationCount`. |
 | `refreshUser` | `() => Promise<void>` | Re-fetches the current user profile (e.g., wallet balance after trades). No-ops silently if `client.isAuthenticated` is `false`. |
+| `passwordlessLogin` | `(username: string) => Promise<PasswordlessLoginResult>` | Passwordless login/auto-signup. Sets token, stores username, updates user. Throws with `code: PASSWORD_REQUIRED` for password-protected accounts. |
+| `showAdminLogin` | `boolean` | `true` when silent re-auth detected a password-protected account requiring password input. |
+| `pendingAdminUsername` | `string \| null` | The username that triggered the admin login prompt during silent re-auth. |
+| `clearAdminLogin` | `() => void` | Resets `showAdminLogin` to `false` and `pendingAdminUsername` to `null`. |
 
 *Preview coordination:*
 
@@ -2044,6 +2096,10 @@ function useAuth(): {
   signup: (username: string, password: string, options?: SignupOptions) => Promise<UserProfile>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  passwordlessLogin: (username: string) => Promise<PasswordlessLoginResult>;
+  showAdminLogin: boolean;
+  pendingAdminUsername: string | null;
+  clearAdminLogin: () => void;
 }
 ```
 
@@ -2059,6 +2115,10 @@ function useAuth(): {
 | `signup` | `(username: string, password: string, options?: SignupOptions) => Promise<UserProfile>` | Register a new user, then automatically log in (signup returns no token, so a login call follows). Increments the invalidation counter. Re-throws errors. |
 | `logout` | `() => void` | Clear token, user profile, auth error, preview state (belief and payout), and selected position. Increments the invalidation counter. |
 | `refreshUser` | `() => Promise<void>` | Re-fetch the current user's profile (e.g., to update wallet balance after a trade). Silently fails if not authenticated. |
+| `passwordlessLogin` | `(username: string) => Promise<PasswordlessLoginResult>` | Passwordless login with auto-signup. Returns `{ action: 'login' \| 'signup', user, token }`. Sets token and user on the provider. Throws with `code: PASSWORD_REQUIRED` for password-protected accounts. |
+| `showAdminLogin` | `boolean` | `true` when silent re-auth detected a password-protected account. Used by `PasswordlessAuthWidget` to auto-open the admin login form. |
+| `pendingAdminUsername` | `string \| null` | Username that triggered admin login during silent re-auth. Pre-fills the admin login form. |
+| `clearAdminLogin` | `() => void` | Resets `showAdminLogin` and `pendingAdminUsername`. Called after successful admin login. |
 
 **Behavior:**
 
@@ -3295,6 +3355,72 @@ import { AuthWidget } from '@functionspace/ui';
 ```
 
 **Related:** `useAuth` (hook) | `validateUsername` (core utility) | `UserProfile` (type)
+
+---
+
+#### `PasswordlessAuthWidget`
+
+Modal-based passwordless authentication widget. Users sign in or sign up with just a username. Password-protected accounts are directed to an admin login form within the modal.
+
+```tsx
+import { PasswordlessAuthWidget } from '@functionspace/ui';
+```
+
+**CSS class:** `fs-passwordless-auth`
+
+**Props:**
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `requireAccessCode` | `boolean` | `false` | Show access code field on the admin signup form |
+| `onLogin` | `(user: UserProfile, action: 'login' \| 'signup') => void` | -- | Called after successful passwordless login or auto-signup |
+| `onSignup` | `(user: UserProfile) => void` | -- | Called after successful admin signup |
+| `onLogout` | `() => void` | -- | Called after logout |
+
+**States:**
+
+| State | Renders | Transitions To |
+|-------|---------|----------------|
+| **Idle** | "Sign In / Sign Up" button | Passwordless form (click) |
+| **Passwordless form** | Username field + submit + "Admin Login" link | Idle (cancel/success), Admin login (link) |
+| **Admin login** | Username + password fields, navigation links | Idle (cancel/success), Passwordless (link), Admin signup (link) |
+| **Admin signup** | Username + password + confirm + optional access code | Idle (cancel/success), Admin login (link) |
+| **Authenticated** | Wallet balance (`$X.XX`), username, "Sign Out" button | Idle (sign out) |
+
+**Behavior:**
+
+- **Passwordless flow:** Submitting a username calls `passwordlessLogin()`. If the user exists without a password, they log in. If the user doesn't exist, an account is auto-created. If the account requires a password, the `PASSWORD_REQUIRED` error is caught and displayed with a prompt to use Admin Login.
+- **Silent re-auth:** When `storedUsername` is passed to `FunctionSpaceProvider`, the provider attempts `silentReAuth` on mount. If the stored account requires a password, `showAdminLogin` becomes `true` and the widget auto-opens the admin login form with the username pre-filled.
+- **Admin login:** Standard username + password authentication through `login()` from `useAuth()`.
+- **Admin signup:** Standard username + password + confirm signup through `signup()` from `useAuth()`.
+- **Modal:** Opens on button click, closes on cancel, success, or Escape key.
+- **Loading UX:** Inputs and buttons disabled during auth operations. Submit button text changes to "Signing in...", "Logging in...", or "Creating account...".
+- **Error handling:** Widget manages its own `formError` state. Form errors display in a dedicated error area.
+- **Form reset:** All fields and errors clear on every view transition.
+
+**Context interactions:**
+
+- **Reads (via `useAuth`):** `user`, `isAuthenticated`, `loading`, `showAdminLogin`, `pendingAdminUsername`
+- **Writes (via `useAuth`):** `passwordlessLogin()`, `login()`, `signup()`, `logout()`, `clearAdminLogin()`
+
+**Internal calls:** `useAuth`, `validateUsername`, `PASSWORD_REQUIRED`
+
+**Example:**
+
+```tsx
+<FunctionSpaceProvider
+  config={{ baseUrl: 'https://your-api.example.com' }}
+  theme="fs-dark"
+  storedUsername={localStorage.getItem('fs-username')}
+>
+  <PasswordlessAuthWidget
+    onLogin={(user, action) => localStorage.setItem('fs-username', user.username)}
+    onLogout={() => localStorage.removeItem('fs-username')}
+  />
+</FunctionSpaceProvider>
+```
+
+**Related:** `useAuth` (hook) | `PASSWORD_REQUIRED` (constant) | `PasswordlessLoginResult` (type) | `AuthWidget` (password-based alternative)
 
 ---
 

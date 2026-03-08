@@ -88,6 +88,7 @@ Every new function must be classifiable by both layer AND category. This keeps t
 | Modify chart colors | `packages/react/src/themes.ts` (ChartColors, resolveChartColors, preset overrides) |
 | Add/modify belief shapes | `packages/core/src/shapes/definitions.ts` + `packages/core/src/math/generators.ts` |
 | Add auth functions | `packages/core/src/auth/auth.ts` |
+| Add auth widgets | `packages/ui/src/auth/` (AuthWidget, PasswordlessAuthWidget) |
 | Add chart zoom/pan math | `packages/core/src/chart/zoom.ts` |
 | Add internal UI primitives | `packages/ui/src/components/` (not exported from package root) |
 
@@ -239,5 +240,6 @@ If the implementation introduced anything new or improved on existing patterns, 
 | New test file added | CLAUDE.md — Testing Requirements table |
 | Architecture change | CLAUDE.md — Architecture section; PLAYBOOK.md — Layer Boundaries |
 | New agent or skill added | CLAUDE.md — Automated Reviewers or Skills section |
+| New/changed public API (widget, hook, core function) | `llms.txt` — consumer integration guide; `sdk_docs_v1.0.md` — external SDK documentation |
 
 **If you added it to the code but not to the docs, the work is not done.**

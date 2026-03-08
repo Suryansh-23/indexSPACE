@@ -6,6 +6,7 @@ export class FSClient {
   private username?: string;
   private password?: string;
   private authenticating: Promise<void> | null = null;
+  private storedUsername: string | null = null;
 
   constructor(config: FSConfig) {
     this.baseUrl = config.baseUrl;
@@ -29,6 +30,21 @@ export class FSClient {
 
   clearToken(): void {
     this.token = null;
+  }
+
+  /** Store a username for auto re-auth (used by passwordless flow) */
+  setStoredUsername(username: string): void {
+    this.storedUsername = username;
+  }
+
+  /** Get the stored username (for auto re-auth on mount) */
+  getStoredUsername(): string | null {
+    return this.storedUsername;
+  }
+
+  /** Clear stored username (called on logout) */
+  clearStoredUsername(): void {
+    this.storedUsername = null;
   }
 
   // ── Authentication ──

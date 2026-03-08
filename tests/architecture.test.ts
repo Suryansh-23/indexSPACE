@@ -151,6 +151,18 @@ describe('SDK Architecture', () => {
       expect(contextFile).toMatch(/refreshUser:/);
     });
 
+    it('context stores passwordless auth state', () => {
+      const contextFile = fs.readFileSync(
+        path.join(__dirname, '../packages/react/src/context.ts'),
+        'utf-8'
+      );
+
+      expect(contextFile).toMatch(/passwordlessLogin:/);
+      expect(contextFile).toMatch(/showAdminLogin:\s*boolean/);
+      expect(contextFile).toMatch(/pendingAdminUsername:\s*string\s*\|\s*null/);
+      expect(contextFile).toMatch(/clearAdminLogin:/);
+    });
+
     it('context does not store market data (use hooks instead)', () => {
       const contextFile = fs.readFileSync(
         path.join(__dirname, '../packages/react/src/context.ts'),
@@ -263,6 +275,16 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('AuthWidgetProps');
     });
 
+    it('PasswordlessAuthWidget is exported from ui package', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/ui/src/index.ts'),
+        'utf-8'
+      );
+
+      expect(indexContent).toContain('PasswordlessAuthWidget');
+      expect(indexContent).toContain('PasswordlessAuthWidgetProps');
+    });
+
     it('OverlayCurve type is exported from ui package', () => {
       const indexContent = fs.readFileSync(
         path.join(__dirname, '../packages/ui/src/index.ts'),
@@ -322,6 +344,18 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('signupUser');
       expect(indexContent).toContain('fetchCurrentUser');
       expect(indexContent).toContain('validateUsername');
+    });
+
+    it('passwordless auth functions and types are exported from core', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/core/src/index.ts'),
+        'utf-8'
+      );
+
+      expect(indexContent).toContain('passwordlessLoginUser');
+      expect(indexContent).toContain('silentReAuth');
+      expect(indexContent).toContain('PASSWORD_REQUIRED');
+      expect(indexContent).toContain('PasswordlessLoginResult');
     });
 
     it('timeline core functions are exported from core', () => {

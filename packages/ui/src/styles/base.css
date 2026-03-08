@@ -11,7 +11,8 @@
 .fs-bucket-range,
 .fs-bucket-trade-panel,
 .fs-auth-widget,
-.fs-custom-shape {
+.fs-custom-shape,
+.fs-passwordless-auth {
   --fs-primary-glow: color-mix(in srgb, var(--fs-primary) 20%, transparent);
   --fs-primary-light: color-mix(in srgb, var(--fs-primary) 80%, white);
   --fs-header-gradient: color-mix(in srgb, var(--fs-primary) 15%, transparent);
@@ -1875,4 +1876,58 @@
 
 .fs-auth-switch-link:hover {
   color: var(--fs-primary);
+}
+
+/* ── Passwordless Auth Widget ── */
+
+.fs-passwordless-auth {
+  background: linear-gradient(to bottom right, var(--fs-bg-secondary), var(--fs-background));
+  border: var(--fs-border-width) solid var(--fs-border);
+  border-radius: var(--fs-radius-lg);
+  padding: 1rem 1.25rem;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.fs-auth-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--fs-overlay);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fs-auth-modal {
+  background: var(--fs-surface);
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius-lg);
+  padding: 1.5rem;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  height: auto;
+}
+
+.fs-auth-mode-link {
+  font-size: 0.8125rem;
+  color: var(--fs-text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.fs-auth-mode-link:hover {
+  opacity: 1;
+  color: var(--fs-text);
+}
+
+.fs-auth-label-hint {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--fs-text-secondary);
+  opacity: 0.8;
 }

@@ -173,6 +173,19 @@ export interface FanChartPoint {
 
 // ── Auth Types ──
 
+/** Sentinel error code for password-protected accounts */
+export const PASSWORD_REQUIRED = 'PASSWORD_REQUIRED' as const;
+
+/** Result of passwordless login attempt */
+export interface PasswordlessLoginResult {
+  /** Whether this was a login (existing user) or signup (new user) */
+  action: 'login' | 'signup';
+  /** The authenticated user profile */
+  user: UserProfile;
+  /** JWT access token */
+  token: string;
+}
+
 export interface UserProfile {
   userId: number;
   username: string;
