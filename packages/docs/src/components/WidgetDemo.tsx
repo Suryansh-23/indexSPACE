@@ -4,6 +4,8 @@ import BrowserOnly from '@docusaurus/BrowserOnly';
 interface WidgetDemoProps {
   children: React.ReactNode;
   height?: string;
+  maxWidth?: string;
+  fitContent?: boolean;
   title?: string;
 }
 
@@ -35,13 +37,15 @@ class WidgetErrorBoundary extends React.Component<
   }
 }
 
-export default function WidgetDemo({ children, height, title }: WidgetDemoProps) {
+export default function WidgetDemo({ children, height, maxWidth, fitContent, title }: WidgetDemoProps) {
   return (
     <div style={{
       border: '1px solid var(--ifm-color-emphasis-300)',
       borderRadius: '8px',
       overflow: 'hidden',
       margin: '1.5rem 0',
+      maxWidth: maxWidth || undefined,
+      width: fitContent ? 'fit-content' : undefined,
     }}>
       {title && (
         <div style={{

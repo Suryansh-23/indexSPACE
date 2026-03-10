@@ -121,7 +121,7 @@ export interface GaussianParams {
   bounds?: [number, number];
 }
 
-export interface PlateauParams {
+export interface RangeParams {
   low: number;
   high: number;
   bounds?: [number, number];

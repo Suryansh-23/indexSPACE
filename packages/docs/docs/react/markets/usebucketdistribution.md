@@ -18,7 +18,7 @@ function useBucketDistribution(
   buckets: BucketData[] | null;
   loading: boolean;
   error: Error | null;
-  refetch: () => void;
+  refetch: () => Promise<void>;
 }
 ```
 
@@ -30,6 +30,7 @@ function useBucketDistribution(
 
 **Behavior:**
 
+* Requires `FunctionSpaceProvider`. Throws if called outside one.
 * Calls `useMarket(marketId)` to obtain market config (`L`, `H`, `decimals`) and `useConsensus(marketId, numPoints)` to fetch the consensus density curve. No additional API calls are made.
 * Returns `loading` and `error` from `useConsensus` only; `useMarket` data is consumed silently.
 * The `buckets` array is memoized and recomputes when `consensus`, `market`, `numBuckets`, or the provider's `invalidationCount` changes. Returns `null` until both market and consensus data are available.
@@ -41,6 +42,8 @@ function useBucketDistribution(
 **Example:**
 
 ```tsx
+import { useBucketDistribution } from '@functionspace/react';
+
 function OutcomeBuckets({ marketId }: { marketId: number }) {
   const { buckets, loading, error, refetch } = useBucketDistribution(marketId, 8);
 

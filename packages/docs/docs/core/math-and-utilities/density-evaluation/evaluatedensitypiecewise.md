@@ -18,7 +18,7 @@ function evaluateDensityPiecewise(
 ): number  // probability density at x
 ```
 
-Values outside `[L, H]` are clamped to the edge coefficients. The return value is a density (can be > 1), not a probability. To get the probability of a range, integrate the density over that range (or use `calculateBucketDistribution`).
+Values outside `[L, H]` are clamped to the edge density values (the edge coefficient scaled by `(K+1)/(H-L)`). The return value is a density (can be > 1), not a probability. To get the probability of a range, integrate the density over that range (or use `calculateBucketDistribution`).
 
 **Example:**
 

@@ -4,12 +4,13 @@ sidebar_position: 2
 ---
 
 import WidgetDemo from '@site/src/components/WidgetDemo';
-import BinaryPanelDemo from '@site/src/components/demos/BinaryPanelDemo';
+import { BinaryPanelLayout } from '@demo-app/App_BinaryPanel';
+import { DEMO_MARKET_ID, DEMO_USERNAME } from '@site/src/constants';
 
 # Binary Panel
 
 <WidgetDemo title="Live Demo" height="900px">
-  <BinaryPanelDemo />
+  <BinaryPanelLayout marketId={DEMO_MARKET_ID} username={DEMO_USERNAME} />
 </WidgetDemo>
 
 **File:** `demo-app/src/App_BinaryPanel.tsx`

@@ -52,7 +52,7 @@ function AllComponentsInner() {
       </div>
 
       <div data-capture="TradePanel" style={{ marginBottom: '2rem', maxWidth: 420 }}>
-        <TradePanel marketId={MARKET_ID} modes={['gaussian', 'plateau']} />
+        <TradePanel marketId={MARKET_ID} modes={['gaussian', 'range']} />
       </div>
 
       <div data-capture="ShapeCutter" style={{ marginBottom: '2rem' }}>

@@ -4,20 +4,21 @@ sidebar_position: 5
 ---
 
 import WidgetDemo from '@site/src/components/WidgetDemo';
-import ShapeCutterDemo from '@site/src/components/demos/ShapeCutterDemo';
+import { ShapeCutterTradingLayout } from '@demo-app/App_ShapeCutterTradingLayout';
+import { DEMO_MARKET_ID, DEMO_USERNAME } from '@site/src/constants';
 
 # Shape Cutter Trading Layout
 
 <WidgetDemo title="Live Demo" height="900px">
-  <ShapeCutterDemo />
+  <ShapeCutterTradingLayout marketId={DEMO_MARKET_ID} username={DEMO_USERNAME} />
 </WidgetDemo>
 
 **File:** `demo-app/src/App_ShapeCutterTradingLayout.tsx`
 
 The 8-preset shape selector with a three-tab chart. The middle ground between TradePanel and CustomShapeEditor.
 
-**Components:** `MarketStats` + `AuthWidget` -> `MarketCharts` (consensus + distribution + timeline tabs, zoomable) -> `ShapeCutter` -> `PositionTable`
+**Components:** `MarketStats` + `PasswordlessAuthWidget` -> `MarketCharts` (consensus + distribution + timeline tabs, zoomable) -> `ShapeCutter` -> `PositionTable`
 
-**What it enables:** Users choose from 8 belief geometries (Gaussian, Spike, Plateau, Bimodal, Dip, Left Skew, Right Skew, Uniform), tune parameters with sliders, and see their shape previewed on the consensus chart in real-time. The timeline tab shows historical consensus evolution -- how stable or volatile the market has been.
+**What it enables:** Users choose from 8 belief geometries (Gaussian, Spike, Range, Bimodal, Dip, Left Skew, Right Skew, Uniform), tune parameters with sliders, and see their shape previewed on the consensus chart in real-time. The timeline tab shows historical consensus evolution -- how stable or volatile the market has been.
 
 **Target audience:** Intermediate traders who want expressive shapes without drag-and-drop complexity.

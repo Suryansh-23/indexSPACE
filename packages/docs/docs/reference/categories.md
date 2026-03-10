@@ -5,92 +5,84 @@ sidebar_position: 2
 
 # Categories
 
-### All Functions by Category
+Every SDK function belongs to a **category** that determines its functional domain.
 
-#### Transactions
+### Transactions (State-Changing)
 
-| Layer | Function              | Scope    |
-| ----- | --------------------- | -------- |
-| L1    | `buy()`               | Position |
-| L1    | `sell()`              | Position |
-| L1    | `createMarket()`      | Market   |
-| L1    | `approvePosition()`   | Position |
-| L1    | `setApprovalForAll()` | Position |
-| L1    | `transferPosition()`  | Position |
-| L1    | `claimPayout()`       | Position |
-| L1    | `resolveMarket()`     | Market   |
-| L3    | `updatePosition()`    | Position |
-| L3    | `batchSell()`         | Position |
-| L3    | `batchClaim()`        | Position |
-| L3    | `batchBuy()`          | Position |
-| L3    | `claimAll()`          | Position |
-| L3    | `closeAllPositions()` | Position |
-| L3    | `exitMarket()`        | Market   |
+| Layer | Function | Scope |
+|-------|----------|-------|
+| L1 | `buy()` | Open a position |
+| L1 | `sell()` | Close a position |
 
-#### Builders
+### Position Generators (Belief Construction)
 
-| Layer | Function                  | Shape Type             |
-| ----- | ------------------------- | ---------------------- |
-| L1    | `buildBelief()`           | Universal constructor  |
-| L2    | `buildGaussian()`         | Bell curve             |
-| L2    | `buildSpike()`            | Sharp peak             |
-| L2    | `buildPlateau()`          | Flat range             |
-| L2    | `buildRamp()`             | Directional gradient   |
-| L2    | `buildStep()`             | Multiple regions       |
-| L2    | `buildMultimodal()`       | Multiple peaks         |
-| L2    | `buildCustom()`           | User-drawn             |
-| L3    | `buildBinary()`           | Yes/No on range        |
-| L3    | `buildAmplifyConsensus()` | Consensus + conviction |
-| L3    | `buildContrarian()`       | Anti-consensus         |
+| Layer | Function | Shape Type |
+|-------|----------|------------|
+| L1 | `generateBelief()` | Universal constructor (regions) |
+| L2 | `generateGaussian()` | Bell curve |
+| L2 | `generateRange()` | Uniform range (single or multi) |
+| L2 | `generateDip()` | Valley / dip shape |
+| L2 | `generateLeftSkew()` | Left-skewed distribution |
+| L2 | `generateRightSkew()` | Right-skewed distribution |
+| L2 | `generateCustomShape()` | User-drawn control points |
+| L2 | `generateBellShape()` | Symmetric bell (for editor defaults) |
 
-#### Projections
+### Projections (Read-Only Previews)
 
-| Layer | Function                           | Phase      |
-| ----- | ---------------------------------- | ---------- |
-| L0    | `evaluatePotential()`              | Any        |
-| L0    | `evaluateDensity()`                | Any        |
-| L2    | `projectBuy()`                     | Pre-entry  |
-| L2    | `projectSell()`                    | Exit       |
-| L2    | `projectPayout()`                  | Settlement |
-| L2    | `projectPayoutCurve()`             | Settlement |
-| L2    | `projectCollateralForPayout()`     | Pre-entry  |
-| L2    | `projectCollateralForClaimShare()` | Pre-entry  |
-| L2    | `projectClaimShare()`              | Position   |
-| L2    | `projectEligibility()`             | Position   |
-| L3    | `projectExpectedPayout()`          | Pre-entry  |
-| L3    | `projectProfitRange()`             | Settlement |
-| L3    | `projectCompare()`                 | Comparison |
+| Layer | Function | Phase |
+|-------|----------|-------|
+| L2 | `projectPayoutCurve()` | Pre-entry payout preview |
+| L2 | `projectSell()` | Exit collateral estimate |
 
-#### Queries
+### Queries (Server State)
 
-| Layer | Function                     | Scope    |
-| ----- | ---------------------------- | -------- |
-| L1    | `queryMarketState()`         | Market   |
-| L1    | `queryPositionState()`       | Position |
-| L1    | `queryUserPositions()`       | User     |
-| L1    | `queryAllowance()`           | Token    |
-| L2    | `queryDensityAt()`           | Market   |
-| L2    | `queryPercentile()`          | Market   |
-| L2    | `queryDensityBetween()`      | Market   |
-| L2    | `queryConfidenceInterval()`  | Market   |
-| L2    | `queryClaimShare()`          | Position |
-| L3    | `queryConsensusSummary()`    | Market   |
-| L3    | `queryMarketCertainty()`     | Market   |
-| L3    | `queryPositionVsConsensus()` | Position |
-| L3    | `queryPositionSummary()`     | Position |
+| Layer | Function | Scope |
+|-------|----------|-------|
+| L1 | `queryMarketState()` | Full market state |
+| L1 | `getConsensusCurve()` | Consensus as chart-ready points |
+| L1 | `queryConsensusSummary()` | Mean, median, mode, variance, stdDev |
+| L1 | `queryDensityAt()` | Density at a single point |
+| L1 | `queryMarketHistory()` | Historical market snapshots |
+| L1 | `queryMarketPositions()` | All positions for a market |
+| L1 | `queryPositionState()` | Single position by ID |
+| L1 | `queryTradeHistory()` | Trade entries for a market |
 
-#### Discovery
+### Discovery
 
-| Layer | Function                  | Purpose                   |
-| ----- | ------------------------- | ------------------------- |
-| L2    | `discoverMarkets()`       | Filtered market search    |
-| L2    | `discoverUserActivity()`  | User's market involvement |
-| L2    | `discoverUserPositions()` | User's positions          |
-| L3    | `discoverTrending()`      | High activity markets     |
-| L3    | `discoverResolvingSoon()` | Upcoming resolutions      |
-| L3    | `discoverNew()`           | Recently created          |
-| L3    | `discoverHighValue()`     | Large pool markets        |
-| L3    | `discoverByCreator()`     | Creator's markets         |
-| L3    | `discoverByCategory()`    | Category-filtered         |
+| Layer | Function | Purpose |
+|-------|----------|---------|
+| L1 | `discoverMarkets()` | List all available markets |
 
-###
+### Auth
+
+| Layer | Function | Purpose |
+|-------|----------|---------|
+| L0 | `validateUsername()` | Client-side username validation |
+| L1 | `loginUser()` | Username/password login |
+| L1 | `signupUser()` | Create account |
+| L1 | `fetchCurrentUser()` | Fetch authenticated user profile |
+| L1 | `passwordlessLoginUser()` | Login or auto-signup by username |
+| L1 | `silentReAuth()` | Re-authenticate stored session |
+
+### Pure Math (L0)
+
+| Function | Purpose |
+|----------|---------|
+| `evaluateDensityPiecewise()` | Density PDF at a single point |
+| `evaluateDensityCurve()` | Density PDF as `{ x, y }[]` curve |
+| `computeStatistics()` | Mean, median, mode, variance, stdDev from coefficients |
+| `computePercentiles()` | 9-point percentile set from coefficients |
+| `calculateBucketDistribution()` | Divide range into probability buckets |
+| `transformHistoryToFanChart()` | History snapshots to fan chart points |
+| `mapPosition()` | Transform raw API position to `Position` type |
+| `positionsToTradeEntries()` | Positions to `TradeEntry[]` for display |
+
+### Chart Zoom Math (L0)
+
+| Function | Purpose |
+|----------|---------|
+| `pixelToDataX()` | Convert pixel coordinate to data value |
+| `computeZoomedDomain()` | Cursor-anchored zoom domain |
+| `computePannedDomain()` | Drag-based pan domain |
+| `filterVisibleData()` | Filter data array to visible domain |
+| `generateEvenTicks()` | Evenly-spaced tick values |

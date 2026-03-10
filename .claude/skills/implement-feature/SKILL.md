@@ -213,7 +213,7 @@ Synthesize the "Doc Updates Needed" sections from all supervisor reports. Then c
 | New pattern discovered | PLAYBOOK.md -- relevant section |
 | New test file | CLAUDE.md -- Testing Requirements table |
 | Architecture change | CLAUDE.md -- Architecture section |
-| New/changed public API (widget, hook, core function) | `llms.txt` -- consumer integration guide; `sdk_docs_v1.0.md` -- external SDK documentation |
+| New/changed public API (widget, hook, core function) | `llms.txt` -- consumer integration guide; `packages/docs/docs/` -- Docusaurus documentation pages |
 
 ## PHASE 7 -- Completion Report and Review Prompt (MANDATORY)
 

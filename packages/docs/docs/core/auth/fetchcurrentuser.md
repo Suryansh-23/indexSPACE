@@ -18,6 +18,8 @@ Returns the same `UserProfile` type documented above. Handles both nested (`{ us
 **Example:**
 
 ```typescript
+import { fetchCurrentUser } from '@functionspace/core';
+
 const profile = await fetchCurrentUser(client);
 console.log(`Wallet balance: $${profile.walletValue}`);
 ```

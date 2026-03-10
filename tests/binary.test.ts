@@ -1,15 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { generatePlateau } from '@functionspace/core';
+import { generateRange } from '@functionspace/core';
 
 const K = 20;
 const L = 80;
 const H = 100;
 
-describe('Binary Option (generatePlateau for binary use case)', () => {
+describe('Binary Option (generateRange for binary use case)', () => {
   describe('Yes side (threshold → H)', () => {
     it('produces K+1 elements summing to ~1.0', () => {
       const threshold = 90;
-      const belief = generatePlateau(threshold, H, K, L, H, 1);
+      const belief = generateRange(threshold, H, K, L, H, 1);
       expect(belief).toHaveLength(K + 1);
       const sum = belief.reduce((a, b) => a + b, 0);
       expect(sum).toBeCloseTo(1.0, 5);
@@ -17,7 +17,7 @@ describe('Binary Option (generatePlateau for binary use case)', () => {
 
     it('concentrates mass in upper coefficients', () => {
       const threshold = 90;
-      const belief = generatePlateau(threshold, H, K, L, H, 1);
+      const belief = generateRange(threshold, H, K, L, H, 1);
 
       // Normalized threshold position: (90-80)/(100-80) = 0.5
       const thresholdIdx = Math.round(((threshold - L) / (H - L)) * K);
@@ -30,7 +30,7 @@ describe('Binary Option (generatePlateau for binary use case)', () => {
   describe('No side (L → threshold)', () => {
     it('produces K+1 elements summing to ~1.0', () => {
       const threshold = 90;
-      const belief = generatePlateau(L, threshold, K, L, H, 1);
+      const belief = generateRange(L, threshold, K, L, H, 1);
       expect(belief).toHaveLength(K + 1);
       const sum = belief.reduce((a, b) => a + b, 0);
       expect(sum).toBeCloseTo(1.0, 5);
@@ -38,7 +38,7 @@ describe('Binary Option (generatePlateau for binary use case)', () => {
 
     it('concentrates mass in lower coefficients', () => {
       const threshold = 90;
-      const belief = generatePlateau(L, threshold, K, L, H, 1);
+      const belief = generateRange(L, threshold, K, L, H, 1);
 
       const thresholdIdx = Math.round(((threshold - L) / (H - L)) * K);
       const upperMass = belief.slice(thresholdIdx).reduce((a, b) => a + b, 0);
@@ -50,8 +50,8 @@ describe('Binary Option (generatePlateau for binary use case)', () => {
   describe('Midpoint threshold symmetry', () => {
     it('yes and no at midpoint are approximate mirrors', () => {
       const mid = (L + H) / 2;
-      const yes = generatePlateau(mid, H, K, L, H, 1);
-      const no = generatePlateau(L, mid, K, L, H, 1);
+      const yes = generateRange(mid, H, K, L, H, 1);
+      const no = generateRange(L, mid, K, L, H, 1);
 
       // Mirror: yes[k] should approximately equal no[K-k]
       for (let k = 0; k <= K; k++) {
@@ -62,7 +62,7 @@ describe('Binary Option (generatePlateau for binary use case)', () => {
 
   describe('Edge cases', () => {
     it('threshold at L: yes covers entire range', () => {
-      const belief = generatePlateau(L, H, K, L, H, 1);
+      const belief = generateRange(L, H, K, L, H, 1);
       expect(belief).toHaveLength(K + 1);
       const sum = belief.reduce((a, b) => a + b, 0);
       expect(sum).toBeCloseTo(1.0, 5);
@@ -75,7 +75,7 @@ describe('Binary Option (generatePlateau for binary use case)', () => {
 
     it('threshold near H: yes side narrows to top of range', () => {
       const nearH = H - 1; // 99
-      const belief = generatePlateau(nearH, H, K, L, H, 1);
+      const belief = generateRange(nearH, H, K, L, H, 1);
       expect(belief).toHaveLength(K + 1);
       const sum = belief.reduce((a, b) => a + b, 0);
       expect(sum).toBeCloseTo(1.0, 5);
@@ -86,9 +86,9 @@ describe('Binary Option (generatePlateau for binary use case)', () => {
 
     it('sharpness=1 produces hard cliff edges', () => {
       const threshold = 90;
-      const belief = generatePlateau(threshold, H, K, L, H, 1);
+      const belief = generateRange(threshold, H, K, L, H, 1);
 
-      // Coefficients well inside the plateau should be much larger
+      // Coefficients well inside the range should be much larger
       // than coefficients well outside
       const thresholdIdx = Math.round(((threshold - L) / (H - L)) * K);
       const insideCoeff = belief[Math.min(thresholdIdx + 2, K)];

@@ -272,7 +272,7 @@ export interface RangeInput {
  * L2: Range belief generator. Supports single or multiple outcome ranges.
  * Each range becomes a RangeRegion with configurable sharpness (0 = smooth taper, 1 = hard cliff).
  * Multiple ranges are composed into one belief vector — e.g., three non-contiguous
- * bucket selections become three plateau regions in a single normalized vector.
+ * bucket selections become three range regions in a single normalized vector.
  * Resolves through generateBelief with RangeRegion[].
  */
 export function generateRange(low: number, high: number, K: number, L: number, H: number, sharpness?: number): BeliefVector;
@@ -301,20 +301,6 @@ export function generateRange(
   );
 }
 
-/**
- * @deprecated Use generateRange instead.
- * L2: Plateau (flat range) generator. Alias for generateRange with single-range signature.
- */
-export function generatePlateau(
-  low: number,
-  high: number,
-  K: number,
-  L: number,
-  H: number,
-  sharpness: number = 0.5,
-): BeliefVector {
-  return generateRange(low, high, K, L, H, sharpness);
-}
 
 /**
  * L2: Dip (inverted gaussian) generator.

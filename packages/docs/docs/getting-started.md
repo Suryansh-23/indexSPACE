@@ -72,6 +72,8 @@ The provider config accepts:
 | `password`         | `string?` | Password for auto-authentication on mount        |
 | `autoAuthenticate` | `boolean?`| Set to `false` to suppress auto-auth even when credentials are present |
 
+The provider also accepts a top-level `storedUsername` prop (outside `config`) to enable silent re-authentication for passwordless flows. When provided, the provider attempts `silentReAuth` on mount.
+
 **Core-only (no React)** -- create an `FSClient` directly:
 
 ```typescript

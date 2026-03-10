@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   generateGaussian,
   generateRange,
-  generatePlateau,
   generateBelief,
   generateDip,
   generateLeftSkew,
@@ -58,15 +57,15 @@ describe('Backward compatibility', () => {
     expect(peakIndex(belief)).toBe(expectedCenterIdx);
   });
 
-  it('generatePlateau is unchanged', () => {
-    const belief = generatePlateau(80, 120, K, L, H);
-    assertValidBelief(belief, 'plateau');
-    // Values in the plateau range should be roughly equal
+  it('generateRange is unchanged', () => {
+    const belief = generateRange(80, 120, K, L, H);
+    assertValidBelief(belief, 'range');
+    // Values in the range should be roughly equal
     const lowIdx = Math.round(((80 - L) / (H - L)) * K);
     const highIdx = Math.round(((120 - L) / (H - L)) * K);
-    const plateauValues = belief.slice(lowIdx, highIdx + 1);
-    const avg = plateauValues.reduce((a, b) => a + b, 0) / plateauValues.length;
-    for (const v of plateauValues) {
+    const rangeValues = belief.slice(lowIdx, highIdx + 1);
+    const avg = rangeValues.reduce((a, b) => a + b, 0) / rangeValues.length;
+    for (const v of rangeValues) {
       expect(v).toBeCloseTo(avg, 2);
     }
   });
@@ -108,19 +107,19 @@ describe('Spike shape', () => {
   });
 });
 
-describe('Plateau shape', () => {
+describe('Range shape', () => {
   it('produces valid belief vector', () => {
-    const belief = generatePlateau(80, 120, K, L, H);
-    assertValidBelief(belief, 'plateau');
+    const belief = generateRange(80, 120, K, L, H);
+    assertValidBelief(belief, 'range');
   });
 
   it('has roughly flat values within the range', () => {
-    const belief = generatePlateau(80, 120, K, L, H);
+    const belief = generateRange(80, 120, K, L, H);
     const lowIdx = Math.round(((80 - L) / (H - L)) * K);
     const highIdx = Math.round(((120 - L) / (H - L)) * K);
-    const plateauValues = belief.slice(lowIdx, highIdx + 1);
-    const avg = plateauValues.reduce((a, b) => a + b, 0) / plateauValues.length;
-    for (const v of plateauValues) {
+    const rangeValues = belief.slice(lowIdx, highIdx + 1);
+    const avg = rangeValues.reduce((a, b) => a + b, 0) / rangeValues.length;
+    for (const v of rangeValues) {
       expect(Math.abs(v - avg)).toBeLessThan(0.005);
     }
   });
@@ -237,13 +236,13 @@ describe('Right Skew shape', () => {
 
 describe('Uniform shape', () => {
   it('produces valid belief vector', () => {
-    // Uniform = full-range plateau
-    const belief = generatePlateau(L, H, K, L, H);
+    // Uniform = full-range generateRange
+    const belief = generateRange(L, H, K, L, H);
     assertValidBelief(belief, 'uniform');
   });
 
   it('all values are roughly equal', () => {
-    const belief = generatePlateau(L, H, K, L, H);
+    const belief = generateRange(L, H, K, L, H);
     const expected = 1 / (K + 1);
     for (const v of belief) {
       expect(v).toBeCloseTo(expected, 2);
@@ -254,16 +253,18 @@ describe('Uniform shape', () => {
 // ── generateRange (L2 multi-range) ──
 
 describe('generateRange', () => {
-  it('single-range produces same output as generatePlateau', () => {
-    const viaRange = generateRange(80, 120, K, L, H, 0.5);
-    const viaPlateau = generatePlateau(80, 120, K, L, H, 0.5);
-    expect(viaRange).toEqual(viaPlateau);
+  it('single-range produces valid belief vector', () => {
+    const belief = generateRange(80, 120, K, L, H, 0.5);
+    assertValidBelief(belief, 'single-range');
   });
 
-  it('single-range with explicit sharpness=1 produces same as generatePlateau sharpness=1', () => {
-    const viaRange = generateRange(80, 120, K, L, H, 1);
-    const viaPlateau = generatePlateau(80, 120, K, L, H, 1);
-    expect(viaRange).toEqual(viaPlateau);
+  it('single-range with sharpness=1 produces hard edges', () => {
+    const belief = generateRange(80, 120, K, L, H, 1);
+    assertValidBelief(belief, 'single-range-sharp');
+    // Values inside range should be elevated vs outside
+    const insideIdx = Math.round(((100 - L) / (H - L)) * K);
+    const outsideIdx = Math.round(((60 - L) / (H - L)) * K);
+    expect(belief[insideIdx]).toBeGreaterThan(belief[outsideIdx]);
   });
 
   it('multi-range: 2 non-contiguous ranges produce valid belief', () => {

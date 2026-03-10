@@ -14,13 +14,13 @@ function computeStatistics(
   coefficients: number[],
   L: number,
   H: number,
-): ConsensusSummary
+): { mean: number; median: number; mode: number; variance: number; stdDev: number }
 ```
 
-**Returns `ConsensusSummary`:**
+**Returns:**
 
 ```typescript
-interface ConsensusSummary {
+{
   mean: number;      // Expected value: L + (H-L) * sum(k/K * p_k)
   median: number;    // CDF integration to 0.5
   mode: number;      // Argmax of density on a 500-point grid

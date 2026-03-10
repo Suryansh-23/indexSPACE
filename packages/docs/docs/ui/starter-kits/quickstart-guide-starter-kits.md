@@ -41,7 +41,7 @@ export default function App() {
           <ConsensusChart marketId={MARKET_ID} height={500} zoomable />
         
         
-          <TradePanel marketId={MARKET_ID} />
+          <TradePanel marketId={MARKET_ID} modes={['gaussian', 'range']} />
         
       
 

@@ -17,7 +17,7 @@ async function queryPositionState(
 ): Promise<Position>
 ```
 
-Returns the same `Position` type documented above. Throws `Error(`Position positionIdnotfoundinmarketpositionIdnotfoundinmarket{marketId}`)` if no match is found.
+Returns the same `Position` type documented above. Throws `Error("Position <positionId> not found in market <marketId>")` if no match is found.
 
 **Example:**
 

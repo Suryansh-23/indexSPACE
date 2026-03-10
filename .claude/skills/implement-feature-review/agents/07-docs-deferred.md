@@ -37,7 +37,7 @@ Read the doc update matrix in `sdk_iteration_docs/CLAUDE.md` (the table mapping 
 | New CSS widget root class | PLAYBOOK.md derived-variables selector example | Check the example |
 | New test file | CLAUDE.md Testing Requirements table | Check the table |
 | Architecture change | CLAUDE.md Architecture section | Check the section |
-| New/changed public API (widget, hook, core function) | `llms.txt` + `sdk_docs_v1.0.md` | Check both consumer-facing docs |
+| New/changed public API (widget, hook, core function) | `llms.txt` + `packages/docs/docs/` | Check both consumer-facing docs |
 
 For each required update, verify it exists AND is accurate. A doc update that exists but contains wrong information is worse than a missing update.
 

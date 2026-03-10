@@ -20,6 +20,10 @@ class FSClient {
   clearToken(): void                // Remove the current token
   authenticate(): Promise<void>     // Login using the credentials from config
 
+  setStoredUsername(username: string): void  // Store username for passwordless re-auth
+  getStoredUsername(): string | null         // Retrieve stored username
+  clearStoredUsername(): void                // Remove stored username
+
   get<T>(path: string, params?: Record<string, string>): Promise<T>
   post<T>(path: string, body?: unknown, params?: Record<string, string>): Promise<T>
 }

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { FSClient } from '../packages/core/src/client.js';
 import { passwordlessLoginUser, silentReAuth } from '../packages/core/src/auth/auth.js';
 import { PASSWORD_REQUIRED } from '../packages/core/src/types.js';
-import { generateGaussian, generatePlateau, generateBelief } from '../packages/core/src/math/generators.js';
+import { generateGaussian, generateRange, generateBelief } from '../packages/core/src/math/generators.js';
 import { evaluateDensityPiecewise, evaluateDensityCurve, computeStatistics } from '../packages/core/src/math/density.js';
 import { queryMarketState, getConsensusCurve, queryConsensusSummary, queryDensityAt } from '../packages/core/src/queries/market.js';
 import { queryPositionState, queryMarketPositions } from '../packages/core/src/queries/positions.js';
@@ -45,9 +45,9 @@ describe('Math: generateGaussian', () => {
   });
 });
 
-describe('Math: generatePlateau', () => {
+describe('Math: generateRange', () => {
   it('produces vector that sums to 1 with non-negative values', () => {
-    const v = generatePlateau(50, 70, K, L, H);
+    const v = generateRange(50, 70, K, L, H);
     expect(v.length).toBe(K + 1);
     const sum = v.reduce((a, b) => a + b, 0);
     expect(sum).toBeCloseTo(1.0, 10);
@@ -290,14 +290,14 @@ describe('API: Full trade cycle (Gaussian via generateGaussian)', () => {
   }, 30000);
 });
 
-describe('API: Full trade cycle (Plateau via generatePlateau)', () => {
-  it('generatePlateau → buy → projectSell → sell', async () => {
+describe('API: Full trade cycle (Range via generateRange)', () => {
+  it('generateRange -> buy -> projectSell -> sell', async () => {
     const client = makeClient();
     const market = await queryMarketState(client, MARKET_ID);
     const { L: mL, H: mH, K: mK } = market.config;
     const low = mL + (mH - mL) * 0.3;
     const high = mL + (mH - mL) * 0.7;
-    const belief = generatePlateau(low, high, mK, mL, mH);
+    const belief = generateRange(low, high, mK, mL, mH);
 
     const buyResult = await buy(client, MARKET_ID, belief, 1, { prediction: (low + high) / 2 });
     expect(buyResult.positionId).toBeDefined();

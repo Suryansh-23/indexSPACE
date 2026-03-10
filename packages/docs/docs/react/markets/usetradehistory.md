@@ -32,6 +32,7 @@ function useTradeHistory(
 
 **Behavior:**
 
+* Requires `FunctionSpaceProvider`. Throws if called outside one.
 * `trades` starts as `null` and becomes a `TradeEntry[]` after the first successful fetch; check for `null` before rendering.
 * Re-fetches automatically when `marketId` or `limit` changes, and whenever the provider's invalidation fires (e.g., after a `buy` or `sell` transaction).
 * Polling is cleaned up on unmount or when `pollInterval` changes; safe to unmount mid-fetch.
@@ -43,6 +44,8 @@ function useTradeHistory(
 **Example:**
 
 ```tsx
+import { useTradeHistory } from '@functionspace/react';
+
 function TradeFeed({ marketId }: { marketId: string }) {
   const { trades, loading, error, refetch } = useTradeHistory(marketId, {
     limit: 50,

@@ -5,6 +5,7 @@ sidebar_position: 3
 
 import { ShapeCutter } from '@functionspace/ui';
 import WidgetDemo from '@site/src/components/WidgetDemo';
+import ChartToggle from '@site/src/components/ChartToggle';
 import { DEMO_MARKET_ID } from '@site/src/constants';
 
 # ShapeCutter
@@ -16,6 +17,8 @@ A trading panel offering **8 distinct belief shape presets** with clickable SVG 
 ```tsx
 import { ShapeCutter } from '@functionspace/ui';
 ```
+
+<ChartToggle />
 
 <WidgetDemo title="Live Demo" height="450px">
   <ShapeCutter marketId={DEMO_MARKET_ID} />
@@ -39,12 +42,12 @@ import { ShapeCutter } from '@functionspace/ui';
 | ---------- | ---------------------------------------------------- | ------------------------------------------------ |
 | Gaussian   | `generateGaussian`                                   | Target outcome, confidence                       |
 | Spike      | `generateGaussian` (with dynamic tighter multiplier) | Target outcome, confidence                       |
-| Plateau    | `generatePlateau` (sharpness `1`)                    | Range (two-handle slider)                        |
+| Range      | `generateRange` (sharpness `1`)                      | Range (two-handle slider)                        |
 | Bimodal    | `generateBelief` (two `PointRegion`s)                | Range (peak positions), confidence, peak balance |
 | The Dip    | `generateDip`                                        | Target outcome, confidence                       |
 | Left Skew  | `generateLeftSkew`                                   | Target outcome, confidence, skew intensity       |
 | Right Skew | `generateRightSkew`                                  | Target outcome, confidence, skew intensity       |
-| Uniform    | `generatePlateau(L, H, ...)` (full range)            | None                                             |
+| Uniform    | `generateRange(L, H, ...)` (full range)              | None                                             |
 
 **Behavior:**
 
@@ -60,7 +63,7 @@ import { ShapeCutter } from '@functionspace/ui';
 * **Writes:** `ctx.setPreviewBelief(belief)` on input change, `ctx.setPreviewPayout(result)` after debounced projection, clears both on unmount
 * **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useMarket`, `generateGaussian`, `generatePlateau`, `generateBelief`, `generateDip`, `generateLeftSkew`, `generateRightSkew`, `SHAPE_DEFINITIONS`, `projectPayoutCurve`, `buy`
+**Internal calls:** `useMarket`, `generateGaussian`, `generateRange`, `generateBelief`, `generateDip`, `generateLeftSkew`, `generateRightSkew`, `SHAPE_DEFINITIONS`, `projectPayoutCurve`, `buy`
 
 **Example:**
 
@@ -73,7 +76,7 @@ import { ShapeCutter } from '@functionspace/ui';
 ```tsx
 <ShapeCutter
   marketId={42}
-  shapes={['gaussian', 'plateau', 'bimodal', 'dip']}
+  shapes={['gaussian', 'range', 'bimodal', 'dip']}
   defaultShape="bimodal"
   onBuy={(result) => console.log('Position:', result.positionId)}
 />

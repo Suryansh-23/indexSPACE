@@ -4,12 +4,13 @@ sidebar_position: 4
 ---
 
 import WidgetDemo from '@site/src/components/WidgetDemo';
-import DistributionRangeDemo from '@site/src/components/demos/DistributionRangeDemo';
+import { DistRangeLayout } from '@demo-app/App_DistRange';
+import { DEMO_MARKET_ID } from '@site/src/constants';
 
 # Distribution Range
 
 <WidgetDemo title="Live Demo" height="700px">
-  <DistributionRangeDemo />
+  <DistRangeLayout marketId={DEMO_MARKET_ID} />
 </WidgetDemo>
 
 **File:** `demo-app/src/App_DistRange.tsx`

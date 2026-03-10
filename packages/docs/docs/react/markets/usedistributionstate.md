@@ -35,13 +35,19 @@ function useDistributionState(
 | `percentiles`        | `PercentileSet \| null`                      | 9-point percentile set (p2\_5 through p97\_5) computed from `market.consensus` (via `useMarket`), not from the separately-fetched consensus curve |
 | `getBucketsForRange` | `(min: number, max: number) => BucketData[]` | Compute buckets over a custom sub-range using the current `bucketCount`. Returns empty array if consensus or market data is not yet loaded.       |
 
-**Behavior:** This hook is designed for sharing state between components. Pass the returned object to both a chart and a selector to keep bucket configuration synchronized. Buckets and percentiles recompute reactively when the underlying market or consensus data changes, when `bucketCount` is updated, or when a cache invalidation is triggered via context.
+**Behavior:**
+
+* Requires `FunctionSpaceProvider`. Throws if called outside one.
+* This hook is designed for sharing state between components. Pass the returned object to both a chart and a selector to keep bucket configuration synchronized. Buckets and percentiles recompute reactively when the underlying market or consensus data changes, when `bucketCount` is updated, or when a cache invalidation is triggered via context.
 
 **Delegates to:** `useMarket` + `useConsensus` (hooks), `calculateBucketDistribution` + `computePercentiles` (core math).
 
 **Example:**
 
 ```tsx
+import { useDistributionState } from '@functionspace/react';
+import { DistributionChart, BucketRangeSelector } from '@functionspace/ui';
+
 function DistributionView({ marketId }: { marketId: number }) {
   const dist = useDistributionState(marketId, { defaultBucketCount: 10 });
 

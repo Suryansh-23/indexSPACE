@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useContext, useCallback } from 'react';
 import {
   generateGaussian,
-  generatePlateau,
+  generateRange,
   projectPayoutCurve,
   buy,
 } from '@functionspace/core';
@@ -13,17 +13,17 @@ import '../styles/base.css';
 
 export interface TradePanelProps {
   marketId: string | number;
-  modes?: ('gaussian' | 'plateau')[];
+  modes?: ('gaussian' | 'range')[];
   onBuy?: (result: BuyResult) => void;
 }
 
-export function TradePanel({ marketId, modes = ['gaussian', 'plateau'], onBuy }: TradePanelProps) {
+export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy }: TradePanelProps) {
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('TradePanel must be used within FunctionSpaceProvider');
 
   const { market } = useMarket(marketId);
 
-  const [activeMode, setActiveMode] = useState<'gaussian' | 'plateau'>(modes[0]);
+  const [activeMode, setActiveMode] = useState<'gaussian' | 'range'>(modes[0]);
   const [amount, setAmount] = useState('100');
   const [prediction, setPrediction] = useState<number | null>(null);
   const [confidence, setConfidence] = useState(50); // 0-100 percentage
@@ -83,7 +83,7 @@ export function TradePanel({ marketId, modes = ['gaussian', 'plateau'], onBuy }:
       const [lo, hi] = rangeValues;
       if (lo >= hi) return null;
       if (lo < L || hi > H) return null;
-      return generatePlateau(lo, hi, K, L, H, 1);
+      return generateRange(lo, hi, K, L, H, 1);
     }
   }, [market, activeMode, prediction, confidence, rangeValues, getStdDevFromConfidence]);
 

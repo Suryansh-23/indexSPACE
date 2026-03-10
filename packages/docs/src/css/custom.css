@@ -24,9 +24,20 @@
 @import '../../../ui/src/styles/base.css';
 @import '../../../ui/src/styles/slider.css';
 
-/* Disable auth widgets in docs - login not supported on static site */
-.fs-auth-widget form,
-.fs-passwordless-auth form {
+/* Widen doc content area for widget demos */
+.container {
+  max-width: 1400px !important;
+}
+
+article {
+  max-width: none;
+}
+
+/* Disable auth submit in docs - login not supported on static site */
+.fs-auth-widget form input,
+.fs-auth-widget form .fs-auth-btn-primary,
+.fs-passwordless-auth form input,
+.fs-passwordless-auth form .fs-auth-btn-primary {
   pointer-events: none;
   opacity: 0.5;
 }

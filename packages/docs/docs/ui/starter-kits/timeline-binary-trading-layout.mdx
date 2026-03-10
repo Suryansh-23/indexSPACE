@@ -4,12 +4,13 @@ sidebar_position: 6
 ---
 
 import WidgetDemo from '@site/src/components/WidgetDemo';
-import TimelineBinaryDemo from '@site/src/components/demos/TimelineBinaryDemo';
+import { TimelineBinaryLayout } from '@demo-app/App_TimelineBinaryTradingLayout';
+import { DEMO_MARKET_ID } from '@site/src/constants';
 
 # Timeline Binary Trading Layout
 
 <WidgetDemo title="Live Demo" height="700px">
-  <TimelineBinaryDemo />
+  <TimelineBinaryLayout marketId={DEMO_MARKET_ID} />
 </WidgetDemo>
 
 **File:** `demo-app/src/App_TimelineBinaryTradingLayout.tsx`

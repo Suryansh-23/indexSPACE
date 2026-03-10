@@ -772,7 +772,7 @@ function generateBelief(
 | `skew` | `number` | `0` | Asymmetry. Negative = wider left tail, positive = wider right tail. |
 | `inverted` | `boolean` | `false` | When `true`, creates a dip: high at edges, low at center |
 
-**`RangeRegion`** -- Flat-topped plateau:
+**`RangeRegion`** -- Flat-topped range:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|

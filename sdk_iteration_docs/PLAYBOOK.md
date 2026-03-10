@@ -448,7 +448,6 @@ Thin wrappers that construct the correct `Region` array and delegate to `generat
 | `generateGaussian(center, spread, K, L, H)` | `[{ type: 'point', center, spread }]` |
 | `generateRange(low, high, K, L, H, sharpness?)` | `[{ type: 'range', low, high, sharpness: sharpness ?? 0.5 }]` — single range |
 | `generateRange(ranges[], K, L, H)` | Multiple `RangeRegion` entries with per-range sharpness/weight — multi-range composition |
-| `generatePlateau(low, high, K, L, H, sharpness?)` | **Deprecated alias** for single-range `generateRange`. Default sharpness = 0.5. |
 | `generateDip(center, spread, K, L, H)` | `[{ type: 'point', center, spread: spread*1.5, inverted: true }]` |
 | `generateLeftSkew(center, spread, K, L, H, skewAmount?)` | `[{ type: 'point', center, spread, skew: -skewAmount }]` |
 | `generateRightSkew(center, spread, K, L, H, skewAmount?)` | `[{ type: 'point', center, spread, skew: skewAmount }]` |
@@ -499,7 +498,7 @@ When `sharpness = 1`, the coefficient vector has a hard step function at the ran
 | Simple shape with one region | Create L2 if it will be reused | `generateGaussian`, `generateDip` |
 | Shape that's just existing L2 with different params | Call existing L2 with modified params — **no new function** | Spike = `generateGaussian(center, spread * 0.2, K, L, H)` |
 | Shape with multiple regions | Call `generateBelief` directly from the widget | Bimodal = two PointRegions with different centers/weights |
-| Shape that is a special case of existing L2 | Call existing L2 with boundary params | Uniform = `generatePlateau(L, H, K, L, H)` |
+| Shape that is a special case of existing L2 | Call existing L2 with boundary params | Uniform = `generateRange(L, H, K, L, H)` |
 
 **Rule of thumb:** Create a new L2 only when the shape has unique Region parameters that encode a distinct shape concept (like inversion or skew). If it's just "same generator, different numbers," let the widget pass different numbers.
 
@@ -536,7 +535,7 @@ All density rendering uses piecewise-linear interpolation via a single function:
 - Maps each output point to a position in the coefficient array (`u * K`)
 - Linearly interpolates between the two nearest coefficients
 - Applies density scaling `(K+1)/(H-L)` for correct PDF normalization
-- Preserves sharp transitions faithfully (plateaus have cliff edges, spikes have narrow peaks)
+- Preserves sharp transitions faithfully (ranges have cliff edges, spikes have narrow peaks)
 - Used by `ConsensusChart` for previews, consensus, and selected position curves
 
 **`evaluateDensityPiecewise(coefficients, x, L, H)` — Single-point evaluation**
@@ -571,7 +570,6 @@ Peaks beyond 4x are clipped visually but remain in the tooltip data. This ensure
 - `generateGaussian(center, spread, K, L, H)` → belief vector (L2)
 - `generateRange(low, high, K, L, H, sharpness?)` → belief vector (L2, single range)
 - `generateRange(ranges[], K, L, H)` → belief vector (L2, multi-range composition)
-- `generatePlateau(low, high, K, L, H, sharpness?)` → belief vector (L2, **deprecated** — alias for single-range `generateRange`)
 - `generateDip(center, spread, K, L, H)` → belief vector (L2)
 - `generateLeftSkew(center, spread, K, L, H, skewAmount?)` → belief vector (L2)
 - `generateRightSkew(center, spread, K, L, H, skewAmount?)` → belief vector (L2)
@@ -816,9 +814,10 @@ import { DEMO_MARKET_ID } from '@site/src/constants';
 
 Key rules:
 - All widgets MUST be wrapped in `<WidgetDemo>` (provides `BrowserOnly` for SSR safety + error boundary)
-- `PositionTable` requires `username="SDK_demo"` prop
-- Auth widget forms are globally disabled via CSS in `custom.css`
-- Use `DEMO_MARKET_ID` from `@site/src/constants` (value: 23)
+- Use `DEMO_MARKET_ID` and `DEMO_USERNAME` from `@site/src/constants`
+- Auth widget forms are globally disabled via CSS in `custom.css` (cancel/back buttons remain enabled)
+- Starter kit pages import layout components from `@demo-app/` (alias for `demo-app/src/`), not from docs components. Each demo-app layout exports a named inner component that accepts `marketId`/`username` props.
+- Escape curly braces in MDX prose text with `\{...\}` to prevent JSX interpretation
 - Verify build: `cd packages/docs && npx docusaurus build`
 
 ---
@@ -1070,16 +1069,10 @@ packages/docs/            # Docusaurus documentation site
 │   ├── css/custom.css    # Infima theme vars, SDK CSS imports, auth widget disabling
 │   ├── plugins/sdk-webpack-plugin.js  # Webpack aliases + extensionAlias for raw TS source
 │   ├── theme/Root.tsx    # Global FunctionSpaceProvider wrapper (syncs Docusaurus color mode)
-│   ├── constants.ts      # DEMO_MARKET_ID = 23
+│   ├── constants.ts      # DEMO_MARKET_ID, DEMO_USERNAME
 │   └── components/
 │       ├── WidgetDemo.tsx           # BrowserOnly wrapper with error boundary
-│       └── demos/                   # Starter kit demo layout components
-│           ├── BasicTradingDemo.tsx
-│           ├── BinaryPanelDemo.tsx
-│           ├── CustomShapeDemo.tsx
-│           ├── DistributionRangeDemo.tsx
-│           ├── ShapeCutterDemo.tsx
-│           └── TimelineBinaryDemo.tsx
+│       └── ChartToggle.tsx          # Toggleable consensus chart for trade input pages
 ├── docs/                 # All documentation content (Markdown + MDX)
 │   ├── index.md          # Introduction (slug: /)
 │   ├── core/             # Core package docs

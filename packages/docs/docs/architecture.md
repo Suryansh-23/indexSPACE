@@ -39,7 +39,7 @@ Categories group functions by what they do, independent of their abstraction lay
 | Category | What It Does | Examples | Notes |
 | --- | --- | --- | --- |
 | **Transactions** | Writes to the chain; state-changing operations | `buy()`, `sell()`, `createMarket()`, `updatePosition()` | Require wallet signature |
-| **Positions** | Pure computation; transforms inputs into protocol-ready formats | `generateGaussian()`, `generatePlateau()`, `generateBelief()` | No chain interaction; human interface to compose beliefs |
+| **Positions** | Pure computation; transforms inputs into protocol-ready formats | `generateGaussian()`, `generateRange()`, `generateBelief()` | No chain interaction; human interface to compose beliefs |
 | **Projections** | Computes hypothetical outcomes without chain interaction | `projectBuy()`, `projectPayout()`, `projectSell()` | Read current state, simulate results |
 | **Queries** | Reads and interprets current protocol state | `queryMarketState()`, `queryClaimShare()`, `queryConsensusSummary()` | On-chain reads |
 | **Discovery** | Find and filter markets or positions | `discoverMarkets()`, `discoverTrending()`, `discoverUserPositions()` | Requires indexer |
@@ -113,7 +113,7 @@ The diagram shows a concrete example of layer interaction when a developer wants
 
 **Starting Point: Developer Intent (Layer 3)** The developer specifies a goal: "I want at least $X payout if the outcome falls between L and H." This enters at the Payout Design row, Layer 3. The L3 function does not directly generate shapes or submit transactions -- it orchestrates lower layers to achieve the goal.
 
-**Shape Construction (Layers 2 to 1)** The L3 Payout Design function calls the L2 "Plateau shape" generate to request an appropriate belief shape covering the target range. The L2 generators in turn calls L1 "Raw Shape generation" to produce the actual Bernstein coefficients. This is the Belief row flowing from L3 to L2 to L1.
+**Shape Construction (Layers 2 to 1)** The L3 Payout Design function calls the L2 "Range shape" generate to request an appropriate belief shape covering the target range. The L2 generators in turn calls L1 "Raw Shape generation" to produce the actual Bernstein coefficients. This is the Belief row flowing from L3 to L2 to L1.
 
 **Settlement Projection (Layer 2)** The Projection row shows how the system validates the proposed position. L2 "Settlement values between L-H" computes what payout this shape would produce at various outcomes within the target range. This requires market state, which comes from the Cache.
 

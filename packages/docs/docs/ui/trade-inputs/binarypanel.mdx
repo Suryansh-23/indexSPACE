@@ -3,22 +3,58 @@ title: "BinaryPanel"
 sidebar_position: 2
 ---
 
+import React from 'react';
 import { BinaryPanel } from '@functionspace/ui';
 import WidgetDemo from '@site/src/components/WidgetDemo';
+import ChartToggle from '@site/src/components/ChartToggle';
 import { DEMO_MARKET_ID } from '@site/src/constants';
+
+export const MODES = [
+  { value: 'static', label: 'Static (value=50)' },
+  { value: 'variable', label: 'Variable' },
+  { value: 'dynamic-mode', label: 'Dynamic Mode' },
+  { value: 'dynamic-mean', label: 'Dynamic Mean' },
+];
+
+export const getXPoint = (mode) => {
+  switch (mode) {
+    case 'static': return { mode: 'static', value: 50 };
+    case 'variable': return { mode: 'variable' };
+    case 'dynamic-mode': return { mode: 'dynamic-mode', allowOverride: true };
+    case 'dynamic-mean': return { mode: 'dynamic-mean', allowOverride: true };
+  }
+};
+
+export const BinaryDemo = () => {
+  const [mode, setMode] = React.useState('static');
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+        <label style={{ color: 'var(--fs-text-secondary)', fontSize: '0.875rem' }}>xPoint mode:</label>
+        <select value={mode} onChange={(e) => setMode(e.target.value)}
+          style={{ background: 'var(--fs-surface)', color: 'var(--fs-text)', border: '1px solid var(--fs-border)', borderRadius: '4px', padding: '0.25rem 0.5rem', fontSize: '0.875rem' }}>
+          {MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+        </select>
+      </div>
+      <BinaryPanel marketId={DEMO_MARKET_ID} xPoint={getXPoint(mode)} />
+    </div>
+  );
+};
 
 # BinaryPanel
 
 **`BinaryPanel`**
 
-A simplified Yes/No trading interface. Users bet whether the outcome will be above or below a threshold value X. Renders a natural-language question: "Will {title} be more than {X}{units}?"
+A simplified Yes/No trading interface. Users bet whether the outcome will be above or below a threshold value X. Renders a natural-language question: "Will \{title\} be more than \{X\}\{units\}?"
 
 ```tsx
 import { BinaryPanel } from '@functionspace/ui';
 ```
 
-<WidgetDemo title="Live Demo" height="300px">
-  <BinaryPanel marketId={DEMO_MARKET_ID} />
+<ChartToggle />
+
+<WidgetDemo title="Live Demo" height="auto" maxWidth="800px">
+  <BinaryDemo />
 </WidgetDemo>
 
 **CSS class:** `fs-binary-panel`
@@ -55,13 +91,13 @@ All resolved thresholds are clamped to `[L, H]`.
 
 **Behavior:**
 
-* **Yes:** Builds `generatePlateau(X, H, K, L, H, 1)` -- a hard-edged plateau from the threshold to the market high.
-* **No:** Builds `generatePlateau(L, X, K, L, H, 1)` -- a hard-edged plateau from the market low to the threshold.
+* **Yes:** Builds `generateRange(X, H, K, L, H, 1)` -- a hard-edged range from the threshold to the market high.
+* **No:** Builds `generateRange(L, X, K, L, H, 1)` -- a hard-edged range from the market low to the threshold.
 * **Side toggle:** Clicking an already-selected side deselects it. The amount input and submit button only appear after a side is chosen.
 * **Default amount:** Hardcoded `'100'` USDC.
 * **Post-trade reset:** Side resets to `null` (no selection), amount resets to `'100'`. Threshold persists.
 * **Threshold formatting:** Displays with `market.decimals` precision, followed by `market.xAxisUnits`.
-* **Loading/error states:** Renders "Loading..." or "Error: {message}" when market data is unavailable.
+* **Loading/error states:** Renders "Loading..." or "Error: \{message\}" when market data is unavailable.
 
 **Context interactions:**
 
@@ -69,7 +105,7 @@ All resolved thresholds are clamped to `[L, H]`.
 * **Writes:** `ctx.setPreviewBelief(belief)` on side/threshold change, `ctx.setPreviewPayout(result)` after debounced projection, clears both on unmount
 * **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useMarket`, `generatePlateau`, `computeStatistics`, `projectPayoutCurve`, `buy`
+**Internal calls:** `useMarket`, `generateRange`, `computeStatistics`, `projectPayoutCurve`, `buy`
 
 **Example:**
 

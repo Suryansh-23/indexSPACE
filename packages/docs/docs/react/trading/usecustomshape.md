@@ -31,7 +31,7 @@ _Derived fields:_
 
 | Field        | Type                   | Description                                                                                                  |
 | ------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `pVector`    | `BeliefVector \| null` | Normalized belief vector derived from control values via `buildCustomShape`. `null` when `market` is `null`. |
+| `pVector`    | `BeliefVector \| null` | Normalized belief vector derived from control values via `generateCustomShape`. `null` when `market` is `null`. |
 | `prediction` | `number \| null`       | Mode (peak) of the derived distribution via `computeStatistics`. `null` when `market` is `null`.             |
 
 _Action fields:_
@@ -64,7 +64,7 @@ _Drag fields:_
 * `resetToDefault` regenerates the bell shape at the current `numPoints` (does not reset `numPoints` to 20) and clears both locks and drag state.
 * `pVector` recomputes whenever `controlValues` or `market` changes. `prediction` recomputes whenever `pVector` or `market` changes.
 
-**Delegates to:** `buildCustomShape`, `generateBellShape`, `computeStatistics` from core.
+**Delegates to:** `generateCustomShape`, `generateBellShape`, `computeStatistics` from core.
 
 **Example:**
 

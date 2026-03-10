@@ -192,7 +192,7 @@ interface PointRegion {
 
 The kernel is a Gaussian: `exp(-0.5 * ((u - center) / spread)²)`. When `skew` is set, the effective spread differs on each side of center. A skew of `-1` makes the left tail ~3x wider and the right tail ~0.3x narrower. When `inverted: true`, the Gaussian is flipped: `max(1 - gaussian, 0.02)`, creating a "dip" with high probability everywhere *except* near center.
 
-**`RangeRegion`** (Flat plateau):
+**`RangeRegion`** (Flat range):
 
 ```typescript
 interface RangeRegion {
@@ -336,7 +336,6 @@ All L2 generators are thin wrappers around `generateBelief`. Use them for common
 | `generateGaussian(center, spread, K, L, H)` | `generateBelief([{ type: 'point', center, spread }], K, L, H)` |
 | `generateRange(low, high, K, L, H, sharpness?)` | `generateBelief([{ type: 'range', low, high, sharpness: sharpness ?? 0.5 }], K, L, H)` — note: defaults to `0.5`, not `0` |
 | `generateRange(ranges: RangeInput[], K, L, H)` | `generateBelief(ranges.map(r => ({ type: 'range', ...r })), K, L, H)` — uses each range's own `sharpness` (defaults to `0` at kernel level) |
-| `generatePlateau(low, high, K, L, H, sharpness?)` | Deprecated alias for `generateRange` (single-range form). `sharpness` defaults to `0.5`. |
 | `generateDip(center, spread, K, L, H)` | `generateBelief([{ type: 'point', center, spread: spread * 1.5, inverted: true }], K, L, H)` |
 | `generateLeftSkew(center, spread, K, L, H, skewAmount?)` | `generateBelief([{ type: 'point', center, spread, skew: -skewAmount }], K, L, H)` — `skewAmount` defaults to `1` |
 | `generateRightSkew(center, spread, K, L, H, skewAmount?)` | `generateBelief([{ type: 'point', center, spread, skew: skewAmount }], K, L, H)` — `skewAmount` defaults to `1` |
@@ -566,7 +565,7 @@ for (const pos of positions.filter(p => p.status === 'open')) {
 |--------|------|-------------|
 | `SHAPE_DEFINITIONS` | `ShapeDefinition[]` | Registry of all 8 named belief shapes with metadata (id, name, description, parameter list, SVG icon path). Used by UI shape pickers. |
 | `ShapeDefinition` | Interface | `{ id: ShapeId; name: string; description: string; parameters: ('targetOutcome' \| 'confidence' \| 'rangeValues' \| 'peakBias' \| 'skewAmount')[]; svgPath: string }` |
-| `ShapeId` | Type | `'gaussian' \| 'spike' \| 'plateau' \| 'bimodal' \| 'dip' \| 'leftskew' \| 'rightskew' \| 'uniform'` |
+| `ShapeId` | Type | `'gaussian' \| 'spike' \| 'range' \| 'bimodal' \| 'dip' \| 'leftskew' \| 'rightskew' \| 'uniform'` |
 
 ### Positions
 
@@ -2511,7 +2510,7 @@ All trading components clear `ctx.setPreviewBelief(null)` and `ctx.setPreviewPay
 
 #### `TradePanel`
 
-The simplest parametric trading panel. Offers two belief shapes — Gaussian (bell curve) and Range (flat plateau) — with slider-based inputs.
+The simplest parametric trading panel. Offers two belief shapes — Gaussian (bell curve) and Range (flat range) — with slider-based inputs.
 
 ```tsx
 import { TradePanel } from '@functionspace/ui';
@@ -2524,13 +2523,13 @@ import { TradePanel } from '@functionspace/ui';
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `marketId` | `string \| number` | required | Market to trade on |
-| `modes` | `('gaussian' \| 'plateau')[]` | `['gaussian', 'plateau']` | Which shape modes to offer. Tab bar hidden when only one mode. |
+| `modes` | `('gaussian' \| 'range')[]` | `['gaussian', 'range']` | Which shape modes to offer. Tab bar hidden when only one mode. |
 | `onBuy` | `(result: BuyResult) => void` | -- | Called after successful trade |
 
 **Behavior:**
 
 - **Gaussian mode:** "My Prediction" slider (L to H, step = range/100) + "Confidence" slider (0–100%). Confidence inversely maps to spread width: 0% = 20% of range (wide), 100% = 1% of range (narrow). Generates belief via `generateGaussian`.
-- **Range mode:** Two-handle range slider for selecting an outcome range. Initializes to the middle 50% of the market range. Generates belief via `generatePlateau` with sharpness `1` (hard edges). Tab label displays "Range" (not "Plateau").
+- **Range mode:** Two-handle range slider for selecting an outcome range. Initializes to the middle 50% of the market range. Generates belief via `generateRange` with sharpness `1` (hard edges).
 - **Amount input:** USDC input (minimum $1), default `'100'`. Displays debounced potential payout as `$X.XX`.
 - **Post-trade reset:** All inputs revert to defaults (prediction to midpoint, confidence to 50, range to 25–75%, amount to '100').
 - **Prediction passed to `buy()`:** In Gaussian mode, the slider value. In Range mode, the midpoint of the selected range.
@@ -2541,7 +2540,7 @@ import { TradePanel } from '@functionspace/ui';
 - **Writes:** `ctx.setPreviewBelief(belief)` on input change, `ctx.setPreviewPayout(result)` after debounced projection, clears both on unmount
 - **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useMarket`, `generateGaussian`, `generatePlateau`, `projectPayoutCurve`, `buy`
+**Internal calls:** `useMarket`, `generateGaussian`, `generateRange`, `projectPayoutCurve`, `buy`
 
 **Example:**
 
@@ -2559,7 +2558,7 @@ import { TradePanel } from '@functionspace/ui';
 />
 ```
 
-**Related:** `ConsensusChart` (renders preview from this component's context writes) | `generateGaussian`, `generatePlateau` (core generators)
+**Related:** `ConsensusChart` (renders preview from this component's context writes) | `generateGaussian`, `generateRange` (core generators)
 
 ---
 
@@ -2605,8 +2604,8 @@ All resolved thresholds are clamped to `[L, H]`.
 
 **Behavior:**
 
-- **Yes:** Calls `generatePlateau(X, H, K, L, H, 1)` — a hard-edged plateau from the threshold to the market high.
-- **No:** Calls `generatePlateau(L, X, K, L, H, 1)` — a hard-edged plateau from the market low to the threshold.
+- **Yes:** Calls `generateRange(X, H, K, L, H, 1)` -- a hard-edged range from the threshold to the market high.
+- **No:** Calls `generateRange(L, X, K, L, H, 1)` -- a hard-edged range from the market low to the threshold.
 - **Side toggle:** Clicking an already-selected side deselects it. The amount input and submit button only appear after a side is chosen.
 - **Default amount:** Hardcoded `'100'` USDC.
 - **Post-trade reset:** Side resets to `null` (no selection), amount resets to `'100'`. Threshold persists.
@@ -2619,7 +2618,7 @@ All resolved thresholds are clamped to `[L, H]`.
 - **Writes:** `ctx.setPreviewBelief(belief)` on side/threshold change, `ctx.setPreviewPayout(result)` after debounced projection, clears both on unmount
 - **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useMarket`, `generatePlateau`, `computeStatistics`, `projectPayoutCurve`, `buy`
+**Internal calls:** `useMarket`, `generateRange`, `computeStatistics`, `projectPayoutCurve`, `buy`
 
 **Example:**
 
@@ -2667,12 +2666,12 @@ import { ShapeCutter } from '@functionspace/ui';
 |-------|---------|----------------|
 | Gaussian | `generateGaussian` | Target outcome, confidence |
 | Spike | `generateGaussian` (with dynamic tighter multiplier) | Target outcome, confidence |
-| Plateau | `generatePlateau` (sharpness `1`) | Range (two-handle slider) |
+| Range | `generateRange` (sharpness `1`) | Range (two-handle slider) |
 | Bimodal | `generateBelief` (two `PointRegion`s) | Range (peak positions), confidence, peak balance |
 | The Dip | `generateDip` | Target outcome, confidence |
 | Left Skew | `generateLeftSkew` | Target outcome, confidence, skew intensity |
 | Right Skew | `generateRightSkew` | Target outcome, confidence, skew intensity |
-| Uniform | `generatePlateau(L, H, ...)` (full range) | None |
+| Uniform | `generateRange(L, H, ...)` (full range) | None |
 
 **Behavior:**
 
@@ -2688,7 +2687,7 @@ import { ShapeCutter } from '@functionspace/ui';
 - **Writes:** `ctx.setPreviewBelief(belief)` on input change, `ctx.setPreviewPayout(result)` after debounced projection, clears both on unmount
 - **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useMarket`, `generateGaussian`, `generatePlateau`, `generateBelief`, `generateDip`, `generateLeftSkew`, `generateRightSkew`, `SHAPE_DEFINITIONS`, `projectPayoutCurve`, `buy`
+**Internal calls:** `useMarket`, `generateGaussian`, `generateRange`, `generateBelief`, `generateDip`, `generateLeftSkew`, `generateRightSkew`, `SHAPE_DEFINITIONS`, `projectPayoutCurve`, `buy`
 
 **Example:**
 
@@ -2701,7 +2700,7 @@ import { ShapeCutter } from '@functionspace/ui';
 ```tsx
 <ShapeCutter
   marketId={42}
-  shapes={['gaussian', 'plateau', 'bimodal', 'dip']}
+  shapes={['gaussian', 'range', 'bimodal', 'dip']}
   defaultShape="bimodal"
   onBuy={(result) => console.log('Position:', result.positionId)}
 />
@@ -3659,7 +3658,7 @@ The 8-preset shape selector with a three-tab chart. The middle ground between Tr
 
 **Components:** `MarketStats` + `AuthWidget` → `MarketCharts` (consensus + distribution + timeline tabs, zoomable) → `ShapeCutter` → `PositionTable`
 
-**What it enables:** Users choose from 8 belief geometries (Gaussian, Spike, Plateau, Bimodal, Dip, Left Skew, Right Skew, Uniform), tune parameters with sliders, and see their shape previewed on the consensus chart in real-time. The timeline tab shows historical consensus evolution — how stable or volatile the market has been.
+**What it enables:** Users choose from 8 belief geometries (Gaussian, Spike, Range, Bimodal, Dip, Left Skew, Right Skew, Uniform), tune parameters with sliders, and see their shape previewed on the consensus chart in real-time. The timeline tab shows historical consensus evolution — how stable or volatile the market has been.
 
 **Target audience:** Intermediate traders who want expressive shapes without drag-and-drop complexity.
 

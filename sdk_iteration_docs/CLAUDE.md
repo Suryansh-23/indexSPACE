@@ -93,7 +93,7 @@ Every new function must be classifiable by both layer AND category. This keeps t
 | Add chart zoom/pan math | `packages/core/src/chart/zoom.ts` |
 | Add internal UI primitives | `packages/ui/src/components/` (not exported from package root) |
 | Edit documentation content | `packages/docs/docs/` (Markdown/MDX files) |
-| Add live widget demos | `packages/docs/src/components/` (WidgetDemo wrapper, demo layouts) |
+| Add live widget demos | `packages/docs/src/components/` (WidgetDemo, ChartToggle); starter kit layouts import from `demo-app/src/` via `@demo-app` alias |
 | Edit docs site config | `packages/docs/docusaurus.config.js`, `packages/docs/src/css/custom.css` |
 | Edit docs SDK integration | `packages/docs/src/plugins/sdk-webpack-plugin.js`, `packages/docs/src/theme/Root.tsx` |
 | Update AI context files | `packages/docs/static/llms.txt`, `core.txt`, `react.txt`, `ui.txt` |
@@ -248,7 +248,7 @@ If the implementation introduced anything new or improved on existing patterns, 
 | New test file added | CLAUDE.md — Testing Requirements table |
 | Architecture change | CLAUDE.md — Architecture section; PLAYBOOK.md — Layer Boundaries |
 | New agent or skill added | CLAUDE.md — Automated Reviewers or Skills section |
-| New/changed public API (widget, hook, core function) | `llms.txt` -- consumer integration guide; `sdk_docs_v1.0.md` -- external SDK documentation; `packages/docs/` -- Docusaurus docs if relevant page exists |
+| New/changed public API (widget, hook, core function) | `llms.txt` -- consumer integration guide; `packages/docs/docs/` -- Docusaurus documentation pages |
 | Docs site structure change | `packages/docs/docusaurus.config.js`, `packages/docs/sidebars.js` |
 
 **If you added it to the code but not to the docs, the work is not done.**

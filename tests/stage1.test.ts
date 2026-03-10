@@ -16,7 +16,7 @@ import type {
   PayoutCurve,
   BeliefVector,
   GaussianParams,
-  PlateauParams,
+  RangeParams,
   BucketData,
   FSConfig,
 } from '../packages/core/src/types.js';

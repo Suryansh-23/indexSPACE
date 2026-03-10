@@ -49,7 +49,7 @@ interface PayoutCurve {
 **Example:**
 
 ```typescript
-const belief = buildGaussian(75, 5, K, L, H);
+const belief = generateGaussian(75, 5, K, L, H);
 const curve = await projectPayoutCurve(ctx.client, marketId, belief, 100);
 
 console.log(`Best case: $${curve.maxPayout} if outcome = ${curve.maxPayoutOutcome}`);

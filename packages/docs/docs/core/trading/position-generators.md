@@ -56,7 +56,7 @@ interface PointRegion {
 
 The kernel is a Gaussian: `exp(-0.5 * ((u - center) / spread)²)`. When `skew` is set, the effective spread differs on each side of center. A skew of `-1` makes the left tail \~3x wider and the right tail \~0.3x narrower. When `inverted: true`, the Gaussian is flipped: `max(1 - gaussian, 0.02)`, creating a "dip" with high probability everywhere _except_ near center.
 
-**`RangeRegion`** (Flat plateau):
+**`RangeRegion`** (Flat range):
 
 ```typescript
 interface RangeRegion {
@@ -210,7 +210,6 @@ All L2 generators are thin wrappers around `generateBelief`. Use them for common
 | `generateGaussian(center, spread, K, L, H)`                              | `generateBelief([{ type: 'point', center, spread }], K, L, H)`                                                                                       |
 | `generateRange(low, high, K, L, H, sharpness?)`                          | `generateBelief([{ type: 'range', low, high, sharpness: sharpness ?? 0.5 }], K, L, H)` — note: defaults to `0.5`, not `0`                            |
 | `generateRange(ranges: RangeInput[], K, L, H)`                           | `generateBelief(ranges.map(r => ({ type: 'range', ...r })), K, L, H)` — uses each range's own `sharpness` (defaults to `0` at kernel level)          |
-| `generatePlateau(low, high, K, L, H, sharpness?)`                        | Deprecated alias for `generateRange` (single-range form). `sharpness` defaults to `0.5`.                                                             |
 | `generateDip(center, spread, K, L, H)`                                   | `generateBelief([{ type: 'point', center, spread: spread * 1.5, inverted: true }], K, L, H)`                                                         |
 | `generateLeftSkew(center, spread, K, L, H, skewAmount?)`                 | `generateBelief([{ type: 'point', center, spread, skew: -skewAmount }], K, L, H)` — `skewAmount` defaults to `1`                                     |
 | `generateRightSkew(center, spread, K, L, H, skewAmount?)`                | `generateBelief([{ type: 'point', center, spread, skew: skewAmount }], K, L, H)` — `skewAmount` defaults to `1`                                      |

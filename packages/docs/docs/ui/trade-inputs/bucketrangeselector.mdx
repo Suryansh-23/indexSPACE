@@ -5,6 +5,7 @@ sidebar_position: 5
 
 import { BucketRangeSelector } from '@functionspace/ui';
 import WidgetDemo from '@site/src/components/WidgetDemo';
+import ChartToggle from '@site/src/components/ChartToggle';
 import { DEMO_MARKET_ID } from '@site/src/constants';
 
 # BucketRangeSelector
@@ -16,6 +17,8 @@ A bucket-click trading interface. Displays outcome ranges as a grid of selectabl
 ```tsx
 import { BucketRangeSelector } from '@functionspace/ui';
 ```
+
+<ChartToggle />
 
 <WidgetDemo title="Live Demo" height="400px">
   <BucketRangeSelector marketId={DEMO_MARKET_ID} />
@@ -42,11 +45,11 @@ import { BucketRangeSelector } from '@functionspace/ui';
 * **Bucket grid:** Adaptive column layout -- 3 columns for 9 or fewer, 4 for up to 16, 5 for up to 25, 6 for more than 25. Each button shows the outcome range label and probability percentage. Clicking a selected bucket deselects it (toggle).
 * **FIFO selection:** When `maxSelections` is reached, clicking a new bucket drops the oldest. Custom range selections count toward the max, reducing available bucket slots.
 * **Auto mode:** Filters the grid to buckets within the 95% confidence interval (p2.5 to p97.5), focusing on active probability mass.
-* **Custom range panel:** Collapsible inputs for min/max values with apply/clear buttons. Ranges are validated -- out-of-bounds values are rejected (not clamped), displaying an inline error.
+* **Custom range panel:** Collapsible inputs for min/max values with apply/clear buttons. Ranges are validated -- out-of-bounds values are silently rejected (not clamped).
 * **Selection clearing:** Bucket selections reset automatically when bucket count or auto mode changes (because bucket boundaries shift).
 * **Belief construction:** Generates belief via `generateRange` from the selected bucket and custom range boundaries.
 * **Prediction:** The average midpoint of all selected ranges is passed to `buy()`.
-* **Loading/error states:** Renders "Loading market data..." or "Error: {message}" when data is unavailable.
+* **Loading/error states:** Renders "Loading market data..." or "Error: \{message\}" when data is unavailable.
 
 **Context interactions:**
 

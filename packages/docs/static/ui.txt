@@ -413,7 +413,7 @@ import { TradePanel } from '@functionspace/ui';
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `marketId` | `string \| number` | required | Market to trade on |
-| `modes` | `('gaussian' \| 'plateau')[]` | `['gaussian', 'plateau']` | Which shape modes to offer |
+| `modes` | `('gaussian' \| 'range')[]` | `['gaussian', 'range']` | Which shape modes to offer |
 | `onBuy` | `(result: BuyResult) => void` | -- | Called after successful trade |
 
 ### `BinaryPanel`
@@ -458,7 +458,7 @@ import { ShapeCutter } from '@functionspace/ui';
 | `onBuy` | `(result: BuyResult) => void` | -- | Called after successful trade |
 | `onError` | `(error: Error) => void` | -- | Called on trade failure |
 
-`ShapeId` values: `'gaussian'`, `'spike'`, `'plateau'`, `'bimodal'`, `'dip'`, `'leftskew'`, `'rightskew'`, `'uniform'`
+`ShapeId` values: `'gaussian'`, `'spike'`, `'range'`, `'bimodal'`, `'dip'`, `'leftskew'`, `'rightskew'`, `'uniform'`
 
 ### `CustomShapeEditor`
 
@@ -622,7 +622,7 @@ function App() {
           <ConsensusChart marketId="15" height={500} zoomable />
         </div>
         <div style={{ flex: 3, minWidth: 0 }}>
-          <TradePanel marketId="15" modes={['gaussian', 'plateau']} />
+          <TradePanel marketId="15" modes={['gaussian', 'range']} />
         </div>
       </div>
     </FunctionSpaceProvider>
@@ -859,7 +859,7 @@ export default function App() {
     <FunctionSpaceProvider config={config} theme="native-dark">
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '1rem' }}>
         <ConsensusChart marketId={MARKET_ID} height={400} />
-        <TradePanel marketId={MARKET_ID} modes={['gaussian', 'plateau']} />
+        <TradePanel marketId={MARKET_ID} modes={['gaussian', 'range']} />
       </div>
     </FunctionSpaceProvider>
   );
@@ -952,7 +952,7 @@ type PositionTabId = 'open-orders' | 'trade-history' | 'market-positions';
 #### `ShapeId`
 
 ```typescript
-type ShapeId = 'gaussian' | 'spike' | 'plateau' | 'bimodal' | 'dip' | 'leftskew' | 'rightskew' | 'uniform';
+type ShapeId = 'gaussian' | 'spike' | 'range' | 'bimodal' | 'dip' | 'leftskew' | 'rightskew' | 'uniform';
 ```
 
 ### Key Core Types Used by UI

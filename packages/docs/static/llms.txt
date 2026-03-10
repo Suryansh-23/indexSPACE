@@ -757,7 +757,7 @@ All trading widgets clear preview state on unmount, preventing stale overlays.
 
 #### `TradePanel`
 
-The simplest parametric trading panel. Offers Gaussian (bell curve) and Range (flat plateau) belief shapes with slider-based inputs.
+The simplest parametric trading panel. Offers Gaussian (bell curve) and Range (flat-top) belief shapes with slider-based inputs.
 
 **Import:**
 
@@ -770,7 +770,7 @@ import { TradePanel } from '@functionspace/ui';
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `marketId` | `string \| number` | required | Market to trade on |
-| `modes` | `('gaussian' \| 'plateau')[]` | `['gaussian', 'plateau']` | Which shape modes to offer. Tab bar hidden when only one mode. |
+| `modes` | `('gaussian' \| 'range')[]` | `['gaussian', 'range']` | Which shape modes to offer. Tab bar hidden when only one mode. |
 | `onBuy` | `(result: BuyResult) => void` | -- | Called after successful trade |
 
 **Minimal example:**
@@ -800,7 +800,7 @@ function App() {
 
 **Notes:**
 - Gaussian mode provides a "My Prediction" slider and a "Confidence" slider. Confidence inversely maps to bell curve width.
-- Range mode provides a two-handle range slider. Uses `generatePlateau` internally with hard edges (sharpness `1`).
+- Range mode provides a two-handle range slider. Uses `generateRange` internally with hard edges (sharpness `1`).
 - Default collateral amount is $100 USDC. Displays debounced potential payout.
 - After a successful trade, all inputs revert to defaults (prediction to midpoint, confidence to 50%, amount to $100).
 
@@ -862,7 +862,7 @@ function App() {
 ```
 
 **Notes:**
-- "Yes" generates a plateau from the threshold to the market high. "No" generates a plateau from the market low to the threshold.
+- "Yes" generates a range from the threshold to the market high. "No" generates a range from the market low to the threshold.
 - Clicking an already-selected side deselects the choice. The amount input and submit button only appear after a side is chosen.
 - After a trade, the side resets to `null` (no selection) and the amount resets to $100. The threshold persists.
 - Default collateral amount is $100 USDC.
@@ -889,7 +889,7 @@ import { ShapeCutter } from '@functionspace/ui';
 | `onBuy` | `(result: BuyResult) => void` | -- | Called after successful trade |
 | `onError` | `(error: Error) => void` | -- | Called on trade failure |
 
-`ShapeId` values: `'gaussian'`, `'spike'`, `'plateau'`, `'bimodal'`, `'dip'`, `'leftskew'`, `'rightskew'`, `'uniform'`
+`ShapeId` values: `'gaussian'`, `'spike'`, `'range'`, `'bimodal'`, `'dip'`, `'leftskew'`, `'rightskew'`, `'uniform'`
 
 **Minimal example:**
 
@@ -908,7 +908,7 @@ function App() {
     <FunctionSpaceProvider config={config} theme="fs-dark">
       <ShapeCutter
         marketId="15"
-        shapes={['gaussian', 'plateau', 'bimodal', 'dip']}
+        shapes={['gaussian', 'range', 'bimodal', 'dip']}
         defaultShape="gaussian"
         onBuy={(result) => console.log('Position:', result.positionId)}
       />
@@ -921,7 +921,7 @@ function App() {
 - Layout is two columns: left column contains trade summary and adaptive parameter sliders; right column contains the shape icon grid labeled "Strategy Geometry".
 - Each shape activates different slider combinations -- target outcome or range, confidence, and shape-specific controls (peak balance for bimodal, skew intensity for left/right skew).
 - After a trade, all parameters revert to defaults. The selected shape persists.
-- Uses `generateGaussian`, `generatePlateau`, `generateDip`, `generateLeftSkew`, `generateRightSkew`, and `generateBelief` internally depending on the selected shape.
+- Uses `generateGaussian`, `generateRange`, `generateDip`, `generateLeftSkew`, `generateRightSkew`, and `generateBelief` internally depending on the selected shape.
 
 ---
 
@@ -1343,7 +1343,7 @@ function App() {
           <ConsensusChart marketId="15" height={500} zoomable />
         </div>
         <div style={{ flex: 3, minWidth: 0 }}>
-          <TradePanel marketId="15" modes={['gaussian', 'plateau']} />
+          <TradePanel marketId="15" modes={['gaussian', 'range']} />
         </div>
       </div>
     </FunctionSpaceProvider>
@@ -2343,7 +2343,7 @@ function generateBelief(
 | `skew` | `number` | `0` | Asymmetry. Negative = wider left tail, positive = wider right tail. Range: -1 to 1. |
 | `inverted` | `boolean` | `false` | When `true`, creates a dip: high at edges, low at center |
 
-**`RangeRegion`** -- Flat-topped plateau:
+**`RangeRegion`** -- Flat-topped range:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -3325,16 +3325,13 @@ const { K, L, H } = market.config;
 Use any generator function to construct a normalized `BeliefVector` (a `number[]` of length `K + 1` that sums to 1).
 
 ```typescript
-import { generateGaussian, generateRange, generatePlateau, generateBelief, generateDip } from '@functionspace/core';
+import { generateGaussian, generateRange, generateBelief, generateDip } from '@functionspace/core';
 
 // Gaussian: "I think the outcome will be around 75"
 const belief = generateGaussian(75, 5, K, L, H);
 
 // Range: "I think it will land between 70 and 85"
 const rangeBelief = generateRange(70, 85, K, L, H, 0.5);
-
-// Plateau: same as Range (alias with identical signature)
-const plateauBelief = generatePlateau(70, 85, K, L, H, 1);
 
 // Dip: "Anything but 75"
 const dipBelief = generateDip(75, 5, K, L, H);
@@ -3346,7 +3343,7 @@ const bimodal = generateBelief([
 ], K, L, H);
 ```
 
-All L2 generators (`generateGaussian`, `generateRange`, `generatePlateau`, `generateDip`, `generateLeftSkew`, `generateRightSkew`, `generateCustomShape`) delegate to `generateBelief` internally. `generatePlateau` is an alias for `generateRange` — they produce identical output. Use `generateBelief` directly when you need multi-region composition or fine-grained control with `PointRegion`, `RangeRegion`, or `SplineRegion` types.
+All L2 generators (`generateGaussian`, `generateRange`, `generateDip`, `generateLeftSkew`, `generateRightSkew`, `generateCustomShape`) delegate to `generateBelief` internally. Use `generateBelief` directly when you need multi-region composition or fine-grained control with `PointRegion`, `RangeRegion`, or `SplineRegion` types.
 
 #### Step 3: Execute the Trade
 
@@ -3789,8 +3786,8 @@ export default function App() {
         <div style={{ marginBottom: '1rem' }}>
           <ShapeCutter marketId={MARKET_ID} />
         </div>
-        {/* Alternative: Replace ShapeCutter with TradePanel for simpler Gaussian/Plateau trading:
-            <TradePanel marketId={MARKET_ID} modes={['gaussian', 'plateau']} />
+        {/* Alternative: Replace ShapeCutter with TradePanel for simpler Gaussian/Range trading:
+            <TradePanel marketId={MARKET_ID} modes={['gaussian', 'range']} />
         */}
 
         {/* Positions: Open orders, trade history, market positions */}
@@ -3840,7 +3837,7 @@ export default function App() {
     <FunctionSpaceProvider config={config} theme="native-dark">
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '1rem' }}>
         <ConsensusChart marketId={MARKET_ID} height={400} />
-        <TradePanel marketId={MARKET_ID} modes={['gaussian', 'plateau']} />
+        <TradePanel marketId={MARKET_ID} modes={['gaussian', 'range']} />
       </div>
     </FunctionSpaceProvider>
   );
@@ -4536,7 +4533,7 @@ Regions are the building blocks for `generateBelief()`. Multiple regions combine
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | `ShapeId` | Shape identifier (e.g. `'gaussian'`, `'plateau'`) |
+| `id` | `ShapeId` | Shape identifier (e.g. `'gaussian'`, `'range'`) |
 | `name` | `string` | Human-readable display name |
 | `description` | `string` | Short description of the shape's behavior |
 | `parameters` | `('targetOutcome' \| 'confidence' \| 'rangeValues' \| 'peakBias' \| 'skewAmount')[]` | Which parameter sliders the widget should show for this shape |
@@ -4840,14 +4837,14 @@ type ThemePresetId = 'fs-dark' | 'fs-light' | 'native-dark' | 'native-light';
 **Package:** `@functionspace/core`
 
 ```typescript
-type ShapeId = 'gaussian' | 'spike' | 'plateau' | 'bimodal' | 'dip' | 'leftskew' | 'rightskew' | 'uniform';
+type ShapeId = 'gaussian' | 'spike' | 'range' | 'bimodal' | 'dip' | 'leftskew' | 'rightskew' | 'uniform';
 ```
 
 | Value | Description | Generator Used |
 |-------|-------------|----------------|
 | `'gaussian'` | Standard bell curve | `generateGaussian` |
 | `'spike'` | Narrow, high-confidence gaussian | `generateGaussian` (small spread) |
-| `'plateau'` | Flat-top range belief | `generateRange` |
+| `'range'` | Flat-top range belief | `generateRange` |
 | `'bimodal'` | Two peaks (two `PointRegion`s via `generateBelief`) | `generateBelief` |
 | `'dip'` | Inverted gaussian (high at edges) | `generateDip` |
 | `'leftskew'` | Left-skewed distribution | `generateLeftSkew` |

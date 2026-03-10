@@ -31,7 +31,7 @@ function BasicTradingLayout() {
             <ConsensusChart marketId={MARKET_ID} height={655} zoomable />
           </div>
           <div style={{ flex: 3, minWidth: 0 }}>
-            <TradePanel marketId={MARKET_ID} modes={['gaussian', 'plateau']} />
+            <TradePanel marketId={MARKET_ID} modes={['gaussian', 'range']} />
           </div>
         </div>
         <PositionTable marketId={MARKET_ID} username="" tabs={['open-orders', 'trade-history', 'market-positions']} />

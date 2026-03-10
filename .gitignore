@@ -7,6 +7,7 @@ dist/
 sdk_iteration_docs/ui_images/
 .DS_Store
 .vscode/
+.claude/worktrees/
 
 # Docusaurus
 packages/docs/build/

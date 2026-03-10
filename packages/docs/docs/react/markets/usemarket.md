@@ -36,6 +36,8 @@ function useMarket(
 **Example:**
 
 ```tsx
+import { useMarket } from '@functionspace/react';
+
 function MarketHeader({ marketId }: { marketId: number }) {
   const { market, loading, error, refetch } = useMarket(marketId);
 

@@ -459,16 +459,13 @@ const { K, L, H } = market.config;
 Use any generator function to construct a normalized `BeliefVector` (a `number[]` of length `K + 1` that sums to 1).
 
 ```typescript
-import { generateGaussian, generateRange, generatePlateau, generateBelief, generateDip } from '@functionspace/core';
+import { generateGaussian, generateRange, generateBelief, generateDip } from '@functionspace/core';
 
 // Gaussian: "I think the outcome will be around 75"
 const belief = generateGaussian(75, 5, K, L, H);
 
 // Range: "I think it will land between 70 and 85"
 const rangeBelief = generateRange(70, 85, K, L, H, 0.5);
-
-// Plateau: same as Range (alias with identical signature)
-const plateauBelief = generatePlateau(70, 85, K, L, H, 1);
 
 // Dip: "Anything but 75"
 const dipBelief = generateDip(75, 5, K, L, H);
@@ -480,7 +477,7 @@ const bimodal = generateBelief([
 ], K, L, H);
 ```
 
-All L2 generators (`generateGaussian`, `generateRange`, `generatePlateau`, `generateDip`, `generateLeftSkew`, `generateRightSkew`, `generateCustomShape`) delegate to `generateBelief` internally. `generatePlateau` is an alias for `generateRange` -- they produce identical output. Use `generateBelief` directly when you need multi-region composition or fine-grained control with `PointRegion`, `RangeRegion`, or `SplineRegion` types.
+All L2 generators (`generateGaussian`, `generateRange`, `generateDip`, `generateLeftSkew`, `generateRightSkew`, `generateCustomShape`) delegate to `generateBelief` internally. Use `generateBelief` directly when you need multi-region composition or fine-grained control with `PointRegion`, `RangeRegion`, or `SplineRegion` types.
 
 ### Step 3: Execute the Trade
 
@@ -1115,7 +1112,7 @@ Regions are the building blocks for `generateBelief()`. Multiple regions combine
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | `ShapeId` | Shape identifier (e.g. `'gaussian'`, `'plateau'`) |
+| `id` | `ShapeId` | Shape identifier (e.g. `'gaussian'`, `'range'`) |
 | `name` | `string` | Human-readable display name |
 | `description` | `string` | Short description of the shape's behavior |
 | `parameters` | `('targetOutcome' \| 'confidence' \| 'rangeValues' \| 'peakBias' \| 'skewAmount')[]` | Which parameter sliders the widget should show for this shape |
@@ -1191,14 +1188,14 @@ Regions are the building blocks for `generateBelief()`. Multiple regions combine
 #### `ShapeId`
 
 ```typescript
-type ShapeId = 'gaussian' | 'spike' | 'plateau' | 'bimodal' | 'dip' | 'leftskew' | 'rightskew' | 'uniform';
+type ShapeId = 'gaussian' | 'spike' | 'range' | 'bimodal' | 'dip' | 'leftskew' | 'rightskew' | 'uniform';
 ```
 
 | Value | Description | Generator Used |
 |-------|-------------|----------------|
 | `'gaussian'` | Standard bell curve | `generateGaussian` |
 | `'spike'` | Narrow, high-confidence gaussian | `generateGaussian` (small spread) |
-| `'plateau'` | Flat-top range belief | `generateRange` |
+| `'range'` | Flat-top range belief | `generateRange` |
 | `'bimodal'` | Two peaks (two `PointRegion`s via `generateBelief`) | `generateBelief` |
 | `'dip'` | Inverted gaussian (high at edges) | `generateDip` |
 | `'leftskew'` | Left-skewed distribution | `generateLeftSkew` |

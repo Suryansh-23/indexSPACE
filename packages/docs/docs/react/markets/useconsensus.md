@@ -39,6 +39,8 @@ function useConsensus(
 **Example:**
 
 ```tsx
+import { useConsensus } from '@functionspace/react';
+
 function ConsensusSummary({ marketId }: { marketId: number }) {
   const { consensus, loading, error } = useConsensus(marketId, 300);
 

@@ -32,7 +32,7 @@ interface ConsensusSummary {
 
 ```typescript
 const summary = await queryConsensusSummary(ctx.client, marketId);
-console.log(`Expected: ${summary.mean.toFixed(1)}${market.xAxisUnits}`);
-console.log(`Most likely: ${summary.mode.toFixed(1)}${market.xAxisUnits}`);
+console.log(`Expected: ${summary.mean.toFixed(1)}`);
+console.log(`Most likely: ${summary.mode.toFixed(1)}`);
 console.log(`Spread: +/-${summary.stdDev.toFixed(1)}`);
 ```
