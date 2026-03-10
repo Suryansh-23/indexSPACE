@@ -224,7 +224,7 @@ Query functions read current protocol state from the blockchain. These functions
 Returns the complete on-chain state of a market. This is the single source of truth for all market data and serves as the foundation for all derived queries and projections.
 
 ```typescript
-const state = await queryMarketState('market-123');
+const state = await queryMarketState(client, 'market-123');
 ```
 
 **Response:**
@@ -326,7 +326,7 @@ For asymmetric bounds, use `queryPercentile` directly.
 Returns key statistical measures of the consensus distribution in a single call: mean, median, mode, variance, and standard deviation.
 
 ```typescript
-const summary = await queryConsensusSummary('market-123');
+const summary = await queryConsensusSummary(client, 'market-123');
 ```
 
 **Response:**

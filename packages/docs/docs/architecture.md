@@ -33,7 +33,7 @@ The SDK uses a layered architecture where higher layers compose lower layers. De
 
 ### Category Organisation
 
-Categories group functions by what they do, independent of their abstraction layer. A category can contain functions at L1, L2, and L3.&#x20;
+Categories group functions by what they do, independent of their abstraction layer. A category can contain functions at L1, L2, and L3.
 
 
 | Category | What It Does | Examples | Notes |
@@ -59,19 +59,61 @@ Categories group functions by what they do, independent of their abstraction lay
 
 
 
-### Example Data flow
+### Package Architecture
 
-.png)
+```
++-------------------------------------------------------+
+|                  @functionspace/ui (L3)                |
+|  Charts, Trade Inputs, Market Displays, Auth Widgets  |
+|  Composes React hooks internally                      |
++---------------------------+---------------------------+
+                            |
+                            | depends on
+                            v
++-------------------------------------------------------+
+|               @functionspace/react (L2)               |
+|  useMarket, usePositions, useAuth, useChartZoom, ...  |
+|  FunctionSpaceProvider, Theme System                  |
++---------------------------+---------------------------+
+                            |
+                            | depends on
+                            v
++-------------------------------------------------------+
+|               @functionspace/core (L1)                |
+|  API Client, Auth, Trading, Math, Queries, Discovery  |
+|  Pure TypeScript -- zero framework dependencies       |
++-------------------------------------------------------+
+```
 
-The above is an example of how the a single function will call upon one or many lower layer functions traversing the many functional layers that are composed and checked within a PayoutDesign function.
+Data flows upward from the API through these layers:
+
+```
+API Response
+    |
+    v
+Core functions (queryMarketState, buy, sell, generators)
+    |
+    v
+React hooks (useMarket, usePositions -- add loading/error/refetch)
+    |
+    v
+UI components (ConsensusChart, TradePanel -- render to DOM)
+    |
+    v
+User interaction
+```
+
+### Example Data Flow
+
+The following illustrates how a payout-targeted trade crosses multiple categories and layers.
 
 This is one of many complex scenarios that the SDK abstracts away, developers simply pass the user input and the system will convert it to a viable belief vector ready for on chain submission.
 
 The diagram shows a concrete example of layer interaction when a developer wants to create a position targeting a minimum payout. This workflow crosses multiple categories (Positions, Projections, Transactions) and multiple layers (L1, L2, L3).
 
-**Starting Point: Developer Intent (Layer 3)** The developer specifies a goal: "I want at least $X payout if the outcome falls between L and H." This enters at the Payout Design row, Layer 3. The L3 function doesn't directly generate shapes or submit transactions—it orchestrates lower layers to achieve the goal.
+**Starting Point: Developer Intent (Layer 3)** The developer specifies a goal: "I want at least $X payout if the outcome falls between L and H." This enters at the Payout Design row, Layer 3. The L3 function does not directly generate shapes or submit transactions -- it orchestrates lower layers to achieve the goal.
 
-**Shape Construction (Layers 2 → 1)** The L3 Payout Design function calls the L2 "Plateau shape" generate to request an appropriate belief shape covering the target range. The L2 generators in turn calls L1 "Raw Shape generation" to produce the actual Bernstein coefficients. This is the Belief row flowing from L3 → L2 → L1.
+**Shape Construction (Layers 2 to 1)** The L3 Payout Design function calls the L2 "Plateau shape" generate to request an appropriate belief shape covering the target range. The L2 generators in turn calls L1 "Raw Shape generation" to produce the actual Bernstein coefficients. This is the Belief row flowing from L3 to L2 to L1.
 
 **Settlement Projection (Layer 2)** The Projection row shows how the system validates the proposed position. L2 "Settlement values between L-H" computes what payout this shape would produce at various outcomes within the target range. This requires market state, which comes from the Cache.
 
@@ -80,12 +122,4 @@ The diagram shows a concrete example of layer interaction when a developer wants
 **Transaction Submission (Layer 1)** Once a valid configuration is found, the flow descends to Core layer. The arrow labeled "If Values Are Acceptable" leads to "Submit Buy" at L1, which writes the position to the blockchain.
 
 **Cache Integration** The Cache box at top provides market state to the projection calculations without requiring fresh chain reads on each iteration. This makes the iterative refinement process performant.
-
-
-
-
-
-
-
-
 

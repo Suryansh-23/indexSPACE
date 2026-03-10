@@ -10,13 +10,12 @@ const config = {
   url: 'https://docs.functionspace.org',
   baseUrl: '/',
 
-  onBrokenLinks: 'warn',
-  onBrokenMarkdownLinks: 'warn',
+  onBrokenLinks: 'throw',
+  onBrokenMarkdownLinks: 'throw',
 
   // Custom fields accessible via useDocusaurusContext().siteConfig.customFields
   customFields: {
     fsBaseUrl: 'https://fs-core-api.onrender.com',
-    fsDemoMarketId: 23,
   },
 
   i18n: {

@@ -1,0 +1,79 @@
+---
+title: "AuthWidget"
+sidebar_position: 1
+---
+
+import { AuthWidget } from '@functionspace/ui';
+import WidgetDemo from '@site/src/components/WidgetDemo';
+
+# AuthWidget
+
+**`AuthWidget`**
+
+Self-contained authentication widget handling login, signup, and logout flows across four visual states.
+
+```tsx
+import { AuthWidget } from '@functionspace/ui';
+```
+
+<WidgetDemo title="Live Demo" height="200px">
+  <AuthWidget />
+</WidgetDemo>
+
+**CSS class:** `fs-auth-widget`
+
+**Props:**
+
+| Prop                | Type                          | Default | Description                               |
+| ------------------- | ----------------------------- | ------- | ----------------------------------------- |
+| `requireAccessCode` | `boolean`                     | `false` | Show access code field on the signup form |
+| `onLogin`           | `(user: UserProfile) => void` | --      | Called after successful login             |
+| `onSignup`          | `(user: UserProfile) => void` | --      | Called after successful signup            |
+| `onLogout`          | `() => void`                  | --      | Called after logout                       |
+
+**States:**
+
+| State             | Renders                                                                                                                                  | Transitions To                                                     |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| **Idle**          | "Sign In" and "Sign Up" buttons                                                                                                          | Login form, Signup form                                            |
+| **Login form**    | Username + password fields, "Log In" submit, "Cancel", "Don't have an account? Sign up" link                                             | Idle (cancel/success), Signup form (link), Authenticated (success) |
+| **Signup form**   | Username + password + confirm password + optional access code, "Create Account" submit, "Cancel", "Already have an account? Log in" link | Idle (cancel/success), Login form (link), Authenticated (success)  |
+| **Authenticated** | Wallet balance (`$X.XX`), username, "Sign Out" button                                                                                    | Idle (sign out)                                                    |
+
+**Behavior:**
+
+* **Form validation:**
+  * Username validated on blur and signup submit via `validateUsername()` (3-32 chars, alphanumeric + `.` `-` `_`). Not called on login form submit. Inline error displays below the input.
+  * Password minimum: 6 characters. Confirm password must match.
+  * Access code field shown when `requireAccessCode` is `true`, but is not enforced -- users can leave it blank.
+* **Loading UX:** All inputs and buttons are disabled during auth operations. Submit button text changes to "Logging in..." or "Creating account...".
+* **Error handling:** The widget manages its own `formError` state from caught exceptions rather than using `useAuth().error`. Form errors display in a dedicated error area.
+* **Form reset:** All fields and errors clear on every view transition (cancel, switch forms, success).
+* **Signup flow:** After successful `signup()`, resets the form and switches view. Does NOT automatically call `login()` -- the user must log in separately.
+
+**Context interactions:**
+
+* **Reads (via `useAuth`):** `user`, `isAuthenticated`, `loading`
+* **Writes (via `useAuth`):** `login()`, `signup()`, `logout()` -- these manage token lifecycle, user profile, and invalidation counter on the Provider context.
+
+**Internal calls:** `useAuth`, `validateUsername`
+
+**Example:**
+
+```tsx
+<FunctionSpaceProvider config={config} theme="fs-dark">
+  <AuthWidget />
+</FunctionSpaceProvider>
+```
+
+```tsx
+<AuthWidget
+  requireAccessCode
+  onLogin={(user) => console.log('Welcome', user.username)}
+  onLogout={() => console.log('Signed out')}
+/>
+```
+
+**Related:** `useAuth` (hook) | `validateUsername` (core utility) | `UserProfile` (type)
+
+---

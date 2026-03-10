@@ -1,15 +1,44 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { FunctionSpaceProvider } from '@functionspace/react';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import BrowserOnly from '@docusaurus/BrowserOnly';
 
-// Inner component rendered only in the browser where useColorMode is available
+function getBaseUrl(customFields: Record<string, unknown> | undefined): string {
+  const url = customFields?.fsBaseUrl;
+  if (typeof url !== 'string' || !url) {
+    throw new Error('Missing customFields.fsBaseUrl in docusaurus.config.js');
+  }
+  return url;
+}
+
+// Read color mode from DOM instead of useColorMode hook.
+// Root is above ColorModeProvider in the Docusaurus tree, so the hook
+// is not available here. Docusaurus sets data-theme on <html>.
+function useDocusaurusColorMode(): 'dark' | 'light' {
+  const [mode, setMode] = useState<'dark' | 'light'>(() => {
+    const attr = document.documentElement.getAttribute('data-theme');
+    return attr === 'light' ? 'light' : 'dark';
+  });
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      const attr = document.documentElement.getAttribute('data-theme');
+      setMode(attr === 'light' ? 'light' : 'dark');
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  return mode;
+}
+
 function BrowserSDKProvider({ children }: { children: React.ReactNode }) {
-  // Dynamic import to avoid SSR issues -- useColorMode requires ColorModeProvider
-  const { useColorMode } = require('@docusaurus/theme-common');
   const { siteConfig } = useDocusaurusContext();
-  const { fsBaseUrl } = siteConfig.customFields as { fsBaseUrl: string };
-  const { colorMode } = useColorMode();
+  const fsBaseUrl = getBaseUrl(siteConfig.customFields as Record<string, unknown>);
+  const colorMode = useDocusaurusColorMode();
   const fsTheme = colorMode === 'dark' ? 'fs-dark' : 'fs-light';
 
   return (
@@ -27,7 +56,7 @@ function BrowserSDKProvider({ children }: { children: React.ReactNode }) {
 // SSR fallback: render provider with default dark theme
 function SSRFallbackProvider({ children }: { children: React.ReactNode }) {
   const { siteConfig } = useDocusaurusContext();
-  const { fsBaseUrl } = siteConfig.customFields as { fsBaseUrl: string };
+  const fsBaseUrl = getBaseUrl(siteConfig.customFields as Record<string, unknown>);
 
   return (
     <FunctionSpaceProvider

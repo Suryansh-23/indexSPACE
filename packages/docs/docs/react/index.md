@@ -40,13 +40,15 @@ All hooks in `@functionspace/react` require a `FunctionSpaceProvider` ancestor. 
 | `config.password`         | `string?`       | Password for auto-authentication on mount                                                                                                                                                                |
 | `config.autoAuthenticate` | `boolean?`      | Controls auto-login behavior. Auto-auth fires when this is not explicitly `false` AND both `username` and `password` are truthy. Set to `false` to suppress auto-auth even when credentials are present. |
 | `theme`                   | `FSThemeInput?` | Preset name (`"fs-dark"`, `"fs-light"`, `"native-dark"`, `"native-light"`), partial theme object with optional `preset` base, or full `FSTheme`. Defaults to `"fs-dark"`. See Theme System.              |
+| `storedUsername`          | `string \| null?` | Previously authenticated username. When provided, the Provider attempts silent re-auth on mount via `silentReAuth`. If the account requires a password, sets `showAdminLogin: true` on context. |
 | `children`                | `ReactNode`     | Child component tree                                                                                                                                                                                     |
 
 **Auth modes:**
 
 1. **Auto-auth mode** (`username` + `password` provided, `autoAuthenticate` not `false`): Calls `loginUser(client, username, password)` on mount. Renders an "Authenticating..." placeholder until the request completes. On success, sets the token on the client and stores the `UserProfile`. On failure, stores the error on `authError` but still renders children, allowing guest-mode browsing. Does not increment `invalidationCount`.
-2. **Interactive mode** (no credentials, or `autoAuthenticate: false`): Renders children immediately in guest mode (read-only market browsing). The application authenticates later by calling `login()` or `signup()` from `useAuth()`.
-3. **Guest mode** (no credentials, no intent to authenticate): Identical to interactive mode at the Provider level. All data hooks work (market data, consensus, distributions), but mutation operations require authentication.
+2. **Stored username mode** (`storedUsername` provided, no auto-auth credentials): Renders children immediately, then attempts `silentReAuth(client, storedUsername)` in the background. On success, sets the token and user. If the account requires a password (`PASSWORD_REQUIRED`), sets `showAdminLogin: true` and `pendingAdminUsername` on context so UI widgets can prompt the user. On other failures, clears the stored username.
+3. **Interactive mode** (no credentials, or `autoAuthenticate: false`): Renders children immediately in guest mode (read-only market browsing). The application authenticates later by calling `login()`, `signup()`, or `passwordlessLogin()` from `useAuth()`.
+4. **Guest mode** (no credentials, no intent to authenticate): Identical to interactive mode at the Provider level. All data hooks work (market data, consensus, distributions), but mutation operations require authentication.
 
 The exact auto-auth condition: `config.autoAuthenticate !== false && !!config.username && !!config.password`.
 
@@ -66,6 +68,10 @@ _Auth:_
 | `signup` | `(username: string, password: string, options?: SignupOptions) => Promise` | Registers via `signupUser`, then calls `loginUser` (signup returns no token). Stores user, increments `invalidationCount`. Throws on failure. |
 | `logout` | `() => void` | Clears token, user, `authError`, all preview state, and `selectedPosition`. Increments `invalidationCount`. |
 | `refreshUser` | `() => Promise` | Re-fetches the current user profile (e.g., wallet balance after trades). No-ops silently if `client.isAuthenticated` is `false`. |
+| `passwordlessLogin` | `(username: string) => Promise<PasswordlessLoginResult>` | Passwordless login or auto-signup. Sets token, stores user, increments `invalidationCount`. Throws with `code: PASSWORD_REQUIRED` for password-protected accounts. |
+| `showAdminLogin` | `boolean` | `true` when silent re-auth detected a password-protected stored username. Used by `PasswordlessAuthWidget` to auto-open an admin login prompt. |
+| `pendingAdminUsername` | `string \| null` | The username that triggered `showAdminLogin`. Pre-fills the username field in admin login forms. |
+| `clearAdminLogin` | `() => void` | Resets `showAdminLogin` and `pendingAdminUsername`. Called after successful admin login or dismissal. |
 
 
 _Preview coordination:_

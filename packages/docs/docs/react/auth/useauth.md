@@ -19,6 +19,10 @@ function useAuth(): {
   signup: (username: string, password: string, options?: SignupOptions) => Promise<UserProfile>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  passwordlessLogin: (username: string) => Promise<PasswordlessLoginResult>;
+  showAdminLogin: boolean;
+  pendingAdminUsername: string | null;
+  clearAdminLogin: () => void;
 }
 ```
 
@@ -34,6 +38,10 @@ function useAuth(): {
 | `signup`          | `(username: string, password: string, options?: SignupOptions) => Promise<UserProfile>` | Register a new user, then automatically log in (signup returns no token, so a login call follows). Increments the invalidation counter. Re-throws errors.                  |
 | `logout`          | `() => void`                                                                            | Clear token, user profile, auth error, preview state (belief and payout), and selected position. Increments the invalidation counter.                                      |
 | `refreshUser`     | `() => Promise<void>`                                                                   | Re-fetch the current user's profile (e.g., to update wallet balance after a trade). Silently fails if not authenticated.                                                   |
+| `passwordlessLogin` | `(username: string) => Promise<PasswordlessLoginResult>` | Passwordless login or auto-signup. Sets the token, stores the user, and increments the invalidation counter. Throws with `code: PASSWORD_REQUIRED` for password-protected accounts. |
+| `showAdminLogin`  | `boolean`                                                                               | `true` when silent re-auth detected a password-protected account. UI widgets use this to auto-open a password prompt.                                                      |
+| `pendingAdminUsername` | `string \| null`                                                                   | The username that triggered `showAdminLogin`. Pre-fills the username field in admin login forms.                                                                           |
+| `clearAdminLogin` | `() => void`                                                                            | Resets `showAdminLogin` and `pendingAdminUsername` to their default states. Called after successful admin login or when the user dismisses the prompt.                      |
 
 **Behavior:**
 

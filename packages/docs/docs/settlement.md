@@ -20,7 +20,7 @@ Settlement occurs after a market resolves. The unified collateral pool is distri
 Resolution state is read via `queryMarketState`. The relevant fields are:
 
 ```typescript
-const state = await queryMarketState('market-123');
+const state = await queryMarketState(client, 'market-123');
 
 // Resolution fields:
 state.resolutionState    // 'open' | 'resolved' | 'voided'

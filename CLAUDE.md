@@ -26,7 +26,7 @@ This is a strict 3-layer monorepo (`core` → `react` → `ui`) with enforced ar
 - **Never add code without reading the docs first**
 - **Run automated reviewers** after changes (architecture-reviewer, theme-reviewer — see CLAUDE.md)
 - **Use the add-hook skill** when adding React hooks (see `.claude/skills/add-hook/`)
-- **Tests must pass** before and after: `npx vitest run` + `cd demo-app && npx vite build`
+- **Tests must pass** before and after: `npx vitest run` + `cd demo-app && npx vite build` + `cd packages/docs && npx docusaurus build`
 - **Update the docs** after every implementation — if it's not in the docs, it's not done
 - **No `Co-Authored-By`** in git commits
 - **Never Use Em Dashes** every anywhere ever

@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: functionspace-docs
+    runtime: static
+    buildCommand: npm install && cd packages/docs && npm run build
+    staticPublishPath: packages/docs/build
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+    headers:
+      - path: /llms.txt
+        name: Content-Type
+        value: text/plain
+      - path: /core.txt
+        name: Content-Type
+        value: text/plain
+      - path: /react.txt
+        name: Content-Type
+        value: text/plain
+      - path: /ui.txt
+        name: Content-Type
+        value: text/plain
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

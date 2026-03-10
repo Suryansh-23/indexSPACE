@@ -26,12 +26,12 @@
 
 /* Disable auth widgets in docs - login not supported on static site */
 .fs-auth-widget form,
-.fs-passwordless-auth-widget form {
+.fs-passwordless-auth form {
   pointer-events: none;
   opacity: 0.5;
 }
 .fs-auth-widget form::after,
-.fs-passwordless-auth-widget form::after {
+.fs-passwordless-auth form::after {
   content: 'Authentication disabled in docs';
   display: block;
   text-align: center;

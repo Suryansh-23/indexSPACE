@@ -10,7 +10,8 @@ A TypeScript SDK for embedding prediction market trading widgets into web applic
 packages/
 ├── core/     # Pure TypeScript - API client, math, transactions (no React)
 ├── react/    # React integration - Provider, hooks, theme system
-└── ui/       # React components - TradePanel, ConsensusChart, etc.
+├── ui/       # React components - TradePanel, ConsensusChart, etc.
+└── docs/     # Docusaurus documentation site with live embedded widgets
 demo-app/     # Example implementation showing widget usage
 ```
 
@@ -91,14 +92,20 @@ Every new function must be classifiable by both layer AND category. This keeps t
 | Add auth widgets | `packages/ui/src/auth/` (AuthWidget, PasswordlessAuthWidget) |
 | Add chart zoom/pan math | `packages/core/src/chart/zoom.ts` |
 | Add internal UI primitives | `packages/ui/src/components/` (not exported from package root) |
+| Edit documentation content | `packages/docs/docs/` (Markdown/MDX files) |
+| Add live widget demos | `packages/docs/src/components/` (WidgetDemo wrapper, demo layouts) |
+| Edit docs site config | `packages/docs/docusaurus.config.js`, `packages/docs/src/css/custom.css` |
+| Edit docs SDK integration | `packages/docs/src/plugins/sdk-webpack-plugin.js`, `packages/docs/src/theme/Root.tsx` |
+| Update AI context files | `packages/docs/static/llms.txt`, `core.txt`, `react.txt`, `ui.txt` |
 
 ## Testing Requirements
 
 **Tests MUST pass before and after any changes.** Run from repo root:
 
 ```bash
-npx vitest run              # All tests (required)
-cd demo-app && npx vite build   # Build verification (required)
+npx vitest run                          # All tests (required)
+cd demo-app && npx vite build           # Demo app build verification (required)
+cd packages/docs && npx docusaurus build  # Docs site build verification (required)
 ```
 
 | Test File | Purpose | Update When... |
@@ -122,7 +129,8 @@ cd demo-app && npx vite build   # Build verification (required)
 ## Dev Server
 
 ```bash
-cd demo-app && npx vite dev
+cd demo-app && npx vite dev              # Demo app dev server
+cd packages/docs && npx docusaurus start  # Docs site dev server
 ```
 
 ## Theme System
@@ -240,6 +248,7 @@ If the implementation introduced anything new or improved on existing patterns, 
 | New test file added | CLAUDE.md — Testing Requirements table |
 | Architecture change | CLAUDE.md — Architecture section; PLAYBOOK.md — Layer Boundaries |
 | New agent or skill added | CLAUDE.md — Automated Reviewers or Skills section |
-| New/changed public API (widget, hook, core function) | `llms.txt` — consumer integration guide; `sdk_docs_v1.0.md` — external SDK documentation |
+| New/changed public API (widget, hook, core function) | `llms.txt` -- consumer integration guide; `sdk_docs_v1.0.md` -- external SDK documentation; `packages/docs/` -- Docusaurus docs if relevant page exists |
+| Docs site structure change | `packages/docs/docusaurus.config.js`, `packages/docs/sidebars.js` |
 
 **If you added it to the code but not to the docs, the work is not done.**
