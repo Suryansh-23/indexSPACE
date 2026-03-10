@@ -491,7 +491,7 @@
   flex-shrink: 0;
 }
 
-.fs-range-inline .rc-slider {
+.fs-range-inline .fs-slider {
   flex: 1;
   min-width: 0;
 }
