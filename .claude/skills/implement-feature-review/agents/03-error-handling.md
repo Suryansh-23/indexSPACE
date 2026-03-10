@@ -4,13 +4,16 @@
 
 You are an adversarial reviewer focused on correctness. Your job is to find every async function, state management pattern, and side effect in the changed files and verify they handle errors, edge cases, race conditions, and cleanup correctly. Assume every async call will fail, every input will be null, and every effect will need cleanup.
 
-## Prerequisites — Read These First
+## Prerequisites --Read These First
 
 Read these files completely before reviewing any code:
 
-1. `sdk_iteration_docs/CLAUDE.md` — Architecture rules, hook patterns, state management
-2. `sdk_iteration_docs/PLAYBOOK.md` — Trade input pattern (three-phase), cleanup requirements
-3. `{HANDOFF_DOC_PATH}` — What was being built (for context on expected behavior)
+1. `sdk_iteration_docs/CLAUDE.md` -- Architecture rules, hook patterns, state management
+2. `sdk_iteration_docs/PLAYBOOK.md` -- Trade input pattern (three-phase), cleanup requirements
+3. `{HANDOFF_DOC_PATH}` -- What was being built (for context on expected behavior)
+4. `{PLAN_PATH}` -- The implementation plan (if available). Contains intended behavior, error handling expectations, and work stream structure. Useful for understanding what error paths should exist.
+
+If `{PLAN_PATH}` says "NOT FOUND -- artifact missing", skip it.
 
 ## Changed Files
 
@@ -28,7 +31,7 @@ List every `async` function in the changed files. For each one, check:
 |-------|-----------------|
 | try/catch exists | Is the async body wrapped in try/catch? |
 | catch quality | Does catch do something useful? (Not just `console.error` and swallow) |
-| loading state reset | Is `setLoading(false)` in a `finally` block? (Not just in try — must reset on error too) |
+| loading state reset | Is `setLoading(false)` in a `finally` block? (Not just in try --must reset on error too) |
 | error state set | Is `setError(err)` called in the catch block? |
 | error state cleared | Is `setError(null)` called before the async operation starts? |
 
@@ -39,9 +42,9 @@ Use the **Grep tool** (NOT bash grep) to find all async functions in the changed
 ### 2. Check for Discarded Return Values
 
 Find every `await` call and verify the return value is captured when it matters:
-- `await buy(...)` — return value contains success/failure info
-- `await queryMarketState(...)` — return value is the data
-- `await ctx.invalidate(...)` — void return, OK to discard
+- `await buy(...)` --return value contains success/failure info
+- `await queryMarketState(...)` --return value is the data
+- `await ctx.invalidate(...)` --void return, OK to discard
 
 Use the **Grep tool** to find all await calls that might discard returns:
 - Pattern: `await `
@@ -60,8 +63,8 @@ For each function in the changed files, think through:
 
 Look for these patterns:
 - **Stale closure**: `useCallback` or `useEffect` that captures state but doesn't include it in deps
-- **State overwrite**: Two rapid calls where the second completes before the first — does the first's result overwrite the second's?
-- **Navigation during async**: User navigates away while an operation is pending — does the resolved promise try to set state on an unmounted component?
+- **State overwrite**: Two rapid calls where the second completes before the first --does the first's result overwrite the second's?
+- **Navigation during async**: User navigates away while an operation is pending --does the resolved promise try to set state on an unmounted component?
 - **Missing cleanup**: `useEffect` without a cleanup function when it starts async work
 
 ### 5. useEffect & useCallback Dependency Audit
@@ -129,7 +132,7 @@ Write your findings to `{OUTPUT_DIR}/05-error-handling.md` in this exact format:
 
 ## Three-Phase Pattern Compliance (if applicable)
 
-[Assessment of trade input pattern — or N/A]
+[Assessment of trade input pattern --or N/A]
 
 ## Findings by Severity
 

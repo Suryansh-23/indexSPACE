@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FunctionSpaceProvider, useDistributionState } from '@functionspace/react';
 import {
-  ConsensusChart, TradePanel, MarketStats, PositionTable, AuthWidget,
+  ConsensusChart, TradePanel, MarketStats, PositionTable, PasswordlessAuthWidget,
   MarketCharts, ShapeCutter, BinaryPanel, TimelineChart, CustomShapeEditor,
   BucketRangeSelector,
 } from '@functionspace/ui';
@@ -24,7 +24,7 @@ function BasicTradingLayout() {
       <FunctionSpaceProvider config={noAuthConfig} theme={theme}>
         <div style={{ display: 'flex', gap: '1rem' }}>
           <div style={{ flex: 7, minWidth: 0 }}><MarketStats marketId={MARKET_ID} /></div>
-          <div style={{ flex: 3, minWidth: 0 }}><AuthWidget /></div>
+          <div style={{ flex: 3, minWidth: 0 }}><PasswordlessAuthWidget /></div>
         </div>
         <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', marginBottom: '1rem', minHeight: '520px' }}>
           <div style={{ flex: 7, minWidth: 0 }}>
@@ -46,7 +46,7 @@ function BinaryPanelLayout() {
       <FunctionSpaceProvider config={noAuthConfig} theme={theme}>
         <div style={{ display: 'flex', gap: '1rem' }}>
           <div style={{ flex: 7, minWidth: 0 }}><MarketStats marketId={MARKET_ID} /></div>
-          <div style={{ flex: 3, minWidth: 0 }}><AuthWidget /></div>
+          <div style={{ flex: 3, minWidth: 0 }}><PasswordlessAuthWidget /></div>
         </div>
         <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
           <MarketCharts marketId={MARKET_ID} height={400} views={['consensus', 'distribution']} zoomable />
@@ -81,7 +81,7 @@ function CustomShapeLayout() {
       <FunctionSpaceProvider config={noAuthConfig} theme={theme}>
         <div style={{ display: 'flex', gap: '1rem' }}>
           <div style={{ flex: 7, minWidth: 0 }}><MarketStats marketId={MARKET_ID} /></div>
-          <div style={{ flex: 3, minWidth: 0 }}><AuthWidget /></div>
+          <div style={{ flex: 3, minWidth: 0 }}><PasswordlessAuthWidget /></div>
         </div>
         <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
           <CustomShapeEditor marketId={MARKET_ID} zoomable />
@@ -98,7 +98,7 @@ function DistRangeContent() {
     <>
       <div style={{ display: 'flex', gap: '1rem' }}>
         <div style={{ flex: 7, minWidth: 0 }}><MarketStats marketId={MARKET_ID} /></div>
-        <div style={{ flex: 3, minWidth: 0 }}><AuthWidget /></div>
+        <div style={{ flex: 3, minWidth: 0 }}><PasswordlessAuthWidget /></div>
       </div>
       <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
         <MarketCharts marketId={MARKET_ID} height={350} views={['consensus', 'distribution']} distributionState={distState} zoomable />
@@ -126,7 +126,7 @@ function ShapeCutterLayout() {
       <FunctionSpaceProvider config={noAuthConfig} theme={theme}>
         <div style={{ display: 'flex', gap: '1rem' }}>
           <div style={{ flex: 7, minWidth: 0 }}><MarketStats marketId={MARKET_ID} /></div>
-          <div style={{ flex: 3, minWidth: 0 }}><AuthWidget /></div>
+          <div style={{ flex: 3, minWidth: 0 }}><PasswordlessAuthWidget /></div>
         </div>
         <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
           <MarketCharts marketId={MARKET_ID} height={350} views={['consensus', 'distribution', 'timeline']} zoomable />
@@ -146,7 +146,7 @@ function TimelineBinaryLayout() {
       <FunctionSpaceProvider config={noAuthConfig} theme={theme}>
         <div style={{ display: 'flex', gap: '1rem' }}>
           <div style={{ flex: 7, minWidth: 0 }}><MarketStats marketId={MARKET_ID} /></div>
-          <div style={{ flex: 3, minWidth: 0 }}><AuthWidget /></div>
+          <div style={{ flex: 3, minWidth: 0 }}><PasswordlessAuthWidget /></div>
         </div>
         <div style={{ marginTop: '1rem' }}>
           <TimelineChart marketId={MARKET_ID} height={500} zoomable />

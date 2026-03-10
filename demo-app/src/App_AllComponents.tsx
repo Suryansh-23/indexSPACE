@@ -1,7 +1,7 @@
 import { FunctionSpaceProvider, useDistributionState } from '@functionspace/react';
 import {
   MarketStats,
-  AuthWidget,
+  PasswordlessAuthWidget,
   ConsensusChart,
   DistributionChart,
   TimelineChart,
@@ -32,7 +32,7 @@ function AllComponentsInner() {
       </div>
 
       <div data-capture="AuthWidget" style={{ marginBottom: '2rem', maxWidth: 400 }}>
-        <AuthWidget />
+        <PasswordlessAuthWidget />
       </div>
 
       <div data-capture="ConsensusChart" style={{ marginBottom: '2rem' }}>

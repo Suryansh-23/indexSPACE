@@ -1,5 +1,5 @@
 import { FunctionSpaceProvider } from '@functionspace/react';
-import { MarketCharts, BinaryPanel, MarketStats, PositionTable, AuthWidget } from '@functionspace/ui';
+import { MarketCharts, BinaryPanel, MarketStats, PositionTable, PasswordlessAuthWidget } from '@functionspace/ui';
 import { ArticlePage } from './pages/ArticlePage';
 import { config, MARKET_ID, widgetTheme } from './App';
 
@@ -14,7 +14,7 @@ export default function App_BinaryPanel() {
             <MarketStats marketId={MARKET_ID} />
           </div>
           <div style={{ flex: 3, minWidth: 0 }}>
-            <AuthWidget />
+            <PasswordlessAuthWidget />
           </div>
         </div>
 

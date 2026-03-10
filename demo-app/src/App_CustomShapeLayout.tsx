@@ -1,5 +1,5 @@
 import { FunctionSpaceProvider } from '@functionspace/react';
-import { CustomShapeEditor, MarketStats, PositionTable, AuthWidget } from '@functionspace/ui';
+import { CustomShapeEditor, MarketStats, PositionTable, PasswordlessAuthWidget } from '@functionspace/ui';
 import { ArticlePage } from './pages/ArticlePage';
 import { config, MARKET_ID, widgetTheme } from './App';
 
@@ -13,7 +13,7 @@ export default function App_CustomShapeLayout() {
             <MarketStats marketId={MARKET_ID} />
           </div>
           <div style={{ flex: 3, minWidth: 0 }}>
-            <AuthWidget />
+            <PasswordlessAuthWidget />
           </div>
         </div>
 

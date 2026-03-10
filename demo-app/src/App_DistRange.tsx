@@ -1,5 +1,5 @@
 import { FunctionSpaceProvider, useDistributionState } from '@functionspace/react';
-import { MarketCharts, MarketStats, BucketRangeSelector, AuthWidget } from '@functionspace/ui';
+import { MarketCharts, MarketStats, BucketRangeSelector, PasswordlessAuthWidget } from '@functionspace/ui';
 import { ArticlePage } from './pages/ArticlePage';
 import { config, MARKET_ID, widgetTheme } from './App';
 
@@ -14,7 +14,7 @@ function DistRangeContent() {
             <MarketStats marketId={MARKET_ID} />
           </div>
           <div style={{ flex: 3, minWidth: 0 }}>
-            <AuthWidget />
+            <PasswordlessAuthWidget />
           </div>
         </div>
 
