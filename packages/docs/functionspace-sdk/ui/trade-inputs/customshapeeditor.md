@@ -1,0 +1,64 @@
+# CustomShapeEditor
+
+**`CustomShapeEditor`**
+
+A chart-integrated trading panel where users **draw their belief directly** by dragging control points on a probability density chart. The most expressive trading component.
+
+```tsx
+import { CustomShapeEditor } from '@functionspace/ui';
+```
+
+<figure><img src="../../../.gitbook/assets/CustomShapeEditor.png" alt=""><figcaption></figcaption></figure>
+
+**CSS class:** `fs-custom-shape`
+
+**Props:**
+
+| Prop               | Type                          | Default  | Description                                                         |
+| ------------------ | ----------------------------- | -------- | ------------------------------------------------------------------- |
+| `marketId`         | `string \| number`            | required | Market to trade on                                                  |
+| `defaultNumPoints` | `number`                      | `20`     | Initial control point count (5–25)                                  |
+| `zoomable`         | `boolean`                     | --       | Enable chart zoom/pan (control dots are excluded from pan triggers) |
+| `onBuy`            | `(result: BuyResult) => void` | --       | Called after successful trade                                       |
+| `onError`          | `(error: Error) => void`      | --       | Called on trade failure                                             |
+
+**Behavior:**
+
+* **Chart area:** Embeds its own consensus chart (height 280px) rendering the consensus curve (background), user's belief curve (dashed), and optional selected position overlay from context. SVG control dots are positioned using Recharts axis scale functions for pixel-perfect alignment.
+* **Drag interaction:** Control dots respond to mouse/touch drag events. Vertical movement maps to value (0–25). Global listeners are attached during drag for smooth tracking.
+* **Vertical sliders:** A row of sliders below the chart mirrors the control points. Each slider can be dragged independently.
+* **Locking:** Up to 2 control points can be locked, preventing edits. Locked dots display in the consensus color with a `not-allowed` cursor. Locks use FIFO — locking a third point drops the oldest lock.
+* **Point count:** Adjustable slider (5–25). Changing the count resets all values to a bell shape and clears locks.
+* **Y-axis capping:** Overlay curves (preview, selected position) are capped at 4x the consensus maximum density to prevent the consensus curve from being visually squished.
+* **Loading/error states:** Renders "Loading..." or "Error: {message}" when market data is unavailable.
+* **Trade form:** Below the sliders, a trade summary section displays the current prediction, peak payout, and max loss (equal to collateral). An amount input (default 100 USDC) and submit button complete the trade execution form — the same pattern as other trading widgets.
+* **Post-trade reset:** Calls `resetToDefault()`, regenerating a bell shape and clearing locks.
+* **Prediction:** The mode (peak) of the belief distribution is derived from `useCustomShape` (which internally uses `computeStatistics`) and passed to `buy()`.
+
+**Context interactions:**
+
+* **Reads:** `ctx.client`, `ctx.chartColors`, `ctx.selectedPosition` (renders belief overlay), `ctx.previewPayout` (tooltip data)
+* **Writes:** `ctx.setPreviewBelief(belief)` on control value change, `ctx.setPreviewPayout(result)` after debounced projection, clears both on unmount
+* **Triggers:** `ctx.invalidate(marketId)` after successful buy
+
+**Internal calls:** `useMarket`, `useConsensus`, `useCustomShape`, `evaluateDensityCurve`, `useChartZoom`, `rechartsPlotArea`, `projectPayoutCurve`, `buy`
+
+**Example:**
+
+```tsx
+<FunctionSpaceProvider config={config} theme="fs-dark">
+  <CustomShapeEditor marketId={42} zoomable />
+</FunctionSpaceProvider>
+```
+
+```tsx
+<CustomShapeEditor
+  marketId={42}
+  defaultNumPoints={15}
+  onBuy={(result) => console.log('Position:', result.positionId)}
+/>
+```
+
+**Related:** `useCustomShape` (hook managing control point state) | `ConsensusChart` (shares the same context reads for preview/position overlays) | `generateCustomShape` (core position generator)
+
+***

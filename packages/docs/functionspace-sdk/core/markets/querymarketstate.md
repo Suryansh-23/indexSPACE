@@ -1,0 +1,63 @@
+# queryMarketState
+
+**`queryMarketState(client, marketId)`**
+
+**Layer:** L1. Fetches the complete state of a single market. This is the most important market function. It returns the alpha vector, the derived consensus distribution, market config (`K`, `L`, `H`, and AMM parameters), metadata (title, units, decimals), and resolution status.
+
+```typescript
+async function queryMarketState(
+  client: FSClient,
+  marketId: string | number,
+): Promise<MarketState>
+```
+
+**Returns `MarketState`:**
+
+```typescript
+interface MarketState {
+  alpha: number[];            // Raw alpha vector from the AMM
+  consensus: number[];        // Normalized probability distribution (alpha / sum(alpha))
+  totalMass: number;          // Sum of alpha vector
+  poolBalance: number;        // Current collateral pool
+  participantCount: number;   // Total positions ever created
+  totalVolume: number;        // Total collateral traded
+  positionsOpen: number;      // Currently open positions
+  config: MarketConfig;       // { K, L, H, P0, mu, epsAlpha, tau, gamma, lambdaS, lambdaD }
+  title: string;              // Market question text
+  xAxisUnits: string;         // Unit label for outcome axis (e.g., "°F", "USD")
+  decimals: number;           // Display precision for outcome values
+  resolutionState: 'open' | 'resolved' | 'voided';
+  resolvedOutcome: number | null;  // Settlement value (null if unresolved)
+}
+```
+
+The `config` object contains the parameters you need for building beliefs (`K`, `L`, `H`) and the AMM parameters that govern market behavior:
+
+| Config Field | Description                                                    |
+| ------------ | -------------------------------------------------------------- |
+| `K`          | Number of outcome buckets. Belief vectors have length `K + 1`. |
+| `L`          | Lower bound of outcome space.                                  |
+| `H`          | Upper bound of outcome space.                                  |
+| `P0`         | Initial pool size.                                             |
+| `mu`         | AMM sensitivity parameter.                                     |
+| `epsAlpha`   | Minimum alpha per bucket (prevents zero probability).          |
+| `tau`        | Fee parameter for trades.                                      |
+| `gamma`      | Market maker spread parameter.                                 |
+| `lambdaS`    | Sell-side liquidity parameter.                                 |
+| `lambdaD`    | Deposit-side liquidity parameter.                              |
+
+**Example:**
+
+```typescript
+const market = await queryMarketState(ctx.client, 42);
+
+console.log(market.title);                    // "What will the high temperature be on Jan 1?"
+console.log(market.xAxisUnits);               // "°F"
+console.log(market.config.L, market.config.H); // 30, 110
+console.log(market.resolutionState);           // "open"
+
+// The consensus vector is what charts render
+const peakBucket = market.consensus.indexOf(Math.max(...market.consensus));
+const peakOutcome = market.config.L + (peakBucket / market.config.K) * (market.config.H - market.config.L);
+console.log(`Market mode: ~${peakOutcome}°F`);
+```
