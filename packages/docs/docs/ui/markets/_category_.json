@@ -1,0 +1,8 @@
+{
+  "label": "Markets",
+  "position": 5,
+  "link": {
+    "type": "doc",
+    "id": "ui/markets/index"
+  }
+}

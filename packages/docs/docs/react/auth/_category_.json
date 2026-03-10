@@ -1,0 +1,8 @@
+{
+  "label": "Auth",
+  "position": 4,
+  "link": {
+    "type": "doc",
+    "id": "react/auth/index"
+  }
+}

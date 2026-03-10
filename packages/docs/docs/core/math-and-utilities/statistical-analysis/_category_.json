@@ -1,0 +1,8 @@
+{
+  "label": "Statistical Analysis",
+  "position": 2,
+  "link": {
+    "type": "doc",
+    "id": "core/math-and-utilities/statistical-analysis/index"
+  }
+}
