@@ -1,10 +1,10 @@
 import { FunctionSpaceProvider } from '@functionspace/react';
-import { CustomShapeEditor, MarketStats, PositionTable, AuthWidget } from '@functionspace/ui';
+import { MarketCharts, DistributionChart, ShapeCutter, MarketStats, PositionTable, TimeSales, PasswordlessAuthWidget, BinaryPanel } from '@functionspace/ui';
 import { ArticlePage } from './pages/ArticlePage';
 import { config, MARKET_ID, widgetTheme } from './App';
 
 // Reusable layout content (used by both demo-app and docs site)
-export function CustomShapeLayout({ marketId, username }: { marketId: string | number; username?: string }) {
+export function ShapeCutterTradingLayout({ marketId, username }: { marketId: string | number; username?: string }) {
   return (
     <>
       <div style={{ display: 'flex', gap: '1rem' }}>
@@ -12,27 +12,35 @@ export function CustomShapeLayout({ marketId, username }: { marketId: string | n
           <MarketStats marketId={marketId} />
         </div>
         <div style={{ flex: 3, minWidth: 0 }}>
-          <AuthWidget />
+          <PasswordlessAuthWidget />
         </div>
       </div>
 
       <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
-        <CustomShapeEditor marketId={marketId} zoomable />
+        <MarketCharts marketId={marketId} height={350} views={['consensus', 'distribution', 'timeline']} zoomable />
       </div>
 
-      <div>
+      <div style={{ marginBottom: '1rem' }}>
+        <ShapeCutter marketId={marketId} />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr' }}>
         <PositionTable marketId={marketId} username={username} tabs={['open-orders', 'trade-history', 'market-positions']} />
       </div>
+      <BinaryPanel
+        marketId={marketId}
+        xPoint={{ mode: 'static', value: 91 }}
+      />
     </>
   );
 }
 
-// Custom Shape trading layout: MarketStats + Auth, CustomShapeEditor, PositionTable
-export default function App_CustomShapeLayout() {
+// ShapeCutter trading layout: chart with tabs, ShapeCutter below
+export default function App_ShapeCutterTradingLayout() {
   return (
     <ArticlePage widgetWidth="150%">
       <FunctionSpaceProvider config={config} theme={widgetTheme}>
-        <CustomShapeLayout marketId={MARKET_ID} username={config.username} />
+        <ShapeCutterTradingLayout marketId={MARKET_ID} username={config.username} />
       </FunctionSpaceProvider>
     </ArticlePage>
   );

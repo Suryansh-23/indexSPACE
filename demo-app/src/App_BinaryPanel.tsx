@@ -14,7 +14,7 @@ export function BinaryPanelLayout({ marketId, username }: { marketId: string | n
           <MarketStats marketId={marketId} />
         </div>
         <div style={{ flex: 3, minWidth: 0 }}>
-          <AuthWidget />
+          <PasswordlessAuthWidget />
         </div>
       </div>
 

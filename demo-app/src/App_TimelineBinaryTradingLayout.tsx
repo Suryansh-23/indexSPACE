@@ -12,7 +12,7 @@ export function TimelineBinaryLayout({ marketId }: { marketId: string | number }
           <MarketStats marketId={marketId} />
         </div>
         <div style={{ flex: 3, minWidth: 0 }}>
-          <AuthWidget />
+            <PasswordlessAuthWidget />
         </div>
       </div>
 

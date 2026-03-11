@@ -15,7 +15,7 @@ export function BasicTradingLayout({ marketId, username }: { marketId: string | 
           <MarketStats marketId={marketId} />
         </div>
         <div style={{ flex: 3, minWidth: 0 }}>
-          <AuthWidget />
+          <PasswordlessAuthWidget />
         </div>
       </div>
 
