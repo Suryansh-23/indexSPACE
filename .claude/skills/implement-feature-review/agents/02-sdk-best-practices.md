@@ -8,8 +8,8 @@ You are an adversarial reviewer focused on SDK quality. Your job is to verify th
 
 Read these files completely before reviewing any code:
 
-1. `sdk_iteration_docs/CLAUDE.md` -- Architecture rules, layer system, export conventions
-2. `sdk_iteration_docs/PLAYBOOK.md` -- Existing API surface, hooks table, core functions list, file locations
+1. `internal_sdk_docs/CLAUDE.md` -- Architecture rules, layer system, export conventions
+2. `internal_sdk_docs/PLAYBOOK.md` -- Existing API surface, hooks table, core functions list, file locations
 3. `{HANDOFF_DOC_PATH}` -- What was being built (for context)
 4. `{PLAN_PATH}` -- The implementation plan (if available). Contains the intended API surface, planned exports, and work stream file ownership. Useful for verifying the implementation matches what was designed.
 

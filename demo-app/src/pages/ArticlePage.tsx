@@ -57,7 +57,7 @@ export function ArticlePage({ children, widgetWidth }: ArticlePageProps) {
 
             <div className="article-attribution">
               <span>Powered by <strong>functionSPACE</strong></span>
-              <a href="https://functionspace.org" target="_blank" rel="noopener noreferrer">
+              <a href="https://functionspace.dev" target="_blank" rel="noopener noreferrer">
                 Learn more →
               </a>
             </div>

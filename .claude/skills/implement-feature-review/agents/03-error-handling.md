@@ -8,8 +8,8 @@ You are an adversarial reviewer focused on correctness. Your job is to find ever
 
 Read these files completely before reviewing any code:
 
-1. `sdk_iteration_docs/CLAUDE.md` -- Architecture rules, hook patterns, state management
-2. `sdk_iteration_docs/PLAYBOOK.md` -- Trade input pattern (three-phase), cleanup requirements
+1. `internal_sdk_docs/CLAUDE.md` -- Architecture rules, hook patterns, state management
+2. `internal_sdk_docs/PLAYBOOK.md` -- Trade input pattern (three-phase), cleanup requirements
 3. `{HANDOFF_DOC_PATH}` -- What was being built (for context on expected behavior)
 4. `{PLAN_PATH}` -- The implementation plan (if available). Contains intended behavior, error handling expectations, and work stream structure. Useful for understanding what error paths should exist.
 

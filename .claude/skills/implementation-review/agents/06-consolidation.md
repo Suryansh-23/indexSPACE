@@ -17,8 +17,8 @@ Read these files:
 7. `{OUTPUT_DIR}/07-code-quality.md` — Agent 7 findings
 
 Also read:
-- `sdk_iteration_docs/CLAUDE.md` — for doc update recommendations
-- `sdk_iteration_docs/PLAYBOOK.md` — for doc update recommendations
+- `internal_sdk_docs/CLAUDE.md` — for doc update recommendations
+- `internal_sdk_docs/PLAYBOOK.md` — for doc update recommendations
 - `{HANDOFF_DOC_PATH}` — original requirements
 
 ## Your Process
@@ -62,7 +62,7 @@ Report the full output. Any failures here are CRITICAL regardless of what the co
 
 ### 6. Assess Living Doc Accuracy
 
-Check whether `sdk_iteration_docs/CLAUDE.md` and `sdk_iteration_docs/PLAYBOOK.md` accurately reflect the current codebase after these changes:
+Check whether `internal_sdk_docs/CLAUDE.md` and `internal_sdk_docs/PLAYBOOK.md` accurately reflect the current codebase after these changes:
 - Are new hooks listed in the Available Hooks table?
 - Are new components listed in the File Locations section?
 - Are new core functions in the Core Functions list?
@@ -170,10 +170,10 @@ For each file that needs changes, list every required modification:
 
 Changes needed in the living documentation:
 
-### sdk_iteration_docs/CLAUDE.md
+### internal_sdk_docs/CLAUDE.md
 [Specific additions, corrections, or removals needed]
 
-### sdk_iteration_docs/PLAYBOOK.md
+### internal_sdk_docs/PLAYBOOK.md
 [Specific additions, corrections, or removals needed]
 
 ---
@@ -197,7 +197,7 @@ Also write to `{OUTPUT_DIR}/doc-updates-draft.md`:
 
 Based on the implementation review of {FEATURE_NAME}.
 
-## sdk_iteration_docs/CLAUDE.md
+## internal_sdk_docs/CLAUDE.md
 
 ### Additions
 [Exact text to add, with the section it belongs in]
@@ -208,7 +208,7 @@ Based on the implementation review of {FEATURE_NAME}.
 ### Warnings to Add
 [New patterns or anti-patterns discovered during review that should be documented]
 
-## sdk_iteration_docs/PLAYBOOK.md
+## internal_sdk_docs/PLAYBOOK.md
 
 ### Additions
 [Exact text to add, with the section it belongs in]

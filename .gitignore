@@ -4,7 +4,7 @@ dist/
 *.tsbuildinfo
 .vite/
 /Docs/
-sdk_iteration_docs/ui_images/
+internal_sdk_docs/ui_images/
 .DS_Store
 .vscode/
 .claude/worktrees/

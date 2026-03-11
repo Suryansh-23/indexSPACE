@@ -12,8 +12,8 @@ You are the orchestrator for a multi-agent adversarial code review. Your job is 
 
 Read these files completely before doing anything else:
 
-1. `sdk_iteration_docs/CLAUDE.md` — Architecture rules, constraints, testing requirements
-2. `sdk_iteration_docs/PLAYBOOK.md` — Checklists, patterns, existing widget/hook/function reference
+1. `internal_sdk_docs/CLAUDE.md` — Architecture rules, constraints, testing requirements
+2. `internal_sdk_docs/PLAYBOOK.md` — Checklists, patterns, existing widget/hook/function reference
 3. The handoff document at `$ARGUMENTS` — This is the spec. Read it fully. This tells you what was SUPPOSED to be built.
 
 If `$ARGUMENTS` is empty or the file doesn't exist, ask the user to provide the path to the handoff/plan document that was used for implementation.

@@ -2,6 +2,17 @@
 
 A TypeScript SDK for embedding prediction market trading widgets into web applications. Developers install the packages via npm and drop in themed, interactive components that handle market visualization, trade input, and position management.
 
+> **Note:** These packages are not yet published to npm. To use the SDK, clone
+> this repository and use npm workspace linking. The `npm install` commands in
+> the docs are forward-looking and will work once packages are published.
+
+## Documentation
+
+- **Live docs:** [docs.functionspace.dev](https://docs.functionspace.dev)
+- **Docs source:** `packages/docs/` (Docusaurus 3 site with live widget demos)
+- **AI context files:** `packages/docs/static/` -- `llms.txt`, `core.txt`, `react.txt`, `ui.txt`
+- **Internal dev docs:** `internal_sdk_docs/` -- `CLAUDE.md`, `PLAYBOOK.md`, `REACT_ROADMAP.md`
+
 ## Architecture
 
 The SDK is split into three layers with strict dependency boundaries. Each layer can be used independently -- consumers pick the level of abstraction they need.
@@ -326,12 +337,18 @@ npx vitest run
 | `tests/stage1.test.ts` | Core math functions (position generators, density evaluation) |
 | `tests/stage2.test.ts` | API / transaction functions |
 | `tests/chart-zoom.test.ts` | Chart zoom/pan utilities (domain computation, pixel mapping, data filtering) |
+| `tests/cache.test.ts` | QueryCache class unit tests (deduplication, staleness, revalidation) |
+| `tests/client-signal.test.ts` | FSClient signal forwarding and request cancellation |
+| `tests/components.test.tsx` | Widget smoke tests (provider guard, loading, error, primary action, cleanup) |
 
 ### Build Verification
 
 ```bash
 cd demo-app && npx vite build
+cd packages/docs && npx docusaurus build
 ```
+
+(The Docusaurus build verifies no broken links in documentation.)
 
 ## Project Structure
 

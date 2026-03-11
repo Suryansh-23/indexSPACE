@@ -100,8 +100,8 @@ When adding a new hook, complete ALL of these steps:
   ```
 
 ### 6. Update docs
-- Add to `sdk_iteration_docs/PLAYBOOK.md` Available Hooks table
-- Add to `sdk_iteration_docs/CLAUDE.md` if a new test file was created
+- Add to `internal_sdk_docs/PLAYBOOK.md` Available Hooks table
+- Add to `internal_sdk_docs/CLAUDE.md` if a new test file was created
 
 ## Layer Rules
 - Hooks live in `packages/react/src/` — they import from `@functionspace/core` only

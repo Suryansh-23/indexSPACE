@@ -23,8 +23,8 @@ Read the full plan excerpt and convention notes. Then read every file in your ow
 Also read the pattern reference files to understand exactly how your implementation should look.
 
 Read these project docs for rules:
-- `sdk_iteration_docs/CLAUDE.md` -- Architecture rules
-- `sdk_iteration_docs/PLAYBOOK.md` -- Checklists and patterns
+- `internal_sdk_docs/CLAUDE.md` -- Architecture rules
+- `internal_sdk_docs/PLAYBOOK.md` -- Checklists and patterns
 
 ### Step 2: Create Action Plan
 

@@ -8,8 +8,8 @@ You are a pre-implementation validator. Your job is to find missing steps, unacc
 
 Read these files completely:
 
-1. `sdk_iteration_docs/CLAUDE.md` -- Architecture rules, layer system, testing requirements, doc update matrix
-2. `sdk_iteration_docs/PLAYBOOK.md` -- SDK Expansion Checklist, step-by-step guides, file locations
+1. `internal_sdk_docs/CLAUDE.md` -- Architecture rules, layer system, testing requirements, doc update matrix
+2. `internal_sdk_docs/PLAYBOOK.md` -- SDK Expansion Checklist, step-by-step guides, file locations
 3. `{PLAN_PATH}` -- The implementation plan to validate
 
 ## Your Validation Checklist

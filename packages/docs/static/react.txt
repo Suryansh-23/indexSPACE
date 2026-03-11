@@ -11,6 +11,10 @@ Install (headless React -- hooks only, no pre-built components):
   npm install @functionspace/core @functionspace/react
 ```
 
+> **Note:** These packages are not yet published to npm. To use the SDK,
+> clone the repository and use npm workspace linking. The `npm install`
+> commands below are forward-looking and will work once packages are published.
+
 ## Table of Contents
 
 - [1. Overview](#1-overview)

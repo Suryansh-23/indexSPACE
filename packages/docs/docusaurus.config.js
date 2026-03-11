@@ -7,7 +7,7 @@ const config = {
   tagline: 'Build probability trading interfaces',
   favicon: 'img/favicon.ico',
 
-  url: 'https://docs.functionspace.org',
+  url: 'https://docs.functionspace.dev',
   baseUrl: '/',
 
   onBrokenLinks: 'throw',

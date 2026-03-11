@@ -11,9 +11,9 @@ You are implementing a new feature or improvement in the FunctionSpace Trading S
 
 Before doing ANYTHING else, read these three files completely:
 
-1. `sdk_iteration_docs/CLAUDE.md` — Architecture, constraints, layer rules, testing, reviewers
-2. `sdk_iteration_docs/PLAYBOOK.md` — Step-by-step guides, checklists, existing widget reference, core functions list
-3. `sdk_iteration_docs/REACT_ROADMAP.md` — React layer evolution, caching strategy, hook patterns
+1. `internal_sdk_docs/CLAUDE.md` — Architecture, constraints, layer rules, testing, reviewers
+2. `internal_sdk_docs/PLAYBOOK.md` — Step-by-step guides, checklists, existing widget reference, core functions list
+3. `internal_sdk_docs/REACT_ROADMAP.md` — React layer evolution, caching strategy, hook patterns
 
 These are the source of truth. If the code disagrees with the docs, the code is wrong.
 
@@ -118,7 +118,7 @@ Fix any issues the reviewers flag before proceeding.
 
 This is NOT optional. If it's not in the docs, the work is not done.
 
-Consult the update matrix in `sdk_iteration_docs/CLAUDE.md` (Step 3: Update the docs) and update:
+Consult the update matrix in `internal_sdk_docs/CLAUDE.md` (Step 3: Update the docs) and update:
 
 | What changed | Update in... |
 |---|---|

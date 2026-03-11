@@ -2,6 +2,10 @@
 
 This document is a comprehensive implementation guide for AI coding assistants integrating the FunctionSpace Trading SDK into web applications. It covers all integration modes -- from drop-in widget embedding to headless custom UI to core-only non-React usage -- with complete, runnable code examples, type references, and explicit constraint rules. Use the decision tree in Section 3 to identify your integration mode, then follow the corresponding section.
 
+> **Note:** These packages are not yet published to npm. To use the SDK,
+> clone the repository and use npm workspace linking. The `npm install`
+> commands below are forward-looking and will work once packages are published.
+
 ## Table of Contents
 
 - [1. Overview](#1-overview)
@@ -3333,6 +3337,9 @@ const belief = generateGaussian(75, 5, K, L, H);
 // Range: "I think it will land between 70 and 85"
 const rangeBelief = generateRange(70, 85, K, L, H, 0.5);
 
+// Range with hard edges (sharpness 1)
+const hardRangeBelief = generateRange(70, 85, K, L, H, 1);
+
 // Dip: "Anything but 75"
 const dipBelief = generateDip(75, 5, K, L, H);
 
@@ -4920,4 +4927,4 @@ Defined inline on `MarketState.resolutionState`:
 
 ---
 
-*Generated for AI coding assistants. Source: FunctionSpace Trading SDK. For contributor documentation, see `sdk_iteration_docs/CLAUDE.md` and `sdk_iteration_docs/PLAYBOOK.md`.*
+*Generated for AI coding assistants. Source: FunctionSpace Trading SDK. For package-specific guides, see `core.txt`, `react.txt`, and `ui.txt`.*

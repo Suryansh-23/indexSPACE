@@ -8,8 +8,8 @@ You are a pre-implementation validator. Your job is to verify that every concret
 
 Read these files completely:
 
-1. `sdk_iteration_docs/CLAUDE.md` -- Architecture rules and file structure
-2. `sdk_iteration_docs/PLAYBOOK.md` -- File locations, existing widgets/hooks/functions reference
+1. `internal_sdk_docs/CLAUDE.md` -- Architecture rules and file structure
+2. `internal_sdk_docs/PLAYBOOK.md` -- File locations, existing widgets/hooks/functions reference
 3. `{PLAN_PATH}` -- The implementation plan to validate
 
 ## Your Validation Checklist

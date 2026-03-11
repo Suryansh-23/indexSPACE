@@ -2,7 +2,7 @@
  * render_ui_pngs.ts — Automated UI screenshot capture for SDK documentation
  *
  * Uses Playwright to capture pixel-perfect, retina-quality PNGs of every SDK
- * UI component and starter kit layout. Output goes to sdk_iteration_docs/ui_images/.
+ * UI component and starter kit layout. Output goes to internal_sdk_docs/ui_images/.
  *
  * ═══════════════════════════════════════════════════════════════════════════════
  * ARCHITECTURE
@@ -55,14 +55,14 @@
  *
  *   # Capture individual component screenshots
  *   #   (main.tsx must import App_AllComponents)
- *   npx tsx sdk_iteration_docs/render_ui_pngs.ts components
+ *   npx tsx internal_sdk_docs/render_ui_pngs.ts components
  *
  *   # Capture starter kit layout screenshots
  *   #   (main.tsx must import App_StarterKitCapture)
- *   npx tsx sdk_iteration_docs/render_ui_pngs.ts kits
+ *   npx tsx internal_sdk_docs/render_ui_pngs.ts kits
  *
  *   # Default (no argument) runs "kits" mode
- *   npx tsx sdk_iteration_docs/render_ui_pngs.ts
+ *   npx tsx internal_sdk_docs/render_ui_pngs.ts
  *
  * ═══════════════════════════════════════════════════════════════════════════════
  * ENVIRONMENT VARIABLES
@@ -72,7 +72,7 @@
  *   SCALE    — Device scale factor for retina (default: 2, use 1 for standard)
  *
  * ═══════════════════════════════════════════════════════════════════════════════
- * OUTPUT FILES — sdk_iteration_docs/ui_images/
+ * OUTPUT FILES — internal_sdk_docs/ui_images/
  * ═══════════════════════════════════════════════════════════════════════════════
  *
  *   "components" mode produces:
@@ -314,7 +314,7 @@ async function main() {
   if (!['components', 'kits'].includes(mode)) {
     console.error(`Unknown mode: "${mode}"`);
     console.error('');
-    console.error('Usage: npx tsx sdk_iteration_docs/render_ui_pngs.ts [components|kits]');
+    console.error('Usage: npx tsx internal_sdk_docs/render_ui_pngs.ts [components|kits]');
     console.error('');
     console.error('  components  Capture individual UI component screenshots');
     console.error('              Requires App_AllComponents in main.tsx');

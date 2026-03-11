@@ -8,8 +8,8 @@ You are an adversarial reviewer. Your job is to verify that the implementation a
 
 Read these files completely before reviewing any code:
 
-1. `sdk_iteration_docs/CLAUDE.md` — Architecture rules and constraints
-2. `sdk_iteration_docs/PLAYBOOK.md` — Checklists and patterns
+1. `internal_sdk_docs/CLAUDE.md` — Architecture rules and constraints
+2. `internal_sdk_docs/PLAYBOOK.md` — Checklists and patterns
 3. `{HANDOFF_DOC_PATH}` — **This is your primary reference.** Read every word. This defines what was supposed to be built.
 
 ## Changed Files

@@ -36,9 +36,9 @@ Orchestrator (you, the main Claude session)
 
 Before doing ANYTHING else, read these three files completely:
 
-1. `sdk_iteration_docs/CLAUDE.md` -- Architecture, constraints, layer rules, testing, reviewers
-2. `sdk_iteration_docs/PLAYBOOK.md` -- Step-by-step guides, checklists, existing widget reference, core functions list
-3. `sdk_iteration_docs/REACT_ROADMAP.md` -- React layer evolution, caching strategy, hook patterns
+1. `internal_sdk_docs/CLAUDE.md` -- Architecture, constraints, layer rules, testing, reviewers
+2. `internal_sdk_docs/PLAYBOOK.md` -- Step-by-step guides, checklists, existing widget reference, core functions list
+3. `internal_sdk_docs/REACT_ROADMAP.md` -- React layer evolution, caching strategy, hook patterns
 
 These are the source of truth. If the code disagrees with the docs, the code is wrong.
 
@@ -186,8 +186,9 @@ After all supervisors complete successfully:
 Run full regression on the merged result:
 
 ```bash
-npx vitest run                        # All tests must pass
-cd demo-app && npx vite build         # Build must succeed
+npx vitest run                          # All tests must pass
+cd demo-app && npx vite build           # Build must succeed
+cd packages/docs && npx docusaurus build  # Docs site must build
 ```
 
 Then run the appropriate automated reviewers based on what changed:
@@ -201,7 +202,7 @@ Fix any issues before proceeding. If fixes require modifying specific files, dis
 
 This is NOT optional. If it's not in the docs, the work is not done.
 
-Synthesize the "Doc Updates Needed" sections from all supervisor reports. Then consult the update matrix in `sdk_iteration_docs/CLAUDE.md` (Step 3: Update the docs) and update:
+Synthesize the "Doc Updates Needed" sections from all supervisor reports. Then consult the update matrix in `internal_sdk_docs/CLAUDE.md` (Step 3: Update the docs) and update:
 
 | What changed | Update in... |
 |---|---|

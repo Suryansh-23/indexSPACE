@@ -9,6 +9,10 @@ Description: Pure TypeScript. API client, probability math, belief construction,
 Install: npm install @functionspace/core
 ```
 
+> **Note:** These packages are not yet published to npm. To use the SDK,
+> clone the repository and use npm workspace linking. The `npm install`
+> commands below are forward-looking and will work once packages are published.
+
 ## Table of Contents
 
 - [1. Overview](#1-overview)
