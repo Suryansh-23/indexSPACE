@@ -1,5 +1,5 @@
 import { FunctionSpaceProvider } from '@functionspace/react';
-import { ConsensusChart, TradePanel, MarketStats, PositionTable, AuthWidget } from '@functionspace/ui';
+import { ConsensusChart, TradePanel, MarketStats, PositionTable, PasswordlessAuthWidget } from '@functionspace/ui';
 import { ArticlePage } from './pages/ArticlePage';
 import { config, MARKET_ID, widgetTheme } from './App';
 

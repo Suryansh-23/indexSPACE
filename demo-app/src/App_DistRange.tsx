@@ -10,19 +10,17 @@ export function DistRangeLayout({ marketId }: { marketId: string | number }) {
 
   return (
     <>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <div style={{ flex: 7, minWidth: 0 }}>
-            <MarketStats marketId={MARKET_ID} />
-          </div>
-          <div style={{ flex: 3, minWidth: 0 }}>
-            <PasswordlessAuthWidget />
-          </div>
+      <div style={{ display: 'flex', gap: '1rem' }}>
+        <div style={{ flex: 7, minWidth: 0 }}>
+          <MarketStats marketId={marketId} />
         </div>
-    
+        <div style={{ flex: 3, minWidth: 0 }}>
+          <PasswordlessAuthWidget />
+        </div>
       </div>
 
       <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
-        <MarketCharts marketId={marketId} height={350} views={['consensus', 'distribution']} distributionState={distState} zoomable />
+        <MarketCharts marketId={marketId} height={350} views={['distribution']} distributionState={distState} zoomable />
       </div>
 
       <div style={{ marginBottom: '1rem' }}>

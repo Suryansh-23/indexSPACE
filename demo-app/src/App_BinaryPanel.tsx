@@ -1,5 +1,5 @@
 import { FunctionSpaceProvider } from '@functionspace/react';
-import { MarketCharts, BinaryPanel, MarketStats, PositionTable, AuthWidget } from '@functionspace/ui';
+import { MarketCharts, BinaryPanel, MarketStats, PositionTable, PasswordlessAuthWidget } from '@functionspace/ui';
 import { ArticlePage } from './pages/ArticlePage';
 import { config, MARKET_ID, widgetTheme } from './App';
 

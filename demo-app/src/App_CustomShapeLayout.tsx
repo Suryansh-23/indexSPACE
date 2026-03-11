@@ -1,10 +1,10 @@
 import { FunctionSpaceProvider } from '@functionspace/react';
-import { MarketCharts, DistributionChart, ShapeCutter, MarketStats, PositionTable, TimeSales, PasswordlessAuthWidget, BinaryPanel } from '@functionspace/ui';
+import { CustomShapeEditor, MarketStats, PositionTable, PasswordlessAuthWidget } from '@functionspace/ui';
 import { ArticlePage } from './pages/ArticlePage';
 import { config, MARKET_ID, widgetTheme } from './App';
 
 // Reusable layout content (used by both demo-app and docs site)
-export function ShapeCutterTradingLayout({ marketId, username }: { marketId: string | number; username?: string }) {
+export function CustomShapeLayout({ marketId, username }: { marketId: string | number; username?: string }) {
   return (
     <>
       <div style={{ display: 'flex', gap: '1rem' }}>
@@ -17,30 +17,20 @@ export function ShapeCutterTradingLayout({ marketId, username }: { marketId: str
       </div>
 
       <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
-        <MarketCharts marketId={marketId} height={350} views={['consensus', 'distribution', 'timeline']} zoomable />
+        <CustomShapeEditor marketId={marketId} zoomable />
       </div>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <ShapeCutter marketId={marketId} />
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr' }}>
-        <PositionTable marketId={marketId} username={username} tabs={['open-orders', 'trade-history', 'market-positions']} />
-      </div>
-      <BinaryPanel
-        marketId={marketId}
-        xPoint={{ mode: 'static', value: 91 }}
-      />
+      <PositionTable marketId={marketId} username={username} tabs={['open-orders', 'trade-history', 'market-positions']} />
     </>
   );
 }
 
-// ShapeCutter trading layout: chart with tabs, ShapeCutter below
-export default function App_ShapeCutterTradingLayout() {
+// Custom shape layout: drag-to-draw belief editor
+export default function App_CustomShapeLayout() {
   return (
     <ArticlePage widgetWidth="150%">
       <FunctionSpaceProvider config={config} theme={widgetTheme}>
-        <ShapeCutterTradingLayout marketId={MARKET_ID} username={config.username} />
+        <CustomShapeLayout marketId={MARKET_ID} username={config.username} />
       </FunctionSpaceProvider>
     </ArticlePage>
   );
