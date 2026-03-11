@@ -18,8 +18,8 @@ Read these review reports from `{OUTPUT_DIR}/`:
 8. `08-docs-deferred.md` -- Agent 8 findings (documentation & deferred items)
 
 Also read:
-- `sdk_iteration_docs/CLAUDE.md` -- for doc update recommendations
-- `sdk_iteration_docs/PLAYBOOK.md` -- for doc update recommendations
+- `internal_sdk_docs/CLAUDE.md` -- for doc update recommendations
+- `internal_sdk_docs/PLAYBOOK.md` -- for doc update recommendations
 - `{HANDOFF_DOC_PATH}` -- original requirements
 - `{PLAN_PATH}` -- implementation plan (if available)
 - `{COMPLETION_PATH}` -- completion report (if available)
@@ -83,6 +83,10 @@ npx vitest run --reporter=verbose 2>&1
 
 ```bash
 cd demo-app && npx vite build 2>&1
+```
+
+```bash
+cd packages/docs && npx docusaurus build 2>&1
 ```
 
 Report the full output. Any failures here are CRITICAL regardless of what the code-reading agents found.
@@ -211,10 +215,10 @@ For each file that needs changes, list every required modification:
 
 Changes needed in the living documentation (synthesized from Agent 8 and cross-referenced with other agents' findings):
 
-### sdk_iteration_docs/CLAUDE.md
+### internal_sdk_docs/CLAUDE.md
 [Specific additions, corrections, or removals needed]
 
-### sdk_iteration_docs/PLAYBOOK.md
+### internal_sdk_docs/PLAYBOOK.md
 [Specific additions, corrections, or removals needed]
 
 ---
@@ -239,7 +243,7 @@ Also write to `{OUTPUT_DIR}/doc-updates-draft.md`:
 
 Based on the implementation review of {FEATURE_NAME}.
 
-## sdk_iteration_docs/CLAUDE.md
+## internal_sdk_docs/CLAUDE.md
 
 ### Additions
 [Exact text to add, with the section it belongs in]
@@ -250,7 +254,7 @@ Based on the implementation review of {FEATURE_NAME}.
 ### Warnings to Add
 [New patterns or anti-patterns discovered during review that should be documented]
 
-## sdk_iteration_docs/PLAYBOOK.md
+## internal_sdk_docs/PLAYBOOK.md
 
 ### Additions
 [Exact text to add, with the section it belongs in]

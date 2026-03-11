@@ -1,0 +1,8 @@
+{
+  "label": "Transactions",
+  "position": 2,
+  "link": {
+    "type": "doc",
+    "id": "core/trading/transactions/index"
+  }
+}

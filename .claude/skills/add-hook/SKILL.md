@@ -65,7 +65,7 @@ When adding a new hook, complete ALL of these steps:
 - If the core function doesn't exist yet, create it first in the appropriate category:
   - `packages/core/src/queries/` for read-only data
   - `packages/core/src/transactions/` for mutations
-  - `packages/core/src/projections/` for hypothetical calculations
+  - `packages/core/src/previews/` for hypothetical calculations
 - Export it from `packages/core/src/index.ts`
 
 ### 2. Create the hook file
@@ -100,8 +100,8 @@ When adding a new hook, complete ALL of these steps:
   ```
 
 ### 6. Update docs
-- Add to `sdk_iteration_docs/PLAYBOOK.md` Available Hooks table
-- Add to `sdk_iteration_docs/CLAUDE.md` if a new test file was created
+- Add to `internal_sdk_docs/PLAYBOOK.md` Available Hooks table
+- Add to `internal_sdk_docs/CLAUDE.md` if a new test file was created
 
 ## Layer Rules
 - Hooks live in `packages/react/src/` — they import from `@functionspace/core` only

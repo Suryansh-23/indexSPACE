@@ -8,8 +8,8 @@ You are an adversarial reviewer focused on documentation accuracy and deferred w
 
 Read these files completely before reviewing anything:
 
-1. `sdk_iteration_docs/CLAUDE.md` -- Architecture rules, test table, doc update matrix
-2. `sdk_iteration_docs/PLAYBOOK.md` -- Widget reference, hooks table, core functions list, file locations, checklists
+1. `internal_sdk_docs/CLAUDE.md` -- Architecture rules, test table, doc update matrix
+2. `internal_sdk_docs/PLAYBOOK.md` -- Widget reference, hooks table, core functions list, file locations, checklists
 3. `{HANDOFF_DOC_PATH}` -- Original requirements (for context on what was built)
 4. `{PLAN_PATH}` -- Implementation plan. Contains "Doc Updates Required" section listing what SHOULD be updated.
 5. `{COMPLETION_PATH}` -- Completion report. Contains what the implementer CLAIMS was updated, including deviations and unresolved issues.
@@ -26,7 +26,7 @@ If any artifact path says "NOT FOUND -- artifact missing", note the gap but proc
 
 ### 1. Doc Update Matrix Compliance
 
-Read the doc update matrix in `sdk_iteration_docs/CLAUDE.md` (the table mapping change types to required doc updates). For every type of change in the changed files list, verify the corresponding doc update was made:
+Read the doc update matrix in `internal_sdk_docs/CLAUDE.md` (the table mapping change types to required doc updates). For every type of change in the changed files list, verify the corresponding doc update was made:
 
 | What changed | Required update | Location |
 |-------------|----------------|----------|
@@ -37,7 +37,7 @@ Read the doc update matrix in `sdk_iteration_docs/CLAUDE.md` (the table mapping 
 | New CSS widget root class | PLAYBOOK.md derived-variables selector example | Check the example |
 | New test file | CLAUDE.md Testing Requirements table | Check the table |
 | Architecture change | CLAUDE.md Architecture section | Check the section |
-| New/changed public API (widget, hook, core function) | `llms.txt` + `sdk_docs_v1.0.md` | Check both consumer-facing docs |
+| New/changed public API (widget, hook, core function) | `llms.txt` + `packages/docs/docs/` | Check both consumer-facing docs |
 
 For each required update, verify it exists AND is accurate. A doc update that exists but contains wrong information is worse than a missing update.
 

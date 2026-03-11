@@ -96,13 +96,12 @@ export class FSClient {
     return url.toString();
   }
 
-  private async request<T>(
-    method: string,
-    path: string,
-    body?: unknown,
-    params?: Record<string, string>,
-    isRetry = false,
-  ): Promise<T> {
+  private async request<T>(method: string, path: string, opts?: {
+    body?: unknown;
+    params?: Record<string, string>;
+    signal?: AbortSignal;
+    isRetry?: boolean;
+  }): Promise<T> {
     await this.ensureAuth();
 
     // Guest mode: allow GET, block mutations
@@ -110,7 +109,7 @@ export class FSClient {
       throw new Error('Authentication required. Please sign in to perform this action.');
     }
 
-    const url = this.buildUrl(path, params);
+    const url = this.buildUrl(path, opts?.params);
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -124,17 +123,18 @@ export class FSClient {
     const res = await fetch(url, {
       method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: opts?.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      signal: opts?.signal,
     });
 
     // 401 retry: only when credentials exist (guest mode cannot re-authenticate)
-    if (res.status === 401 && !isRetry) {
+    if (res.status === 401 && !opts?.isRetry) {
       this.token = null;
       if (!this.username || !this.password) {
         throw new Error('Authentication required. Please sign in to perform this action.');
       }
       await this.authenticate();
-      return this.request<T>(method, path, body, params, true);
+      return this.request<T>(method, path, { ...opts, isRetry: true });
     }
 
     if (!res.ok) {
@@ -150,11 +150,11 @@ export class FSClient {
     return data as T;
   }
 
-  async get<T>(path: string, params?: Record<string, string>): Promise<T> {
-    return this.request<T>('GET', path, undefined, params);
+  async get<T>(path: string, params?: Record<string, string>, signal?: AbortSignal): Promise<T> {
+    return this.request<T>('GET', path, { params, signal });
   }
 
-  async post<T>(path: string, body?: unknown, params?: Record<string, string>): Promise<T> {
-    return this.request<T>('POST', path, body, params);
+  async post<T>(path: string, body?: unknown, params?: Record<string, string>, signal?: AbortSignal): Promise<T> {
+    return this.request<T>('POST', path, { body, params, signal });
   }
 }

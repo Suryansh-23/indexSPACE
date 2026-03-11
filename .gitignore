@@ -3,7 +3,12 @@ dist/
 .env
 *.tsbuildinfo
 .vite/
-Docs/
-sdk_iteration_docs/ui_images/
+/Docs/
+internal_sdk_docs/ui_images/
 .DS_Store
 .vscode/
+.claude/worktrees/
+
+# Docusaurus
+packages/docs/build/
+packages/docs/.docusaurus/

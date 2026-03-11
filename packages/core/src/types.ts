@@ -85,13 +85,14 @@ export interface SellResult {
   collateralReturned: number;
 }
 
-export interface ProjectSellResult {
+export interface PreviewSellResult {
   collateralReturned: number;
   iterations: number;
 }
 
 export interface PayoutCurve {
-  projections: Array<{
+  // API response uses "projections" -- remapped to "previews" in SDK types
+  previews: Array<{
     outcome: number;
     payout: number;
     profitLoss: number;
@@ -121,7 +122,7 @@ export interface GaussianParams {
   bounds?: [number, number];
 }
 
-export interface PlateauParams {
+export interface RangeParams {
   low: number;
   high: number;
   bounds?: [number, number];

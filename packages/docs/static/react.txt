@@ -1,0 +1,1180 @@
+# @functionspace/react -- Agent Implementation Guide
+
+This document is a focused implementation guide for AI coding assistants working with the `@functionspace/react` package. It covers the headless custom UI integration mode -- provider setup, data-fetching hooks, state and action hooks, belief construction, trade execution patterns, previews, and the context API. This mode uses `@functionspace/core` + `@functionspace/react` without pre-built UI widgets, giving full control over rendering.
+
+```
+Packages:
+  @functionspace/core   -- Pure TypeScript. API client, probability math, belief construction, trade execution. Zero framework dependencies.
+  @functionspace/react  -- React integration. Provider, hooks, theme system. Depends on @functionspace/core.
+
+Install (headless React -- hooks only, no pre-built components):
+  npm install @functionspace/core @functionspace/react
+```
+
+> **Note:** These packages are not yet published to npm. To use the SDK,
+> clone the repository and use npm workspace linking. The `npm install`
+> commands below are forward-looking and will work once packages are published.
+
+## Table of Contents
+
+- [1. Overview](#1-overview)
+- [2. Known Limitations](#2-known-limitations)
+- [3. Setup](#3-setup)
+- [4. Data Hooks Reference](#4-data-hooks-reference)
+- [5. State & Action Hooks](#5-state--action-hooks)
+- [6. Building Beliefs](#6-building-beliefs)
+- [7. Executing Trades (Headless)](#7-executing-trades-headless)
+- [8. Previews](#8-previews)
+- [9. Context API Quick Reference](#9-context-api-quick-reference)
+- [10. NEVER Rules (Headless)](#10-never-rules-headless)
+- [11. Type Reference](#11-type-reference)
+
+---
+
+## 1. Overview
+
+### 1.1 Machine-Readable Preamble
+
+```
+SDK: FunctionSpace Trading SDK
+Version: 1.x (pre-release)
+Packages:
+  @functionspace/core   -- Pure TypeScript. API client, probability math, belief construction, trade execution. Zero framework dependencies.
+  @functionspace/react  -- React integration. Provider, hooks, theme system. Depends on @functionspace/core.
+  @functionspace/ui     -- Pre-built React widgets. Charts, trade panels, position tables. Depends on @functionspace/core and @functionspace/react.
+
+Install (headless React -- hooks only, no pre-built components):
+  npm install @functionspace/core @functionspace/react
+
+Description: A TypeScript SDK for embedding prediction market trading widgets into web applications. Three packages form a strict dependency chain: core (pure TS math and API client) -> react (hooks, Provider, theming) -> ui (pre-built interactive components).
+```
+
+### 1.2 What This Package Does
+
+The `@functionspace/react` package provides the React integration layer for the FunctionSpace Trading SDK. It includes `FunctionSpaceProvider` (which manages auth, theming, and shared state), data-fetching hooks (`useMarket`, `useConsensus`, `usePositions`, etc.), state hooks (`useAuth`, `useCustomShape`, `useChartZoom`), and the context API for cross-component coordination.
+
+### 1.3 Package Dependency Chain
+
+```
+@functionspace/core       Pure TypeScript. API client, probability math,
+        |                 belief construction, trade execution. No framework
+        |                 dependencies. Works in Node.js, browsers, or any
+        |                 JavaScript runtime.
+        v
+@functionspace/react      React integration layer. FunctionSpaceProvider
+        |                 manages auth, theming, and shared state. Hooks
+        |                 wrap core functions for React consumption.
+        v
+@functionspace/ui         Pre-built React widgets. ConsensusChart, TradePanel,
+                          PositionTable, ShapeCutter, and more. Fully themed
+                          and self-contained.
+```
+
+This document covers `@functionspace/core` + `@functionspace/react` (headless custom UI mode).
+
+### 1.4 Authentication Modes
+
+| Mode | Config | Description |
+|------|--------|-------------|
+| **Auto-auth** | Pass `username` and `password` in the `config` object | The Provider authenticates automatically on mount; no login UI or manual token management required. |
+| **Interactive** | Omit `username` and `password` from `config` | Use the `useAuth()` hook to present login/signup forms; the user authenticates at runtime. |
+| **Guest** | No credentials anywhere | Read-only access to market data; trading operations (`buy`, `sell`) are blocked server-side. |
+
+---
+
+## 2. Known Limitations
+
+| # | Limitation | Impact | Workaround |
+|---|-----------|--------|------------|
+| 1 | **No query caching or request deduplication.** Each hook instance fires its own independent API request. Mounting `useMarket` and `useConsensus` for the same market produces two separate network calls to the same endpoint. No `staleTime` or `gcTime` behavior exists. | Redundant API traffic scales linearly with the number of mounted hooks. Pages with multiple widgets for one market generate multiple identical requests per invalidation cycle. | Accept the redundant requests. Do not attempt to add TanStack Query, SWR, or any external caching wrapper around the SDK hooks. The internal hook API is not designed to be wrapped by external cache layers, and doing so will break invalidation coordination. |
+| 2 | **No real-time transport (WebSocket/SSE).** The SDK has no push-based data delivery. All data freshness depends on explicit refetch calls or polling. Changes made by other users are not automatically visible. | Market state, consensus curves, and position data go stale between manual refetches. In multi-user scenarios, the local view drifts from server state until the next refetch. | Use `useTradeHistory` with the `pollInterval` option to create a live trade feed (e.g., `useTradeHistory(marketId, { pollInterval: 3000 })`). For other data types, call `ctx.invalidate(marketId)` after local trades to trigger a refetch of all hooks. There is no polling support for hooks other than `useTradeHistory`. |
+| 3 | **No mutation hooks.** `buy()` and `sell()` are imported directly from `@functionspace/core`, not from `@functionspace/react`. No `useBuy` or `useSell` hooks exist. Preview functions (`previewPayoutCurve`, `previewSell`) are also core imports. | Developers building custom trade UIs must import from two packages (`@functionspace/core` for mutations and `@functionspace/react` for data hooks), manage their own `submitting`/`error` state, and manually call `ctx.invalidate(marketId)` and `ctx.refreshUser()` after every trade. | Import `buy` and `sell` from `@functionspace/core`. After a successful trade, call `ctx.invalidate(marketId)` to refresh all data hooks, then call `ctx.refreshUser()` to update the wallet balance. |
+| 4 | **No market search or filtering.** `discoverMarkets()` returns all available markets as a flat `MarketState[]` array. The function accepts no search, filter, sort, or pagination parameters. | Applications that need to display a subset of markets must fetch the entire market list on every call. There is no server-side filtering. | Call `discoverMarkets(client)` and filter the returned array client-side using standard `Array.filter()`, `Array.sort()`, or `Array.find()` methods. |
+| 5 | **Global invalidation only.** `ctx.invalidate(marketId)` accepts a `marketId` parameter, but the parameter is currently ignored. Calling `invalidate` increments a global counter that causes every mounted data-fetching hook to refetch, regardless of which market the hook watches. | In multi-market dashboards, a trade on one market triggers unnecessary refetches for all other markets. Network traffic and UI re-renders scale with the total number of mounted hooks across all markets, not just the affected market. | Accept the global refetch behavior. Do not attempt to build per-market invalidation logic on top of the SDK. The `marketId` parameter is accepted for forward-compatibility and will be respected in a future release. |
+| 7 | **Settlement not yet implemented.** The `Position` type includes `settlementPayout` and `MarketState` includes `resolvedOutcome` fields, but no settlement functions exist in the SDK. | Positions in resolved markets cannot be settled through the SDK. The `settlementPayout` field is always `null` in current responses. | Monitor the `resolutionState` field on `MarketState` for `'resolved'` or `'voided'` status. Settlement processing must be handled outside the SDK until settlement functions are added. |
+| 8 | **Race conditions in data hooks on rapid marketId changes.** Data-fetching hooks (useMarket, useConsensus, usePositions, useMarketHistory, useDistributionState, useBucketDistribution) do not use AbortController or generation counters. If `marketId` changes rapidly, an earlier response can resolve after a later one and overwrite it with stale data. | When switching markets quickly (e.g., clicking through a market list), displayed data may briefly show results from a previously selected market. | Avoid rapid programmatic `marketId` switching. If building a market list with click-to-select, the data will self-correct once all in-flight requests settle. |
+| 9 | **Missing mounted guards in data hooks.** The same data-fetching hooks listed above do not check component mount status before calling `setState`. Fast unmount/remount cycles can trigger React warnings about state updates on unmounted components. | Console warnings during fast navigation. No data corruption, but noisy logs. | These warnings are benign and do not affect functionality. They will be resolved in a future release. |
+
+---
+
+## 3. Setup
+
+### Installation
+
+Install the core computation library and the React integration layer. The `@functionspace/ui` package is intentionally excluded -- you are building your own UI.
+
+```bash
+npm install @functionspace/core @functionspace/react
+```
+
+### Provider Setup
+
+Every headless integration requires a `FunctionSpaceProvider` at the root of the widget tree. The provider creates the API client, manages authentication, resolves theming, and exposes shared state via React context.
+
+```tsx
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { FunctionSpaceProvider } from '@functionspace/react';
+
+const config = {
+  baseUrl: 'https://api.example.com',
+  username: 'trader1',
+  password: 'secret',
+  autoAuthenticate: true,
+};
+
+function App() {
+  return (
+    <FunctionSpaceProvider config={config} theme="fs-dark">
+      <YourCustomUI />
+    </FunctionSpaceProvider>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')!).render(<App />);
+```
+
+The `config` object accepts these fields:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `baseUrl` | `string` | Yes | Base URL of the FunctionSpace API server |
+| `username` | `string` | No | Username for auto-authentication |
+| `password` | `string` | No | Password for auto-authentication |
+| `autoAuthenticate` | `boolean` | No | When `true` (the default if `username` and `password` are provided), the provider logs in automatically on mount |
+
+### Import Map
+
+Headless integrations pull from two packages. Core functions and types come from `@functionspace/core`. Hooks, the provider, the context object, and theme utilities come from `@functionspace/react`.
+
+```tsx
+// --- @functionspace/core ---
+// Belief generators
+import {
+  generateBelief,
+  generateGaussian,
+  generateRange,
+  generateDip,
+  generateLeftSkew,
+  generateRightSkew,
+  generateCustomShape,
+  generateBellShape,
+} from '@functionspace/core';
+
+// Transactions (state-changing)
+import { buy, sell } from '@functionspace/core';
+
+// Previews (read-only previews)
+import { previewPayoutCurve, previewSell } from '@functionspace/core';
+
+// Pure math (no network)
+import {
+  evaluateDensityCurve,
+  computeStatistics,
+  computePercentiles,
+  calculateBucketDistribution,
+} from '@functionspace/core';
+
+// Types
+import type {
+  MarketState,
+  MarketConfig,
+  BeliefVector,
+  Position,
+  BuyResult,
+  SellResult,
+  PayoutCurve,
+  PreviewSellResult,
+  ConsensusCurve,
+  BucketData,
+  Region,
+  PointRegion,
+  RangeRegion,
+  SplineRegion,
+} from '@functionspace/core';
+
+// --- @functionspace/react ---
+// Provider and context
+import { FunctionSpaceProvider, FunctionSpaceContext } from '@functionspace/react';
+import type { FSContext } from '@functionspace/react';
+
+// Data hooks
+import {
+  useMarket,
+  useConsensus,
+  usePositions,
+  useTradeHistory,
+  useMarketHistory,
+  useBucketDistribution,
+  useDistributionState,
+} from '@functionspace/react';
+
+// State and action hooks
+import { useAuth, useCustomShape, useChartZoom, rechartsPlotArea } from '@functionspace/react';
+```
+
+### Authentication Modes
+
+**Auto-auth (credentials in config).** The provider calls `loginUser()` on mount. All hooks wait for authentication to complete before fetching data. Best for demos, internal tools, and server-rendered pages where credentials are injected from environment variables.
+
+```tsx
+const config = {
+  baseUrl: 'https://api.example.com',
+  username: import.meta.env.VITE_FS_USERNAME,
+  password: import.meta.env.VITE_FS_PASSWORD,
+  autoAuthenticate: true,
+};
+```
+
+**Interactive auth (login via `useAuth()`).** Omit credentials. The provider starts in guest mode (read-only). Your custom UI calls `login()` or `signup()` from the `useAuth()` hook. Charts and data hooks work immediately in read-only mode; trading functions require authentication.
+
+```tsx
+const config = {
+  baseUrl: 'https://api.example.com',
+  autoAuthenticate: false,
+};
+```
+
+**Guest mode (read-only).** Same as interactive, but you never call `login()`. Data hooks work. Trading functions will fail with authentication errors. Useful for public dashboards.
+
+---
+
+## 4. Data Hooks Reference
+
+All data-fetching hooks follow a consistent contract. Each returns an object with a named data property, plus `loading`, `error`, and `refetch`. All data hooks react to `ctx.invalidationCount` -- when any component calls `ctx.invalidate(marketId)`, every mounted data hook refetches automatically.
+
+### `useMarket(marketId)`
+
+Fetches the complete market state including configuration, consensus, and metadata.
+
+```typescript
+function useMarket(marketId: string | number): {
+  market: MarketState | null;
+  loading: boolean;
+  error: Error | null;
+  refetch: () => void;
+}
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `marketId` | `string \| number` | The market identifier |
+
+**Return shape:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `market` | `MarketState \| null` | Complete market state, or `null` while loading |
+| `loading` | `boolean` | `true` during the initial fetch |
+| `error` | `Error \| null` | Fetch error, if any |
+| `refetch` | `() => void` | Manually trigger a refetch |
+
+The `MarketState` object contains the market configuration (`market.config` with `K`, `L`, `H`, and other protocol parameters), the current consensus vector (`market.consensus`), pool statistics (`market.totalMass`, `market.poolBalance`, `market.totalVolume`), metadata (`market.title`, `market.xAxisUnits`, `market.decimals`), and resolution state (`market.resolutionState`).
+
+**Example:**
+
+```tsx
+import React, { useContext } from 'react';
+import { FunctionSpaceContext, useMarket } from '@functionspace/react';
+
+function MarketHeader({ marketId }: { marketId: string }) {
+  const { market, loading, error } = useMarket(marketId);
+
+  if (loading) return <div>Loading market...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+  if (!market) return null;
+
+  return (
+    <div>
+      <h2>{market.title}</h2>
+      <p>Range: {market.config.L} - {market.config.H} {market.xAxisUnits}</p>
+      <p>Total volume: ${market.totalVolume.toFixed(2)}</p>
+      <p>Open positions: {market.positionsOpen}</p>
+    </div>
+  );
+}
+```
+
+### `useConsensus(marketId, numPoints?)`
+
+Fetches the consensus probability density as a renderable curve (array of `{x, y}` points).
+
+```typescript
+function useConsensus(
+  marketId: string | number,
+  numPoints?: number,
+): {
+  consensus: ConsensusCurve | null;
+  loading: boolean;
+  error: Error | null;
+  refetch: () => void;
+}
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `marketId` | `string \| number` | -- | The market identifier |
+| `numPoints` | `number` | Server default | Number of sample points for the density curve |
+
+**Return shape:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `consensus` | `ConsensusCurve \| null` | Object containing `points: Array<{x: number; y: number}>` and `config: MarketConfig` |
+| `loading` | `boolean` | `true` during the initial fetch |
+| `error` | `Error \| null` | Fetch error, if any |
+| `refetch` | `() => void` | Manually trigger a refetch |
+
+**Example:**
+
+```tsx
+import React from 'react';
+import { useConsensus } from '@functionspace/react';
+
+function ConsensusPeakDisplay({ marketId }: { marketId: string }) {
+  const { consensus, loading, error } = useConsensus(marketId, 200);
+
+  if (loading) return <div>Loading consensus...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+  if (!consensus) return null;
+
+  const peak = consensus.points.reduce(
+    (max, pt) => (pt.y > max.y ? pt : max),
+    consensus.points[0],
+  );
+
+  return (
+    <div>
+      <p>Most likely outcome: {peak.x.toFixed(2)} (density: {peak.y.toFixed(4)})</p>
+      <p>Curve points: {consensus.points.length}</p>
+    </div>
+  );
+}
+```
+
+### `usePositions(marketId, username?)`
+
+Fetches all positions for a market, with an optional filter by username.
+
+```typescript
+function usePositions(
+  marketId: string | number,
+  username?: string,
+): {
+  positions: Position[] | null;
+  loading: boolean;
+  error: Error | null;
+  refetch: () => void;
+}
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `marketId` | `string \| number` | -- | The market identifier |
+| `username` | `string` | `undefined` | When provided, filters positions to this user only. When omitted, returns all market positions. |
+
+**Example:**
+
+```tsx
+import React, { useContext } from 'react';
+import { FunctionSpaceContext, usePositions } from '@functionspace/react';
+
+function MyPositions({ marketId }: { marketId: string }) {
+  const ctx = useContext(FunctionSpaceContext);
+  if (!ctx) throw new Error('Must be within FunctionSpaceProvider');
+
+  const { positions, loading, error } = usePositions(
+    marketId,
+    ctx.user?.username,
+  );
+
+  if (loading) return <div>Loading positions...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+  if (!positions || positions.length === 0) return <div>No positions</div>;
+
+  const openPositions = positions.filter(p => p.status === 'open');
+
+  return (
+    <ul>
+      {openPositions.map(pos => (
+        <li key={pos.positionId}>
+          Position #{pos.positionId}: ${pos.collateral.toFixed(2)} collateral,{' '}
+          {pos.claims.toFixed(4)} claims
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+### `useTradeHistory(marketId, options?)`
+
+Fetches trade history entries. This is the only data hook that supports `pollInterval` for automatic periodic refetching.
+
+```typescript
+function useTradeHistory(
+  marketId: string | number,
+  options?: { limit?: number; pollInterval?: number },
+): {
+  trades: TradeEntry[] | null;
+  loading: boolean;
+  error: Error | null;
+  refetch: () => void;
+}
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `marketId` | `string \| number` | -- | The market identifier |
+| `options.limit` | `number` | `100` | Maximum number of trade entries to return |
+| `options.pollInterval` | `number` | `undefined` | Polling interval in milliseconds. When set, the hook refetches at this interval automatically. |
+
+**Example:**
+
+```tsx
+import React from 'react';
+import { useTradeHistory } from '@functionspace/react';
+
+function LiveTradesFeed({ marketId }: { marketId: string }) {
+  const { trades, loading, error } = useTradeHistory(marketId, {
+    limit: 20,
+    pollInterval: 5000, // refresh every 5 seconds
+  });
+
+  if (loading) return <div>Loading trades...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+  if (!trades || trades.length === 0) return <div>No trades yet</div>;
+
+  return (
+    <ul>
+      {trades.map(trade => (
+        <li key={trade.id}>
+          {trade.timestamp} -- {trade.username} {trade.side}{' '}
+          ${trade.amount.toFixed(2)}
+          {trade.prediction !== null && ` @ ${trade.prediction}`}
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+### `useMarketHistory(marketId, options?)`
+
+Fetches historical market snapshots (alpha vector changes over time). Used to build fan charts showing how the consensus evolved.
+
+```typescript
+function useMarketHistory(
+  marketId: string | number,
+  options?: { limit?: number },
+): {
+  history: MarketHistory | null;
+  loading: boolean;
+  error: Error | null;
+  refetch: () => void;
+}
+```
+
+**Example:**
+
+```tsx
+import React from 'react';
+import { useMarketHistory } from '@functionspace/react';
+import { transformHistoryToFanChart } from '@functionspace/core';
+import { useMarket } from '@functionspace/react';
+
+function HistoryStats({ marketId }: { marketId: string }) {
+  const { market } = useMarket(marketId);
+  const { history, loading, error } = useMarketHistory(marketId, { limit: 100 });
+
+  if (loading || !market || !history) return <div>Loading history...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+
+  const { L, H } = market.config;
+  const fanData = transformHistoryToFanChart(history.snapshots, L, H);
+
+  return (
+    <div>
+      <p>Total snapshots: {history.totalSnapshots}</p>
+      <p>Fan chart data points: {fanData.length}</p>
+    </div>
+  );
+}
+```
+
+### `useBucketDistribution(marketId, numBuckets?, numPoints?)`
+
+Computes a histogram of probability across equal-width outcome buckets.
+
+```typescript
+function useBucketDistribution(
+  marketId: string | number,
+  numBuckets?: number,
+  numPoints?: number,
+): {
+  buckets: BucketData[] | null;
+  loading: boolean;
+  error: Error | null;
+  refetch: () => void;
+}
+```
+
+**Example:**
+
+```tsx
+import React from 'react';
+import { useBucketDistribution } from '@functionspace/react';
+
+function ProbabilityBuckets({ marketId }: { marketId: string }) {
+  const { buckets, loading, error } = useBucketDistribution(marketId, 10);
+
+  if (loading) return <div>Loading distribution...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+  if (!buckets) return null;
+
+  return (
+    <div>
+      {buckets.map((bucket, i) => (
+        <div key={i} style={{ display: 'flex', gap: '1rem', marginBottom: '4px' }}>
+          <span style={{ width: '120px' }}>{bucket.range}</span>
+          <div
+            style={{
+              width: `${bucket.percentage}%`,
+              maxWidth: '300px',
+              height: '20px',
+              background: '#3b82f6',
+            }}
+          />
+          <span>{bucket.percentage.toFixed(1)}%</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+---
+
+## 5. State & Action Hooks
+
+State and action hooks differ from data hooks: they manage local UI state or expose context actions rather than fetching server data. They do not follow the `{ named, loading, error, refetch }` pattern.
+
+### `useAuth()`
+
+Provides authentication state and actions from the provider context.
+
+```typescript
+function useAuth(): {
+  user: UserProfile | null;
+  isAuthenticated: boolean;
+  loading: boolean;
+  error: Error | null;
+  login: (username: string, password: string) => Promise<UserProfile>;
+  signup: (username: string, password: string, options?: SignupOptions) => Promise<UserProfile>;
+  logout: () => void;
+  refreshUser: () => Promise<void>;
+  passwordlessLogin: (username: string) => Promise<PasswordlessLoginResult>;
+  showAdminLogin: boolean;
+  pendingAdminUsername: string | null;
+  clearAdminLogin: () => void;
+}
+```
+
+**Return shape:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `user` | `UserProfile \| null` | Current user (with `userId`, `username`, `walletValue`, `role`), or `null` if not authenticated |
+| `isAuthenticated` | `boolean` | Whether a user session is active |
+| `loading` | `boolean` | `true` while an auth operation (login/signup/auto-auth) is in progress |
+| `error` | `Error \| null` | Most recent auth error |
+| `login` | `(username, password) => Promise<UserProfile>` | Logs in and returns the user profile. The provider stores the token automatically. |
+| `signup` | `(username, password, options?) => Promise<UserProfile>` | Registers a new user, then auto-logs-in. Returns the user profile. |
+| `logout` | `() => void` | Clears auth token, user, previews, and triggers invalidation |
+| `refreshUser` | `() => Promise<void>` | Re-fetches the user profile (call after trades to update wallet balance) |
+| `passwordlessLogin` | `(username) => Promise<PasswordlessLoginResult>` | Passwordless login/auto-signup. Returns `{ action, user, token }`. Throws with `code: PASSWORD_REQUIRED` for password-protected accounts. |
+
+**Example:**
+
+```tsx
+import React, { useState } from 'react';
+import { useAuth } from '@functionspace/react';
+
+function LoginForm() {
+  const { user, isAuthenticated, loading, error, login, logout } = useAuth();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+
+  if (isAuthenticated && user) {
+    return (
+      <div>
+        <span>Logged in as {user.username} (${user.walletValue.toFixed(2)})</span>
+        <button onClick={logout}>Sign Out</button>
+      </div>
+    );
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await login(username, password);
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input value={username} onChange={e => setUsername(e.target.value)} placeholder="Username" />
+      <input value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder="Password" />
+      <button type="submit" disabled={loading}>
+        {loading ? 'Logging in...' : 'Log In'}
+      </button>
+      {error && <p style={{ color: 'red' }}>{error.message}</p>}
+    </form>
+  );
+}
+```
+
+### `useCustomShape(market)`
+
+State management for custom shape editing. Manages an array of control point values, locked points, drag state, and automatically computes the resulting belief vector and prediction via `generateCustomShape` and `computeStatistics`.
+
+```typescript
+function useCustomShape(market: MarketState | null): UseCustomShapeReturn
+```
+
+**Return shape (`UseCustomShapeReturn`):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `controlValues` | `number[]` | Current control point Y-values (0-25 range) |
+| `lockedPoints` | `number[]` | Indices of locked control points (max 2) |
+| `numPoints` | `number` | Current number of control points (5-25, default 20) |
+| `pVector` | `BeliefVector \| null` | The belief vector generated from current control values, or `null` if no market |
+| `prediction` | `number \| null` | The mode (most likely outcome) of the belief distribution |
+| `setControlValue` | `(index: number, value: number) => void` | Set a specific control point's value (respects locks) |
+| `toggleLock` | `(index: number) => void` | Toggle lock state for a control point |
+| `setNumPoints` | `(n: number) => void` | Change the number of control points (resets to bell shape) |
+| `resetToDefault` | `() => void` | Reset all control values to the default bell shape |
+| `startDrag` | `(index: number) => void` | Begin dragging a control point |
+| `handleDrag` | `(value: number) => void` | Update the currently dragged point's value |
+| `endDrag` | `() => void` | End the drag operation |
+| `isDragging` | `boolean` | Whether a drag is currently in progress |
+| `draggingIndex` | `number \| null` | Index of the point currently being dragged |
+
+### `useChartZoom(options)`
+
+Scroll-wheel zoom and drag-to-pan state machine for chart containers.
+
+```typescript
+function useChartZoom(options: ChartZoomOptions): ChartZoomResult
+```
+
+**Parameters (`ChartZoomOptions`):**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `data` | `any[]` | Yes | The data array being charted |
+| `xKey` | `string` | Yes | Property name for the x-axis value in each data item |
+| `fullXDomain` | `[number, number]` | Yes | The full x-axis range `[min, max]`. Must be memoized -- the hook resets zoom when this value changes. |
+| `getPlotArea` | `(rect: DOMRect) => {left, right}` | Yes | Function that returns the pixel boundaries of the plot area. Use the `rechartsPlotArea` helper for Recharts charts. |
+| `computeYDomain` | `(visibleData: any[], fullData: any[]) => [number, number]` | No | Custom Y-domain computation. |
+| `enabled` | `boolean` | No | Whether zoom/pan is active (default `true`) |
+
+**Return shape (`ChartZoomResult`):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `containerRef` | `React.MutableRefObject<HTMLDivElement \| null>` | Mutable ref to attach to the chart container element |
+| `xDomain` | `[number, number]` | Current x-axis domain (changes as user zooms/pans) |
+| `yDomain` | `[number, number] \| undefined` | Current y-axis domain (if `computeYDomain` is provided) |
+| `isZoomed` | `boolean` | Whether the view is currently zoomed in |
+| `isPanning` | `boolean` | Whether a pan drag is in progress |
+| `containerProps` | `object` | Event handlers to spread onto the container |
+| `reset` | `() => void` | Programmatically reset to the full domain |
+
+The `rechartsPlotArea` helper creates the `getPlotArea` function for Recharts integration:
+
+```typescript
+import { rechartsPlotArea } from '@functionspace/react';
+
+const getPlotArea = rechartsPlotArea(
+  { left: 20, right: 20 }, // chart margin
+  60,                       // y-axis width (optional, default varies)
+);
+```
+
+### `useDistributionState(marketId, config?)`
+
+Comprehensive distribution state management for bucket-based components. Combines market data, bucket distribution, and percentile computation into a single shareable state object.
+
+```typescript
+function useDistributionState(
+  marketId: string | number,
+  config?: DistributionStateConfig,
+): DistributionState
+```
+
+**Return shape (`DistributionState`):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `market` | `MarketState \| null` | The market state |
+| `loading` | `boolean` | Loading state |
+| `error` | `Error \| null` | Error state |
+| `refetch` | `() => void` | Refetch data |
+| `bucketCount` | `number` | Current bucket count |
+| `setBucketCount` | `(n: number) => void` | Update bucket count |
+| `buckets` | `BucketData[] \| null` | Computed bucket distribution |
+| `percentiles` | `PercentileSet \| null` | Computed percentiles (p2.5 through p97.5) |
+| `getBucketsForRange` | `(low: number, high: number) => BucketData[]` | Get buckets within a specific range |
+
+---
+
+## 6. Building Beliefs
+
+A belief vector is a `number[]` of length `K + 1` that sums to 1. It expresses a trader's probability distribution over possible outcomes. Every trade in the SDK starts with constructing a belief.
+
+The three parameters `K`, `L`, and `H` always come from the market configuration. Never hardcode them.
+
+```typescript
+const { market } = useMarket(marketId);
+const { K, L, H } = market.config;
+```
+
+### `generateBelief(regions, K, L, H)` -- Universal Constructor
+
+The L1 universal constructor. Every other generator delegates to this function.
+
+```typescript
+import { generateBelief } from '@functionspace/core';
+import type { Region, BeliefVector } from '@functionspace/core';
+
+function generateBelief(
+  regions: Region[],
+  K: number,
+  L: number,
+  H: number,
+): BeliefVector  // number[] of length K+1, sums to 1
+```
+
+### Region Types
+
+**`PointRegion`** -- Gaussian peak (or inverted dip):
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `type` | `'point'` | -- | Discriminator |
+| `center` | `number` | -- | Peak location in outcome space |
+| `spread` | `number` | -- | Width of the bell curve in outcome-space units |
+| `weight` | `number` | `1` | Relative weight when combining with other regions |
+| `skew` | `number` | `0` | Asymmetry. Negative = wider left tail, positive = wider right tail. |
+| `inverted` | `boolean` | `false` | When `true`, creates a dip: high at edges, low at center |
+
+**`RangeRegion`** -- Flat-topped range:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `type` | `'range'` | -- | Discriminator |
+| `low` | `number` | -- | Start of the range in outcome space |
+| `high` | `number` | -- | End of the range in outcome space |
+| `weight` | `number` | `1` | Relative weight |
+| `sharpness` | `number` | `0` | Edge transition: `0` = smooth cosine taper, `1` = hard cliff |
+
+**`SplineRegion`** -- Arbitrary freeform curve:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `type` | `'spline'` | -- | Discriminator |
+| `controlX` | `number[]` | -- | X positions in outcome space `[L..H]`, sorted ascending |
+| `controlY` | `number[]` | -- | Y values (unnormalized heights) |
+| `weight` | `number` | `1` | Relative weight |
+
+### Convenience Generators
+
+| Function | Signature | Equivalent `generateBelief` Call |
+|----------|-----------|----------------------------------|
+| `generateGaussian` | `(center, spread, K, L, H)` | `generateBelief([{ type: 'point', center, spread }], K, L, H)` |
+| `generateRange` | `(low, high, K, L, H, sharpness?)` | `generateBelief([{ type: 'range', low, high, sharpness: sharpness ?? 0.5 }], K, L, H)` |
+| `generateDip` | `(center, spread, K, L, H)` | `generateBelief([{ type: 'point', center, spread: spread * 1.5, inverted: true }], K, L, H)` |
+| `generateLeftSkew` | `(center, spread, K, L, H, skewAmount?)` | `generateBelief([{ type: 'point', center, spread, skew: -skewAmount }], K, L, H)` |
+| `generateRightSkew` | `(center, spread, K, L, H, skewAmount?)` | `generateBelief([{ type: 'point', center, spread, skew: skewAmount }], K, L, H)` |
+| `generateCustomShape` | `(controlValues, K, L, H)` | `generateBelief([{ type: 'spline', controlX: [evenly spaced L..H], controlY: controlValues }], K, L, H)` |
+
+### Examples
+
+**Single Gaussian -- "I think the outcome will be around 75":**
+
+```typescript
+import { generateGaussian } from '@functionspace/core';
+
+const { K, L, H } = market.config;
+const belief = generateGaussian(75, 5, K, L, H);
+```
+
+**Bimodal -- "I think it will be either 60 or 90, leaning toward 90":**
+
+```typescript
+import { generateBelief } from '@functionspace/core';
+
+const { K, L, H } = market.config;
+const belief = generateBelief([
+  { type: 'point', center: 60, spread: 4, weight: 0.3 },
+  { type: 'point', center: 90, spread: 4, weight: 0.7 },
+], K, L, H);
+```
+
+**Range -- "Somewhere between 70 and 85":**
+
+```typescript
+import { generateRange } from '@functionspace/core';
+
+const { K, L, H } = market.config;
+const belief = generateRange(70, 85, K, L, H, 0.5);
+```
+
+---
+
+## 7. Executing Trades (Headless)
+
+The SDK's pre-built trading widgets implement a three-phase pattern for trade execution. When building custom UI, you must replicate this pattern yourself.
+
+### The Three-Phase Pattern
+
+**Phase 1: Build belief and set preview (instant, every input change).**
+
+```typescript
+const belief = generateGaussian(center, spread, K, L, H);
+ctx.setPreviewBelief(belief);
+```
+
+**Phase 2: Preview payout (debounced, 500ms after last input change).**
+
+```typescript
+const payout = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
+ctx.setPreviewPayout(payout);
+```
+
+**Phase 3: Submit trade (on user confirmation).**
+
+```typescript
+const result = await buy(ctx.client, marketId, belief, collateral, { prediction });
+ctx.setPreviewBelief(null);
+ctx.setPreviewPayout(null);
+ctx.invalidate(marketId);
+await ctx.refreshUser();
+```
+
+### `buy(client, marketId, belief, collateral, options?)`
+
+Opens a new position. Imported from `@functionspace/core`.
+
+```typescript
+import { buy } from '@functionspace/core';
+
+async function buy(
+  client: FSClient,
+  marketId: string | number,
+  belief: BeliefVector,
+  collateral: number,
+  options?: { prediction?: number },
+): Promise<BuyResult>
+```
+
+### `sell(client, positionId, marketId)`
+
+Closes an open position and returns collateral. Imported from `@functionspace/core`.
+
+```typescript
+import { sell } from '@functionspace/core';
+
+async function sell(
+  client: FSClient,
+  positionId: number,
+  marketId: string | number,
+): Promise<SellResult>
+```
+
+### Complete Working Example: Custom Trade Form
+
+```tsx
+import React, { useState, useContext, useEffect, useRef, useCallback } from 'react';
+import { FunctionSpaceContext, useMarket } from '@functionspace/react';
+import {
+  generateGaussian,
+  buy,
+  previewPayoutCurve,
+} from '@functionspace/core';
+import type { PayoutCurve } from '@functionspace/core';
+
+function CustomTradeForm({ marketId }: { marketId: string }) {
+  const ctx = useContext(FunctionSpaceContext);
+  if (!ctx) throw new Error('Must be within FunctionSpaceProvider');
+
+  const { market, loading: marketLoading } = useMarket(marketId);
+
+  // User inputs
+  const [center, setCenter] = useState(75);
+  const [spread, setSpread] = useState(5);
+  const [collateral, setCollateral] = useState(10);
+
+  // Trade state
+  const [payout, setPayout] = useState<PayoutCurve | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastResult, setLastResult] = useState<string | null>(null);
+
+  // Debounce timer ref
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Phase 1: Build belief and set preview (instant)
+  // Phase 2: Preview payout (debounced 500ms)
+  useEffect(() => {
+    if (!market) return;
+    const { K, L, H } = market.config;
+    const belief = generateGaussian(center, spread, K, L, H);
+
+    // Phase 1: instant preview
+    ctx.setPreviewBelief(belief);
+
+    // Phase 2: debounced payout preview
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const curve = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
+        setPayout(curve);
+        ctx.setPreviewPayout(curve);
+      } catch (err) {
+        setPayout(null);
+        ctx.setPreviewPayout(null);
+      }
+    }, 500);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [market, center, spread, collateral, marketId]);
+
+  // Clean up previews on unmount
+  useEffect(() => {
+    return () => {
+      ctx.setPreviewBelief(null);
+      ctx.setPreviewPayout(null);
+    };
+  }, []);
+
+  // Phase 3: Submit trade
+  const handleBuy = useCallback(async () => {
+    if (!market) return;
+    setError(null);
+    setSubmitting(true);
+
+    try {
+      const { K, L, H } = market.config;
+      const belief = generateGaussian(center, spread, K, L, H);
+
+      const result = await buy(ctx.client, marketId, belief, collateral, {
+        prediction: center,
+      });
+
+      ctx.setPreviewBelief(null);
+      ctx.setPreviewPayout(null);
+      setPayout(null);
+      ctx.invalidate(marketId);
+      await ctx.refreshUser();
+
+      setLastResult(
+        `Position #${result.positionId} opened: ${result.claims.toFixed(4)} claims for $${result.collateral}`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Trade failed');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [market, center, spread, collateral, marketId]);
+
+  if (marketLoading || !market) return <div>Loading market...</div>;
+
+  const { L, H } = market.config;
+
+  return (
+    <div>
+      <h3>Trade: {market.title}</h3>
+      <label>
+        Prediction ({market.xAxisUnits}):
+        <input type="range" min={L} max={H} step={0.1} value={center}
+          onChange={e => setCenter(Number(e.target.value))} />
+        <span>{center}</span>
+      </label>
+      <label>
+        Confidence (spread):
+        <input type="range" min={1} max={20} step={0.5} value={spread}
+          onChange={e => setSpread(Number(e.target.value))} />
+        <span>{spread}</span>
+      </label>
+      <label>
+        Collateral ($):
+        <input type="number" min={1} value={collateral}
+          onChange={e => setCollateral(Number(e.target.value))} />
+      </label>
+      {payout && (
+        <p>Max payout: ${payout.maxPayout.toFixed(2)} at outcome {payout.maxPayoutOutcome.toFixed(1)}</p>
+      )}
+      <button onClick={handleBuy} disabled={submitting || !ctx.isAuthenticated}>
+        {submitting ? 'Submitting...' : `Buy for $${collateral}`}
+      </button>
+      {!ctx.isAuthenticated && <p>Log in to trade</p>}
+      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {lastResult && <p style={{ color: 'green' }}>{lastResult}</p>}
+    </div>
+  );
+}
+
+export default CustomTradeForm;
+```
+
+---
+
+## 8. Previews
+
+Previews are read-only API calls that preview what would happen without executing a trade.
+
+### `previewPayoutCurve(client, marketId, belief, collateral, numOutcomes?)`
+
+Previews what the settlement payout would be for every possible outcome given a hypothetical belief and collateral amount.
+
+```typescript
+import { previewPayoutCurve } from '@functionspace/core';
+
+const curve = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
+ctx.setPreviewPayout(curve);
+```
+
+**Returns `PayoutCurve`:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `previews` | `Array<{outcome, payout, profitLoss: number}>` | Array of outcome/payout pairs |
+| `maxPayout` | `number` | Best-case payout across all outcomes |
+| `maxPayoutOutcome` | `number` | The outcome value that produces the best payout |
+| `inputCollateral` | `number` | Echo of the collateral you passed in |
+
+### `previewSell(client, positionId, marketId)`
+
+Previews how much collateral would be returned if a position were sold at the current market state.
+
+```typescript
+import { previewSell } from '@functionspace/core';
+
+const preview = await previewSell(ctx.client, positionId, marketId);
+// preview = { collateralReturned: number, iterations: number }
+```
+
+---
+
+## 9. Context API Quick Reference
+
+The context is accessed via `useContext(FunctionSpaceContext)` from `@functionspace/react`. It is `null` outside the provider -- always check before using.
+
+```typescript
+import { useContext } from 'react';
+import { FunctionSpaceContext } from '@functionspace/react';
+import type { FSContext } from '@functionspace/react';
+
+const ctx = useContext(FunctionSpaceContext);
+if (!ctx) throw new Error('Must be within FunctionSpaceProvider');
+```
+
+### Read Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `client` | `FSClient` | The HTTP client instance (authenticated if provider has credentials) |
+| `previewBelief` | `number[] \| null` | Active belief vector preview (set by trade inputs, read by charts) |
+| `previewPayout` | `PayoutCurve \| null` | Active payout curve preview |
+| `invalidationCount` | `number` | Internal counter -- hooks watch this to trigger refetches |
+| `selectedPosition` | `Position \| null` | Currently selected position for chart/table sync |
+| `user` | `UserProfile \| null` | Current authenticated user, `null` in guest mode |
+| `isAuthenticated` | `boolean` | Whether a user is currently logged in |
+| `authLoading` | `boolean` | Whether an auth operation is in progress |
+| `authError` | `Error \| null` | Most recent auth error |
+| `chartColors` | `ChartColors` | Resolved chart colors for the current theme (concrete hex values for Recharts SVG) |
+
+### Write Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `setPreviewBelief` | `(belief: number[] \| null) => void` | Set/clear the preview belief overlay |
+| `setPreviewPayout` | `(payout: PayoutCurve \| null) => void` | Set/clear the payout curve overlay |
+| `setSelectedPosition` | `(pos: Position \| null) => void` | Set the selected position |
+| `invalidate` | `(marketId: string \| number) => void` | Trigger data refetch across all mounted hooks |
+| `login` | `(username: string, password: string) => Promise<UserProfile>` | Interactive login |
+| `signup` | `(username: string, password: string, options?: SignupOptions) => Promise<UserProfile>` | Interactive signup (auto-logs-in after) |
+| `logout` | `() => void` | Clear auth state, previews, and trigger invalidation |
+| `refreshUser` | `() => Promise<void>` | Refresh user profile (wallet balance update after trades) |
+
+Total: 18 fields (10 read, 8 write).
+
+---
+
+## 10. NEVER Rules (Headless)
+
+These rules prevent the most common integration mistakes. Each maps to a silent failure or hard-to-debug behavior.
+
+- **NEVER call `buy()` or `sell()` without `ctx.invalidate(marketId)` after success.** Without invalidation, all mounted data hooks (positions, consensus, trade history) continue showing stale data. Charts and tables will not reflect the trade.
+
+- **NEVER assume hooks other than `useTradeHistory` support `pollInterval`.** Only `useTradeHistory` accepts a `pollInterval` option. All other data hooks refetch on invalidation only (via `ctx.invalidationCount`). Do not pass `pollInterval` to `useMarket`, `useConsensus`, `usePositions`, `useMarketHistory`, or `useBucketDistribution` -- it will be silently ignored.
+
+- **NEVER create `FSClient` manually inside a React tree.** The provider creates and manages the client instance. Access it via `useContext(FunctionSpaceContext).client`. Creating a second client bypasses auth state, token management, and invalidation coordination.
+
+- **NEVER skip the debounced payout preview step.** The three-phase pattern exists for a reason. Without Phase 2, any chart rendering payout information in its tooltip will show stale or null data. Debounce at 500ms to avoid flooding the API with preview requests during rapid slider changes.
+
+- **NEVER import `buy` or `sell` from `@functionspace/react`.** Transaction functions live in `@functionspace/core`. The React package exports hooks and the provider -- not transaction functions. The correct import is `import { buy, sell } from '@functionspace/core'`.
+
+- **NEVER use `useFunctionSpace()`.** This hook does not exist. The correct pattern is `useContext(FunctionSpaceContext)` from React, with `FunctionSpaceContext` imported from `@functionspace/react`.
+
+---
+
+## 11. Type Reference
+
+### Core Types (from `@functionspace/core`)
+
+See the complete core type reference in `core.txt`. Key types used in headless mode:
+
+- **`MarketState`** -- Returned by `useMarket()`. Contains `config` (with `K`, `L`, `H`), `consensus`, `title`, `xAxisUnits`, `resolutionState`, and pool statistics.
+- **`ConsensusCurve`** -- Returned by `useConsensus()`. Contains `points: Array<{x, y}>` and `config`.
+- **`Position`** -- Returned by `usePositions()`. Contains `positionId`, `belief`, `collateral`, `claims`, `status`, `prediction`.
+- **`BuyResult`** -- Returned by `buy()`. Contains `positionId`, `belief`, `claims`, `collateral`.
+- **`SellResult`** -- Returned by `sell()`. Contains `positionId`, `collateralReturned`.
+- **`PayoutCurve`** -- Returned by `previewPayoutCurve()`. Contains `previews`, `maxPayout`, `maxPayoutOutcome`.
+- **`BeliefVector`** -- `number[]` of length `K + 1` summing to 1. Passed to `buy()` and `ctx.setPreviewBelief()`.
+- **`BucketData`** -- Returned by `useBucketDistribution()`. Contains `range`, `min`, `max`, `probability`, `percentage`.
+- **`TradeEntry`** -- Returned by `useTradeHistory()`. Contains `id`, `timestamp`, `side`, `prediction`, `amount`, `username`.
+
+### React Types (from `@functionspace/react`)
+
+- **`FSContext`** -- The shape of the React context object. 18 fields (10 read, 8 write). Accessed via `useContext(FunctionSpaceContext)`.
+- **`FSThemeInput`** -- Accepted by the `theme` prop on `FunctionSpaceProvider`. Can be a preset string (`"fs-dark"`, `"fs-light"`, `"native-dark"`, `"native-light"`) or an object with overrides.
+- **`ChartColors`** -- Concrete hex values for Recharts SVG. Accessible via `ctx.chartColors`. Includes `grid`, `axisText`, `consensus`, `previewLine`, `payout`, `positions`, `fanBands`.
+
+### Theme Presets
+
+```typescript
+type ThemePresetId = 'fs-dark' | 'fs-light' | 'native-dark' | 'native-light';
+```
+
+| Value | Description |
+|-------|-------------|
+| `'fs-dark'` | FunctionSpace branded dark theme (vibrant purples, blues) |
+| `'fs-light'` | FunctionSpace branded light theme |
+| `'native-dark'` | Neutral dark theme (minimal branding, suitable for embedding) |
+| `'native-light'` | Neutral light theme |
+
+---
+
+*Generated for AI coding assistants. Source: FunctionSpace Trading SDK `@functionspace/react` package. For the complete multi-package guide, see `llms.txt`.*

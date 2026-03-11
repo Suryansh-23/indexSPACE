@@ -1,0 +1,24 @@
+---
+title: "Timeline Binary Trading Layout"
+sidebar_position: 6
+---
+
+import WidgetDemo from '@site/src/components/WidgetDemo';
+import { TimelineBinaryLayout } from '@demo-app/App_TimelineBinaryTradingLayout';
+import { DEMO_MARKET_ID } from '@site/src/constants';
+
+# Timeline Binary Trading Layout
+
+<WidgetDemo title="Live Demo" height="700px">
+  <TimelineBinaryLayout marketId={DEMO_MARKET_ID} />
+</WidgetDemo>
+
+**File:** `demo-app/src/App_TimelineBinaryTradingLayout.tsx`
+
+The simplest layout: historical fan chart + binary yes/no bet.
+
+**Components:** `MarketStats` + `AuthWidget` -> `TimelineChart` (500px, zoomable) -> `BinaryPanel` (dynamic-mean mode)
+
+**What it enables:** Users see how the market's center of gravity has moved over time (fan chart with confidence bands), then make a simple above/below bet against the current consensus mean. The threshold auto-updates as the mean shifts.
+
+**Target audience:** Casual users, first-time participants. Visually compelling (the fan chart looks like a stock chart with uncertainty bands), immediately actionable (yes/no question). The closest the SDK gets to a traditional prediction market interface.

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useContext, useCallback, useMemo } from 'react';
 import {
   generateRange,
-  projectPayoutCurve,
+  previewPayoutCurve,
   buy,
 } from '@functionspace/core';
 import type { BuyResult, BucketData, RangeInput } from '@functionspace/core';
@@ -154,7 +154,7 @@ export function BucketRangeSelector({
     }
   }, [belief]);
 
-  // Phase 2: Debounced payout projection
+  // Phase 2: Debounced payout preview
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -166,7 +166,7 @@ export function BucketRangeSelector({
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const result = await projectPayoutCurve(ctx.client, marketId, belief, collateral);
+        const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
         if (!mountedRef.current) return;
         setPotentialPayout(result.maxPayout);
         ctx.setPreviewPayout(result);

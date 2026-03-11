@@ -1,0 +1,8 @@
+{
+  "label": "Integration Guides",
+  "position": 13,
+  "link": {
+    "type": "doc",
+    "id": "integration-guides/index"
+  }
+}

@@ -12,19 +12,19 @@ import type {
   Position,
   BuyResult,
   SellResult,
-  ProjectSellResult,
+  PreviewSellResult,
   PayoutCurve,
   BeliefVector,
   GaussianParams,
-  PlateauParams,
+  RangeParams,
   BucketData,
   FSConfig,
 } from '../packages/core/src/types.js';
 
-const BASE_URL = 'http://localhost:8000';
-const USERNAME = '';
-const PASSWORD = '';
-const MARKET_ID = '15';
+const BASE_URL = process.env.FS_TEST_URL || 'http://localhost:8000';
+const USERNAME = process.env.FS_TEST_USERNAME || '';
+const PASSWORD = process.env.FS_TEST_PASSWORD || '';
+const MARKET_ID = process.env.FS_TEST_MARKET_ID || '15';
 
 describe('Stage 1: Types compile correctly', () => {
   it('all type imports resolve without error', () => {

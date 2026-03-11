@@ -10,6 +10,7 @@ export async function queryMarketHistory(
   marketId: string | number,
   limit?: number,
   offset?: number,
+  options?: { signal?: AbortSignal },
 ): Promise<MarketHistory> {
   const params: Record<string, string> = {
     market_id: String(marketId),
@@ -17,7 +18,7 @@ export async function queryMarketHistory(
   if (limit !== undefined) params.limit = String(limit);
   if (offset !== undefined) params.offset = String(offset);
 
-  const data = await client.get<any>('/api/market/history', params);
+  const data = await client.get<any>('/api/market/history', params, options?.signal);
 
   return {
     marketId: data.market_id,

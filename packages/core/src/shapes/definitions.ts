@@ -1,7 +1,7 @@
 export type ShapeId =
   | 'gaussian'
   | 'spike'
-  | 'plateau'
+  | 'range'
   | 'bimodal'
   | 'dip'
   | 'leftskew'
@@ -34,8 +34,8 @@ export const SHAPE_DEFINITIONS: ShapeDefinition[] = [
     svgPath: 'M 5,55 L 45,55 L 50,5 L 55,55 L 95,55',
   },
   {
-    id: 'plateau',
-    name: 'Plateau',
+    id: 'range',
+    name: 'Range',
     description: 'Flat-topped distribution with sharp cliff edges at range boundaries',
     parameters: ['rangeValues'],
     svgPath: 'M 5,55 L 30,55 L 35,20 L 65,20 L 70,55 L 95,55',

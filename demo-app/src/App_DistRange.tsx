@@ -3,9 +3,10 @@ import { MarketCharts, MarketStats, BucketRangeSelector, PasswordlessAuthWidget 
 import { ArticlePage } from './pages/ArticlePage';
 import { config, MARKET_ID, widgetTheme } from './App';
 
-// Inner component so useDistributionState has access to FunctionSpaceProvider context
-function DistRangeContent() {
-  const distState = useDistributionState(MARKET_ID);
+// Reusable layout content (used by both demo-app and docs site)
+// Must be rendered inside FunctionSpaceProvider (useDistributionState needs context)
+export function DistRangeLayout({ marketId }: { marketId: string | number }) {
+  const distState = useDistributionState(marketId);
 
   return (
     <>
@@ -17,13 +18,15 @@ function DistRangeContent() {
             <PasswordlessAuthWidget />
           </div>
         </div>
+    
+      </div>
 
       <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
-        <MarketCharts marketId={MARKET_ID} height={350} views={['consensus', 'distribution']} distributionState={distState} zoomable />
+        <MarketCharts marketId={marketId} height={350} views={['consensus', 'distribution']} distributionState={distState} zoomable />
       </div>
 
       <div style={{ marginBottom: '1rem' }}>
-        <BucketRangeSelector marketId={MARKET_ID} distributionState={distState} />
+        <BucketRangeSelector marketId={marketId} distributionState={distState} />
       </div>
     </>
   );
@@ -34,7 +37,7 @@ export default function App_DistRange() {
   return (
     <ArticlePage>
       <FunctionSpaceProvider config={config} theme={widgetTheme}>
-        <DistRangeContent />
+        <DistRangeLayout marketId={MARKET_ID} />
       </FunctionSpaceProvider>
     </ArticlePage>
   );

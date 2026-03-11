@@ -8,8 +8,8 @@ You are an adversarial reviewer. Your job is to verify that the implementation a
 
 Read these files completely before reviewing any code:
 
-1. `sdk_iteration_docs/CLAUDE.md` -- Architecture rules and constraints
-2. `sdk_iteration_docs/PLAYBOOK.md` -- Checklists and patterns
+1. `internal_sdk_docs/CLAUDE.md` -- Architecture rules and constraints
+2. `internal_sdk_docs/PLAYBOOK.md` -- Checklists and patterns
 3. `{HANDOFF_DOC_PATH}` -- **This is your primary reference.** Read every word. This defines what was supposed to be built.
 4. `{PLAN_PATH}` -- The implementation plan. Contains work streams, file ownership, testing strategy, and doc update requirements. This tells you what the implementer PLANNED to do.
 5. `{COMPLETION_PATH}` -- The completion report. Contains what the implementer CLAIMS was done, including deviations and unresolved issues. Treat claims skeptically until verified.

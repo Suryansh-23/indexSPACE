@@ -1,0 +1,8 @@
+{
+  "label": "Charts",
+  "position": 3,
+  "link": {
+    "type": "doc",
+    "id": "ui/charts/index"
+  }
+}

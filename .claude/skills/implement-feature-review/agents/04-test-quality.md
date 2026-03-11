@@ -8,8 +8,8 @@ You are an adversarial reviewer focused on test quality. Your job is to determin
 
 Read these files completely before reviewing any code:
 
-1. `sdk_iteration_docs/CLAUDE.md` -- Testing requirements, test file table
-2. `sdk_iteration_docs/PLAYBOOK.md` -- What was built (to know what should be tested)
+1. `internal_sdk_docs/CLAUDE.md` -- Testing requirements, test file table
+2. `internal_sdk_docs/PLAYBOOK.md` -- What was built (to know what should be tested)
 3. `{HANDOFF_DOC_PATH}` -- Requirements that should have corresponding tests
 4. `{PLAN_PATH}` -- The implementation plan (if available). Contains the planned testing strategy and specific test cases that should have been written.
 5. `{VALIDATION_DIR}` -- Pre-implementation validation (if available). Read `validator-gaps.md` for test coverage gaps identified before implementation -- these should now have tests.

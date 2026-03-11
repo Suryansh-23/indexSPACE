@@ -1,0 +1,52 @@
+/* Docusaurus theme overrides */
+:root {
+  --ifm-color-primary: #6366f1;
+  --ifm-color-primary-dark: #4f46e5;
+  --ifm-color-primary-darker: #4338ca;
+  --ifm-color-primary-darkest: #3730a3;
+  --ifm-color-primary-light: #818cf8;
+  --ifm-color-primary-lighter: #a5b4fc;
+  --ifm-color-primary-lightest: #c7d2fe;
+  --ifm-code-font-size: 95%;
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #818cf8;
+  --ifm-color-primary-dark: #6366f1;
+  --ifm-color-primary-darker: #4f46e5;
+  --ifm-color-primary-darkest: #4338ca;
+  --ifm-color-primary-light: #a5b4fc;
+  --ifm-color-primary-lighter: #c7d2fe;
+  --ifm-color-primary-lightest: #e0e7ff;
+}
+
+/* SDK widget styles - import directly from source via webpack alias */
+@import '../../../ui/src/styles/base.css';
+@import '../../../ui/src/styles/slider.css';
+
+/* Widen doc content area for widget demos */
+.container {
+  max-width: 1400px !important;
+}
+
+article {
+  max-width: none;
+}
+
+/* Disable auth submit in docs - login not supported on static site */
+.fs-auth-widget form input,
+.fs-auth-widget form .fs-auth-btn-primary,
+.fs-passwordless-auth form input,
+.fs-passwordless-auth form .fs-auth-btn-primary {
+  pointer-events: none;
+  opacity: 0.5;
+}
+.fs-auth-widget form::after,
+.fs-passwordless-auth form::after {
+  content: 'Authentication disabled in docs';
+  display: block;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--ifm-color-emphasis-600);
+  margin-top: 0.5rem;
+}

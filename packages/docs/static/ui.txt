@@ -1,0 +1,977 @@
+# @functionspace/ui -- Agent Implementation Guide
+
+This document is a focused implementation guide for AI coding assistants working with the `@functionspace/ui` package. It covers the widget embedding integration mode -- dropping pre-built chart components, trading panels, position tables, and auth widgets into React applications. All three SDK packages are required.
+
+```
+Packages:
+  @functionspace/core   -- Pure TypeScript. API client, probability math, belief construction, trade execution. Zero framework dependencies.
+  @functionspace/react  -- React integration. Provider, hooks, theme system. Depends on @functionspace/core.
+  @functionspace/ui     -- Pre-built React widgets. Charts, trade panels, position tables. Depends on @functionspace/core and @functionspace/react.
+
+Install (full widget integration):
+  npm install @functionspace/core @functionspace/react @functionspace/ui recharts
+```
+
+> **Note:** These packages are not yet published to npm. To use the SDK,
+> clone the repository and use npm workspace linking. The `npm install`
+> commands below are forward-looking and will work once packages are published.
+
+## Table of Contents
+
+- [1. Overview](#1-overview)
+- [2. Known Limitations](#2-known-limitations)
+- [3. Setup](#3-setup)
+- [4. Theming](#4-theming)
+- [5. Chart Widgets](#5-chart-widgets)
+- [6. Trading Widgets](#6-trading-widgets)
+- [7. Data Display Widgets](#7-data-display-widgets)
+- [8. Composition Patterns](#8-composition-patterns)
+- [9. NEVER Rules (Embedding)](#9-never-rules-embedding)
+- [10. Full App Generation](#10-full-app-generation)
+- [11. NEVER Rules (Full App)](#11-never-rules-full-app)
+- [12. Type Reference](#12-type-reference)
+
+---
+
+## 1. Overview
+
+### 1.1 Machine-Readable Preamble
+
+```
+SDK: FunctionSpace Trading SDK
+Version: 1.x (pre-release)
+Packages:
+  @functionspace/core   -- Pure TypeScript. API client, probability math, belief construction, trade execution. Zero framework dependencies.
+  @functionspace/react  -- React integration. Provider, hooks, theme system. Depends on @functionspace/core.
+  @functionspace/ui     -- Pre-built React widgets. Charts, trade panels, position tables. Depends on @functionspace/core and @functionspace/react.
+
+Install (full widget integration):
+  npm install @functionspace/core @functionspace/react @functionspace/ui recharts
+
+Description: A TypeScript SDK for embedding prediction market trading widgets into web applications. Three packages form a strict dependency chain: core (pure TS math and API client) -> react (hooks, Provider, theming) -> ui (pre-built interactive components).
+```
+
+### 1.2 What This Package Does
+
+The `@functionspace/ui` package provides pre-built React widgets for prediction market trading: chart components (ConsensusChart, DistributionChart, TimelineChart, MarketCharts), trading panels (TradePanel, ShapeCutter, BinaryPanel, BucketRangeSelector, BucketTradePanel, CustomShapeEditor), data display components (PositionTable, TimeSales, MarketStats), and auth widgets (AuthWidget, PasswordlessAuthWidget). All widgets are fully themed and self-contained.
+
+### 1.3 Package Dependency Chain
+
+```
+@functionspace/core       Pure TypeScript. API client, probability math,
+        |                 belief construction, trade execution. No framework
+        |                 dependencies. Works in Node.js, browsers, or any
+        |                 JavaScript runtime.
+        v
+@functionspace/react      React integration layer. FunctionSpaceProvider
+        |                 manages auth, theming, and shared state. Hooks
+        |                 wrap core functions for React consumption.
+        v
+@functionspace/ui         Pre-built React widgets. ConsensusChart, TradePanel,
+                          PositionTable, ShapeCutter, and more. Fully themed
+                          and self-contained.
+```
+
+### 1.4 What IS Supported
+
+- **Full widget embedding with auto-theming.** Drop `ConsensusChart`, `TradePanel`, `PositionTable`, and other components into any React app. All widgets inherit the theme from `FunctionSpaceProvider` with zero manual wiring.
+- **Four theme presets with custom overrides.** Built-in presets: `"fs-dark"`, `"fs-light"`, `"native-dark"`, `"native-light"`. Developers can override any of the 9 core tokens or all 30 tokens for full brand customization.
+- **Six distinct trading interfaces.** `TradePanel` (Gaussian/range), `ShapeCutter` (8 preset shapes), `BinaryPanel` (yes/no), `BucketRangeSelector` (click-to-select buckets), `BucketTradePanel` (composed chart + bucket selector), and `CustomShapeEditor` (drag-to-draw).
+- **Automatic cross-component coordination.** Trading components write preview beliefs to context; chart components read and render preview overlays automatically. No prop-drilling required.
+- **Complete position management.** `PositionTable` with tabbed views (open orders, trade history, market positions), sell actions, pagination, and P&L display.
+- **Trade history with polling.** `useTradeHistory` and the `TimeSales` component support configurable `pollInterval` for near-real-time trade feeds.
+- **Chart zoom and pan.** `useChartZoom` provides scroll-wheel zoom and drag-to-pan for `ConsensusChart` and `TimelineChart`.
+- **Complete authentication flow.** `AuthWidget` for UI-based login/signup, `PasswordlessAuthWidget` for username-only auth, and auto-auth via Provider config.
+
+---
+
+## 2. Known Limitations
+
+| # | Limitation | Impact | Workaround |
+|---|-----------|--------|------------|
+| 1 | **No query caching or request deduplication.** Each hook instance fires its own independent API request. | Redundant API traffic scales linearly with the number of mounted hooks. | Accept the redundant requests. Do not attempt to add TanStack Query or SWR. |
+| 2 | **No real-time transport (WebSocket/SSE).** All data freshness depends on explicit refetch calls or polling. | Market state goes stale between manual refetches. | Use `useTradeHistory` with `pollInterval` for live feeds. Call `ctx.invalidate(marketId)` after trades. |
+| 3 | **No mutation hooks.** `buy()` and `sell()` are imported from `@functionspace/core`, not `@functionspace/react`. | Custom trade UIs must import from two packages. | Pre-built trading components handle mutation lifecycle internally. |
+| 5 | **Global invalidation only.** `ctx.invalidate(marketId)` triggers global refetch regardless of which market. | Multi-market dashboards refetch all hooks on any trade. | Accept the global refetch behavior. |
+| 6 | **Only one trading component at a time.** Multiple trading components cause conflicting preview writes. | Unpredictable chart overlays. | Use tabs, modals, or conditional rendering. Only one trading component mounted at a time. |
+| 7 | **Settlement not yet implemented.** | Positions in resolved markets cannot be settled through the SDK. | Monitor `resolutionState` field. |
+
+---
+
+## 3. Setup
+
+### Install Packages
+
+```bash
+npm install @functionspace/core @functionspace/react @functionspace/ui recharts
+```
+
+### Provider Setup
+
+Every SDK widget must be rendered inside a `FunctionSpaceProvider`. The provider creates the API client, resolves the theme into 30 CSS custom properties, and manages shared state (auth, preview coordination, cache invalidation). No CSS imports are required from the SDK -- styles are self-contained within the components.
+
+```tsx
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { FunctionSpaceProvider } from '@functionspace/react';
+import { ConsensusChart, TradePanel } from '@functionspace/ui';
+
+const config = {
+  baseUrl: 'https://your-api.example.com',
+};
+
+function App() {
+  return (
+    <FunctionSpaceProvider config={config} theme="fs-dark">
+      <ConsensusChart marketId="15" height={400} />
+      <TradePanel marketId="15" />
+    </FunctionSpaceProvider>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);
+```
+
+### Authentication Modes
+
+**Auto-authenticate** -- Pass `username` and `password` in config. The provider authenticates on mount.
+
+```tsx
+const config = {
+  baseUrl: 'https://your-api.example.com',
+  username: 'trader1',
+  password: 'secret',
+  autoAuthenticate: true,
+};
+```
+
+**Interactive** -- Omit credentials from config. Use `AuthWidget` or `PasswordlessAuthWidget` for login/signup UI.
+
+```tsx
+import { FunctionSpaceProvider } from '@functionspace/react';
+import { AuthWidget, ConsensusChart, TradePanel } from '@functionspace/ui';
+
+const config = { baseUrl: 'https://your-api.example.com' };
+
+function App() {
+  return (
+    <FunctionSpaceProvider config={config} theme="fs-dark">
+      <AuthWidget />
+      <ConsensusChart marketId="15" height={400} />
+      <TradePanel marketId="15" />
+    </FunctionSpaceProvider>
+  );
+}
+```
+
+**Guest** -- Same as interactive but without `AuthWidget`. Read-only access.
+
+**Passwordless** -- Use `PasswordlessAuthWidget` for username-only authentication.
+
+```tsx
+import { FunctionSpaceProvider } from '@functionspace/react';
+import { PasswordlessAuthWidget, ConsensusChart } from '@functionspace/ui';
+
+const config = { baseUrl: 'https://your-api.example.com' };
+
+function App() {
+  const savedUsername = localStorage.getItem('fs-username');
+  return (
+    <FunctionSpaceProvider config={config} theme="fs-dark" storedUsername={savedUsername}>
+      <PasswordlessAuthWidget
+        onLogin={(user, action) => {
+          localStorage.setItem('fs-username', user.username);
+          console.log(`${action}: ${user.username}`);
+        }}
+      />
+      <ConsensusChart marketId="15" height={400} />
+    </FunctionSpaceProvider>
+  );
+}
+```
+
+### Config Type Reference
+
+```typescript
+interface FSConfig {
+  baseUrl: string;
+  username?: string;
+  password?: string;
+  autoAuthenticate?: boolean;
+}
+```
+
+---
+
+## 4. Theming
+
+### Preset Selection
+
+| Preset ID | Description |
+|-----------|-------------|
+| `"fs-dark"` | FunctionSpace branded dark theme. Blue primary, dark purple-tinted background, 2px borders, 300ms transitions. |
+| `"fs-light"` | FunctionSpace branded light theme. Blue primary, light gray background. |
+| `"native-dark"` | De-branded dark theme. Pure black background, system fonts, compact radius, 1px borders, 150ms transitions. |
+| `"native-light"` | De-branded light theme. White surface, system fonts, compact radius. |
+
+### The 9 Core Tokens
+
+| Token | What It Controls |
+|-------|-----------------|
+| `primary` | Buttons, active states, consensus curve, header gradients |
+| `accent` | Preview lines, secondary actions, highlights |
+| `positive` | Profit indicators, payout curves, buy confirmations |
+| `negative` | Loss indicators, sell actions, error messages |
+| `background` | Widget and page background |
+| `surface` | Card and panel backgrounds |
+| `text` | Primary text color |
+| `textSecondary` | Secondary, dimmed text |
+| `border` | Borders and dividers |
+
+### Custom Theme Examples
+
+**Preset string (simplest):**
+
+```tsx
+<FunctionSpaceProvider config={config} theme="native-dark">
+  {/* widgets */}
+</FunctionSpaceProvider>
+```
+
+**Preset with overrides (brand matching):**
+
+```tsx
+import type { FSThemeInput } from '@functionspace/react';
+
+const theme: FSThemeInput = {
+  preset: 'fs-dark',
+  primary: '#ff6600',
+  positive: '#00ff00',
+};
+
+<FunctionSpaceProvider config={config} theme={theme}>
+  {/* Buttons and consensus curve are orange; profit states are green */}
+</FunctionSpaceProvider>
+```
+
+**Fully custom 9-token theme:**
+
+```tsx
+import type { FSThemeInput } from '@functionspace/react';
+
+const theme: FSThemeInput = {
+  primary: '#6366f1',
+  accent: '#f59e0b',
+  positive: '#22c55e',
+  negative: '#ef4444',
+  background: '#0a0a0a',
+  surface: '#1a1a1a',
+  text: '#ffffff',
+  textSecondary: '#a0a0a0',
+  border: '#333333',
+};
+```
+
+### CSS Variable Reference
+
+The provider injects all 30 theme tokens as CSS custom properties.
+
+**Core 9:**
+
+| CSS Variable | Token |
+|-------------|-------|
+| `--fs-primary` | `primary` |
+| `--fs-accent` | `accent` |
+| `--fs-positive` | `positive` |
+| `--fs-negative` | `negative` |
+| `--fs-background` | `background` |
+| `--fs-surface` | `surface` |
+| `--fs-text` | `text` |
+| `--fs-text-secondary` | `textSecondary` |
+| `--fs-border` | `border` |
+
+**Tier 1 (derived):** `--fs-bg-secondary`, `--fs-surface-hover`, `--fs-border-subtle`, `--fs-text-muted`
+
+**Tier 2 (component-specific):** `--fs-nav-from`, `--fs-nav-to`, `--fs-overlay`, `--fs-input-bg`, `--fs-code-bg`, `--fs-chart-bg`, `--fs-accent-glow`, `--fs-badge-bg`, `--fs-badge-border`, `--fs-badge-text`, `--fs-logo-filter`
+
+**Tier 3 (shape):** `--fs-font-family`, `--fs-radius-sm`, `--fs-radius-md`, `--fs-radius-lg`, `--fs-border-width`, `--fs-transition-speed`
+
+### Chart Colors: CSS Variables vs. `ctx.chartColors`
+
+Recharts renders SVG elements. SVG `fill` and `stroke` props do not resolve CSS `var()` expressions. Use `ctx.chartColors.*` (concrete hex strings) for all Recharts SVG color props.
+
+| Element Type | Color Source |
+|-------------|-------------|
+| HTML/CSS elements | CSS variables (`var(--fs-primary)`) |
+| Recharts SVG elements | `ctx.chartColors.*` (concrete hex strings) |
+
+Key `chartColors` fields: `consensus`, `previewLine`, `payout`, `grid`, `axisText`, `tooltipBg`, `tooltipBorder`, `tooltipText`, `crosshair`, `positions` (7-color array), `fanBands.mean`, `fanBands.band25`, `fanBands.band50`, `fanBands.band75`, `fanBands.band95`.
+
+---
+
+## 5. Chart Widgets
+
+All chart components must be rendered inside a `FunctionSpaceProvider`.
+
+### `ConsensusChart`
+
+Probability density chart showing the current market consensus. Automatically overlays trade preview curves and selected position curves from context.
+
+```tsx
+import { ConsensusChart } from '@functionspace/ui';
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `marketId` | `string \| number` | required | Market to visualize |
+| `height` | `number` | `300` | Chart height in pixels |
+| `overlayCurves` | `OverlayCurve[]` | -- | Additional density curves to overlay |
+| `zoomable` | `boolean` | -- | Enable scroll-wheel zoom and drag-to-pan |
+
+```tsx
+<ConsensusChart marketId="15" height={400} zoomable />
+```
+
+### `DistributionChart`
+
+Horizontal bar chart showing probability mass by outcome bucket. Includes interactive bucket count slider.
+
+```tsx
+import { DistributionChart } from '@functionspace/ui';
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `marketId` | `string \| number` | required | Market to display |
+| `height` | `number` | `300` | Chart height in pixels |
+| `defaultBucketCount` | `number` | `12` | Initial number of outcome buckets (2 to 50) |
+| `distributionState` | `DistributionState` | -- | External shared state for syncing with `BucketRangeSelector` |
+
+### `TimelineChart`
+
+Fan chart showing consensus evolution over time with nested confidence interval bands.
+
+```tsx
+import { TimelineChart } from '@functionspace/ui';
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `marketId` | `string \| number` | required | Market to display |
+| `height` | `number` | `300` | Chart height in pixels |
+| `zoomable` | `boolean` | -- | Enable scroll-wheel zoom and drag-to-pan |
+
+### `MarketCharts`
+
+Tabbed container combining `ConsensusChart`, `DistributionChart`, and `TimelineChart`.
+
+```tsx
+import { MarketCharts } from '@functionspace/ui';
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `marketId` | `string \| number` | required | Market to display |
+| `height` | `number` | `300` | Chart height in pixels |
+| `views` | `ChartView[]` | `['consensus']` | Which tabs: `'consensus'`, `'distribution'`, `'timeline'` |
+| `overlayCurves` | `OverlayCurve[]` | -- | Overlay curves for the consensus view |
+| `defaultBucketCount` | `number` | `12` | Starting bucket count for distribution |
+| `distributionState` | `DistributionState` | -- | External shared bucket state |
+| `zoomable` | `boolean` | -- | Enable zoom/pan on consensus and timeline views |
+
+```tsx
+<MarketCharts
+  marketId="15"
+  height={400}
+  views={['consensus', 'distribution', 'timeline']}
+  zoomable
+/>
+```
+
+---
+
+## 6. Trading Widgets
+
+All trading widgets follow a three-phase trade pattern:
+
+| Phase | Timing | What Happens | Chart Effect |
+|-------|--------|-------------|--------------|
+| 1. Preview | Instant, on every input change | Generates belief, writes to `ctx.setPreviewBelief(belief)` | Dashed overlay on ConsensusChart |
+| 2. Payout | Debounced, 500ms | Calls `previewPayoutCurve()`, writes to `ctx.setPreviewPayout(result)` | Payout column in chart tooltip |
+| 3. Submit | On button click | Calls `buy()`, clears preview, calls `ctx.invalidate(marketId)` | Preview clears, data hooks refetch |
+
+**Exclusivity rule:** Only one trading widget should be mounted at a time.
+
+### `TradePanel`
+
+Parametric trading panel with Gaussian and Range belief shapes.
+
+```tsx
+import { TradePanel } from '@functionspace/ui';
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `marketId` | `string \| number` | required | Market to trade on |
+| `modes` | `('gaussian' \| 'range')[]` | `['gaussian', 'range']` | Which shape modes to offer |
+| `onBuy` | `(result: BuyResult) => void` | -- | Called after successful trade |
+
+### `BinaryPanel`
+
+Yes/No binary trading interface. Renders: "Will {title} be more than {X}{units}?"
+
+```tsx
+import { BinaryPanel } from '@functionspace/ui';
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `marketId` | `string \| number` | required | Market to trade on |
+| `xPoint` | `XPointMode` | `{ mode: 'variable' }` | How the threshold is determined |
+| `yesColor` | `string` | `'#10b981'` | CSS color for the Yes button |
+| `noColor` | `string` | `'#f43f5e'` | CSS color for the No button |
+| `onBuy` | `(result: BuyResult) => void` | -- | Called after successful trade |
+| `onError` | `(error: Error) => void` | -- | Called on trade failure |
+
+**`XPointMode` type:**
+
+| Mode | Threshold Source | User-Editable |
+|------|-----------------|---------------|
+| `{ mode: 'static', value: 91 }` | Fixed at `value` | Never |
+| `{ mode: 'variable', initial?: 75 }` | `initial` or market midpoint | Always |
+| `{ mode: 'dynamic-mode', allowOverride?: true }` | Consensus peak (mode) | Only if `allowOverride: true` |
+| `{ mode: 'dynamic-mean', allowOverride?: true }` | Consensus mean | Only if `allowOverride: true` |
+
+### `ShapeCutter`
+
+Trading panel with 8 distinct belief shape presets and adaptive parameter sliders.
+
+```tsx
+import { ShapeCutter } from '@functionspace/ui';
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `marketId` | `string \| number` | required | Market to trade on |
+| `shapes` | `ShapeId[]` | all 8 shapes | Filter which shapes to offer |
+| `defaultShape` | `ShapeId` | `'gaussian'` | Pre-selected shape |
+| `onBuy` | `(result: BuyResult) => void` | -- | Called after successful trade |
+| `onError` | `(error: Error) => void` | -- | Called on trade failure |
+
+`ShapeId` values: `'gaussian'`, `'spike'`, `'range'`, `'bimodal'`, `'dip'`, `'leftskew'`, `'rightskew'`, `'uniform'`
+
+### `CustomShapeEditor`
+
+Chart-integrated trading panel where users draw their belief by dragging control points.
+
+```tsx
+import { CustomShapeEditor } from '@functionspace/ui';
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `marketId` | `string \| number` | required | Market to trade on |
+| `defaultNumPoints` | `number` | `20` | Initial control point count (5 to 25) |
+| `zoomable` | `boolean` | -- | Enable chart zoom/pan |
+| `onBuy` | `(result: BuyResult) => void` | -- | Called after successful trade |
+| `onError` | `(error: Error) => void` | -- | Called on trade failure |
+
+### `BucketRangeSelector`
+
+Click-to-select bucket grid for range-based trading.
+
+```tsx
+import { BucketRangeSelector } from '@functionspace/ui';
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `marketId` | `string \| number` | required | Market to trade on |
+| `distributionState` | `DistributionState` | -- | External shared state |
+| `defaultBucketCount` | `number` | `12` | Initial bucket count |
+| `maxSelections` | `number` | `3` | Maximum simultaneously selected buckets |
+| `defaultAutoMode` | `boolean` | `false` | Start in auto mode (crops to 95% CI) |
+| `showCustomRange` | `boolean` | `true` | Show custom min/max range input |
+| `onBuy` | `(result: BuyResult) => void` | -- | Called after successful trade |
+
+### `BucketTradePanel`
+
+Composed component stacking `DistributionChart` on top of `BucketRangeSelector` with shared state.
+
+```tsx
+import { BucketTradePanel } from '@functionspace/ui';
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `marketId` | `string \| number` | required | Market to trade on |
+| `defaultBucketCount` | `number` | `12` | Shared initial bucket count |
+| `chartHeight` | `number` | `300` | Distribution chart height |
+| `maxSelections` | `number` | -- | Forwarded to `BucketRangeSelector` |
+| `onBuy` | `(result: BuyResult) => void` | -- | Called after successful trade |
+
+---
+
+## 7. Data Display Widgets
+
+### `PositionTable`
+
+Paginated, tabbed data table for viewing and managing trading positions.
+
+```tsx
+import { PositionTable } from '@functionspace/ui';
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `marketId` | `string \| number` | required | Market to display positions for |
+| `username` | `string` | required | Authenticated username. Pass `""` for unauthenticated views. |
+| `tabs` | `PositionTabId[]` | `['open-orders', 'trade-history']` | Which tabs to show |
+| `pageSize` | `number` | `20` | Rows per page |
+| `onSell` | `(result: SellResult) => void` | -- | Called after successful sell |
+
+`PositionTabId` values: `'open-orders'`, `'trade-history'`, `'market-positions'`
+
+Notes:
+- Clicking a position row writes to `ctx.setSelectedPosition`, causing `ConsensusChart` to render a colored overlay.
+- The "Sell" button appears only for open positions on the "Open Orders" tab.
+- After a sell, `ctx.invalidate(marketId)` is called automatically.
+
+### `TimeSales`
+
+Live scrollable feed of recent market trades with automatic polling.
+
+```tsx
+import { TimeSales } from '@functionspace/ui';
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `marketId` | `string \| number` | required | Market to display trades for |
+| `maxHeight` | `string` | `'500px'` | Scrollable container max-height |
+| `limit` | `number` | `100` | Maximum trades to fetch |
+| `pollInterval` | `number` | `5000` | Polling interval in ms. `0` to disable. |
+| `showFooter` | `boolean` | `true` | Show footer with count badge |
+| `emptyMessage` | `string` | `'No market activity yet'` | Custom empty state text |
+
+### `MarketStats`
+
+Horizontal stats bar showing key market metrics.
+
+```tsx
+import { MarketStats } from '@functionspace/ui';
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `marketId` | `string \| number` | required | Market to display stats for |
+
+Displays: Total Volume, Current Liquidity, Open Positions, Market Status.
+
+### `AuthWidget`
+
+Self-contained authentication widget handling login, signup, and logout flows.
+
+```tsx
+import { AuthWidget } from '@functionspace/ui';
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `requireAccessCode` | `boolean` | `false` | Show access code field on signup |
+| `onLogin` | `(user: UserProfile) => void` | -- | Called after successful login |
+| `onSignup` | `(user: UserProfile) => void` | -- | Called after successful signup |
+| `onLogout` | `() => void` | -- | Called after logout |
+
+### `PasswordlessAuthWidget`
+
+Modal-based passwordless authentication widget.
+
+```tsx
+import { PasswordlessAuthWidget } from '@functionspace/ui';
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `requireAccessCode` | `boolean` | `false` | Show access code field on admin signup |
+| `onLogin` | `(user: UserProfile, action: 'login' \| 'signup') => void` | -- | Called after successful login/signup |
+| `onSignup` | `(user: UserProfile) => void` | -- | Called after admin signup |
+| `onLogout` | `() => void` | -- | Called after logout |
+
+---
+
+## 8. Composition Patterns
+
+### Chart + Trading Panel Side by Side
+
+```tsx
+import { FunctionSpaceProvider } from '@functionspace/react';
+import { ConsensusChart, TradePanel } from '@functionspace/ui';
+
+const config = {
+  baseUrl: 'https://your-api.example.com',
+  username: 'trader1',
+  password: 'secret',
+};
+
+function App() {
+  return (
+    <FunctionSpaceProvider config={config} theme="fs-dark">
+      <div style={{ display: 'flex', gap: '1rem', minHeight: '520px' }}>
+        <div style={{ flex: 7, minWidth: 0 }}>
+          <ConsensusChart marketId="15" height={500} zoomable />
+        </div>
+        <div style={{ flex: 3, minWidth: 0 }}>
+          <TradePanel marketId="15" modes={['gaussian', 'range']} />
+        </div>
+      </div>
+    </FunctionSpaceProvider>
+  );
+}
+```
+
+Moving sliders on `TradePanel` instantly shows a dashed preview curve on `ConsensusChart`. After submitting a trade, the preview clears and the chart refetches.
+
+### Shared `useDistributionState` Between Chart and Selector
+
+```tsx
+import { FunctionSpaceProvider, useDistributionState } from '@functionspace/react';
+import { MarketCharts, BucketRangeSelector } from '@functionspace/ui';
+
+const MARKET_ID = '15';
+
+function DistRangeContent() {
+  const distState = useDistributionState(MARKET_ID, { defaultBucketCount: 8 });
+
+  return (
+    <>
+      <MarketCharts
+        marketId={MARKET_ID}
+        height={350}
+        views={['consensus', 'distribution']}
+        distributionState={distState}
+        zoomable
+      />
+      <BucketRangeSelector
+        marketId={MARKET_ID}
+        distributionState={distState}
+        maxSelections={4}
+      />
+    </>
+  );
+}
+
+function App() {
+  return (
+    <FunctionSpaceProvider config={config} theme="fs-dark">
+      <DistRangeContent />
+    </FunctionSpaceProvider>
+  );
+}
+```
+
+**Important:** Call `useDistributionState` from a child component inside the provider, not from the same component that renders it.
+
+### Full Dashboard Layout
+
+```tsx
+import { FunctionSpaceProvider } from '@functionspace/react';
+import {
+  MarketStats,
+  AuthWidget,
+  MarketCharts,
+  ShapeCutter,
+  PositionTable,
+  TimeSales,
+} from '@functionspace/ui';
+
+const MARKET_ID = '15';
+const config = {
+  baseUrl: 'https://your-api.example.com',
+  username: 'trader1',
+  password: 'secret',
+};
+
+function App() {
+  return (
+    <FunctionSpaceProvider config={config} theme="fs-dark">
+      {/* Header: stats + auth */}
+      <div style={{ display: 'flex', gap: '1rem' }}>
+        <div style={{ flex: 7, minWidth: 0 }}>
+          <MarketStats marketId={MARKET_ID} />
+        </div>
+        <div style={{ flex: 3, minWidth: 0 }}>
+          <AuthWidget />
+        </div>
+      </div>
+
+      {/* Main: chart + trading */}
+      <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+        <div style={{ flex: 7, minWidth: 0 }}>
+          <MarketCharts
+            marketId={MARKET_ID}
+            height={400}
+            views={['consensus', 'distribution', 'timeline']}
+            zoomable
+          />
+        </div>
+        <div style={{ flex: 3, minWidth: 0 }}>
+          <ShapeCutter marketId={MARKET_ID} />
+        </div>
+      </div>
+
+      {/* Footer: positions + live feed */}
+      <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+        <div style={{ flex: 7, minWidth: 0 }}>
+          <PositionTable
+            marketId={MARKET_ID}
+            username="trader1"
+            tabs={['open-orders', 'trade-history', 'market-positions']}
+          />
+        </div>
+        <div style={{ flex: 3, minWidth: 0 }}>
+          <TimeSales marketId={MARKET_ID} maxHeight="400px" />
+        </div>
+      </div>
+    </FunctionSpaceProvider>
+  );
+}
+```
+
+Layout notes:
+- The 7:3 flex ratio places wider content beside narrower panels.
+- `minWidth: 0` on flex children is mandatory. Without it, Recharts SVG elements overflow.
+- `ShapeCutter` and `MarketCharts` coordinate automatically through context.
+- `AuthWidget` takes no props -- it reads all auth state from context.
+
+---
+
+## 9. NEVER Rules (Embedding)
+
+**NEVER mount multiple trading components simultaneously.** Use tabs, modals, or conditional rendering.
+
+**NEVER use `var(--fs-*)` in Recharts `stroke`/`fill` props.** Use `ctx.chartColors.*` for SVG colors.
+
+**NEVER import from `packages/ui/src/theme.ts`.** Use `ctx.chartColors` from context.
+
+**NEVER create a second `FunctionSpaceProvider` for nested sections.** One provider wraps the entire widget tree.
+
+**NEVER hardcode hex colors in SDK component wrappers.** Use CSS variables for HTML, `ctx.chartColors.*` for SVG.
+
+**NEVER omit `recharts` from dependencies.** It is a required peer dependency of `@functionspace/ui`.
+
+---
+
+## 10. Full App Generation
+
+### Project Scaffolding
+
+```bash
+npm create vite@latest my-trading-app -- --template react-ts
+cd my-trading-app
+npm install @functionspace/core @functionspace/react @functionspace/ui recharts
+```
+
+Version compatibility: React `^18.2.0`, recharts `^2.10.0`, TypeScript `^5.3.0`, Vite `^5.0.0`.
+
+No special SDK configuration in `vite.config.ts`. Do NOT add `resolve.alias` for `@functionspace/*`.
+
+### Environment Variables
+
+```
+VITE_FS_BASE_URL=https://your-api.example.com
+VITE_FS_USERNAME=your_username
+VITE_FS_PASSWORD=your_password
+VITE_FS_MARKET_ID=15
+VITE_FS_AUTO_AUTH=true
+```
+
+### Starter Kit: Market Dashboard
+
+```tsx
+// src/App.tsx -- Market Dashboard Starter Kit
+import { FunctionSpaceProvider } from '@functionspace/react';
+import {
+  MarketCharts,
+  ShapeCutter,
+  MarketStats,
+  PositionTable,
+  AuthWidget,
+} from '@functionspace/ui';
+import type { FSThemeInput } from '@functionspace/react';
+
+const config = {
+  baseUrl: import.meta.env.VITE_FS_BASE_URL,
+  username: import.meta.env.VITE_FS_USERNAME,
+  password: import.meta.env.VITE_FS_PASSWORD,
+  autoAuthenticate: import.meta.env.VITE_FS_AUTO_AUTH !== 'false',
+};
+
+const MARKET_ID = import.meta.env.VITE_FS_MARKET_ID;
+const theme: FSThemeInput = 'fs-dark';
+
+export default function App() {
+  return (
+    <FunctionSpaceProvider config={config} theme={theme}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '1.5rem' }}>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <div style={{ flex: 7, minWidth: 0 }}>
+            <MarketStats marketId={MARKET_ID} />
+          </div>
+          <div style={{ flex: 3, minWidth: 0 }}>
+            <AuthWidget />
+          </div>
+        </div>
+        <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
+          <MarketCharts
+            marketId={MARKET_ID}
+            height={350}
+            views={['consensus', 'distribution', 'timeline']}
+            zoomable
+          />
+        </div>
+        <div style={{ marginBottom: '1rem' }}>
+          <ShapeCutter marketId={MARKET_ID} />
+        </div>
+        <PositionTable
+          marketId={MARKET_ID}
+          username={config.username}
+          tabs={['open-orders', 'trade-history', 'market-positions']}
+        />
+      </div>
+    </FunctionSpaceProvider>
+  );
+}
+```
+
+### Starter Kit: Minimal Embed
+
+```tsx
+// src/App.tsx -- Minimal Embed Starter Kit
+import { FunctionSpaceProvider } from '@functionspace/react';
+import { ConsensusChart, TradePanel } from '@functionspace/ui';
+
+const config = { baseUrl: import.meta.env.VITE_FS_BASE_URL };
+const MARKET_ID = import.meta.env.VITE_FS_MARKET_ID;
+
+export default function App() {
+  return (
+    <FunctionSpaceProvider config={config} theme="native-dark">
+      <div style={{ maxWidth: 800, margin: '0 auto', padding: '1rem' }}>
+        <ConsensusChart marketId={MARKET_ID} height={400} />
+        <TradePanel marketId={MARKET_ID} modes={['gaussian', 'range']} />
+      </div>
+    </FunctionSpaceProvider>
+  );
+}
+```
+
+---
+
+## 11. NEVER Rules (Full App)
+
+1. **NEVER use CSS-in-JS libraries for SDK components.** Do not use `@emotion`, `styled-components`, CSS modules, or Tailwind `@apply` to wrap or restyle SDK widgets.
+
+2. **NEVER add a second `FunctionSpaceProvider` for nested routes.** One provider at the app root.
+
+3. **NEVER place SDK widgets outside the provider tree.** Widgets throw if context is null.
+
+4. **NEVER use monorepo workspace references in production builds.** Do not add `resolve.alias` for `@functionspace/*`.
+
+5. **NEVER omit `recharts` from dependencies.** It is a peer dependency of `@functionspace/ui`.
+
+6. **NEVER import CSS files from SDK packages.** Styles are self-contained.
+
+7. **NEVER use `var(--fs-*)` CSS variables in Recharts SVG `stroke` or `fill` props.** Use `ctx.chartColors.*`.
+
+---
+
+## 12. Type Reference
+
+### UI-Specific Types
+
+#### `OverlayCurve`
+
+**Package:** `@functionspace/ui`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | Unique identifier |
+| `label` | `string` | Display label for legend |
+| `curve` | `Array<{x: number; y: number}>` | Data points |
+| `color` | `string?` | Override color (defaults to theme accent) |
+
+#### `XPointMode`
+
+**Package:** `@functionspace/ui`
+
+```typescript
+type XPointMode =
+  | { mode: 'static'; value: number }
+  | { mode: 'variable'; initial?: number }
+  | { mode: 'dynamic-mode'; allowOverride?: boolean }
+  | { mode: 'dynamic-mean'; allowOverride?: boolean };
+```
+
+#### `TradeInputBaseProps`
+
+**Package:** `@functionspace/ui`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `marketId` | `string \| number` | Target market identifier |
+| `onBuy` | `(result: BuyResult) => void` | Optional callback after successful buy |
+| `onError` | `(error: Error) => void` | Optional callback on trade error |
+
+### Theme Types
+
+#### `FSThemeInput`
+
+```typescript
+type FSThemeInput = ThemePresetId | (Partial<FSTheme> & { preset?: ThemePresetId });
+```
+
+#### `ThemePresetId`
+
+```typescript
+type ThemePresetId = 'fs-dark' | 'fs-light' | 'native-dark' | 'native-light';
+```
+
+#### `ChartView`
+
+```typescript
+type ChartView = 'consensus' | 'distribution' | 'timeline';
+```
+
+#### `PositionTabId`
+
+```typescript
+type PositionTabId = 'open-orders' | 'trade-history' | 'market-positions';
+```
+
+#### `ShapeId`
+
+```typescript
+type ShapeId = 'gaussian' | 'spike' | 'range' | 'bimodal' | 'dip' | 'leftskew' | 'rightskew' | 'uniform';
+```
+
+### Key Core Types Used by UI
+
+- **`MarketState`** -- Contains `config` (K, L, H), `consensus`, `title`, `xAxisUnits`, `resolutionState`.
+- **`BuyResult`** -- Returned by `buy()`. Contains `positionId`, `belief`, `claims`, `collateral`.
+- **`SellResult`** -- Returned by `sell()`. Contains `positionId`, `collateralReturned`.
+- **`Position`** -- Contains `positionId`, `belief`, `collateral`, `claims`, `status`, `prediction`.
+- **`BucketData`** -- Contains `range`, `min`, `max`, `probability`, `percentage`.
+- **`TradeEntry`** -- Contains `id`, `timestamp`, `side`, `prediction`, `amount`, `username`.
+- **`UserProfile`** -- Contains `userId`, `username`, `walletValue`, `role`.
+- **`PayoutCurve`** -- Contains `previews`, `maxPayout`, `maxPayoutOutcome`, `inputCollateral`.
+
+For complete core type reference, see `core.txt`. For React/hooks types, see `react.txt`.
+
+---
+
+*Generated for AI coding assistants. Source: FunctionSpace Trading SDK `@functionspace/ui` package. For the complete multi-package guide, see `llms.txt`.*

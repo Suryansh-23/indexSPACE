@@ -12,8 +12,8 @@ You are the orchestrator for a multi-agent adversarial code review. Your job is 
 
 Read these files completely before doing anything else:
 
-1. `sdk_iteration_docs/CLAUDE.md` -- Architecture rules, constraints, testing requirements
-2. `sdk_iteration_docs/PLAYBOOK.md` -- Checklists, patterns, existing widget/hook/function reference
+1. `internal_sdk_docs/CLAUDE.md` -- Architecture rules, constraints, testing requirements
+2. `internal_sdk_docs/PLAYBOOK.md` -- Checklists, patterns, existing widget/hook/function reference
 3. The handoff document at `$ARGUMENTS` -- This is the original spec. Read it fully. This tells you what was SUPPOSED to be built.
 
 If `$ARGUMENTS` is empty or the file doesn't exist, ask the user to provide the path to the handoff/plan document that was used for implementation.
@@ -164,7 +164,7 @@ After ALL 8 agents complete (or fail), read brief summaries of each agent's key 
   1. Read all 8 report files from `{OUTPUT_DIR}/`
   2. Cross-reference within domains, then across domains (see consolidation prompt for domain groupings)
   3. Deduplicate findings with confidence scoring
-  4. Run regression (`npx vitest run` + `cd demo-app && npx vite build`)
+  4. Run regression (`npx vitest run` + `cd demo-app && npx vite build` + `cd packages/docs && npx docusaurus build`)
   5. Write `{OUTPUT_DIR}/review-{FEATURE_NAME}.md` (the detailed handoff report)
   6. Write `{OUTPUT_DIR}/doc-updates-draft.md` (proposed edits to living docs)
 

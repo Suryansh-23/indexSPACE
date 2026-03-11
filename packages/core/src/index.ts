@@ -7,11 +7,11 @@ export type {
   Position,
   BuyResult,
   SellResult,
-  ProjectSellResult,
+  PreviewSellResult,
   PayoutCurve,
   BeliefVector,
   GaussianParams,
-  PlateauParams,
+  RangeParams,
   BucketData,
   TradeEntry,
   FSConfig,
@@ -32,7 +32,7 @@ export { FSClient } from './client.js';
 
 // Math
 export { evaluateDensityPiecewise, evaluateDensityCurve, computeStatistics, computePercentiles } from './math/density.js';
-export { generateGaussian, generateRange, generatePlateau, generateBelief, generateDip, generateLeftSkew, generateRightSkew, generateCustomShape, generateBellShape } from './math/generators.js';
+export { generateGaussian, generateRange, generateBelief, generateDip, generateLeftSkew, generateRightSkew, generateCustomShape, generateBellShape } from './math/generators.js';
 export type { Region, PointRegion, RangeRegion, SplineRegion, RangeInput } from './math/generators.js';
 export { calculateBucketDistribution } from './math/distribution.js';
 export { transformHistoryToFanChart } from './math/fanChart.js';
@@ -51,9 +51,9 @@ export { queryMarketHistory } from './queries/history.js';
 export { buy } from './transactions/buy.js';
 export { sell } from './transactions/sell.js';
 
-// Projections
-export { projectSell } from './projections/projectSell.js';
-export { projectPayoutCurve } from './projections/projectPayoutCurve.js';
+// Previews
+export { previewSell } from './previews/previewSell.js';
+export { previewPayoutCurve } from './previews/previewPayoutCurve.js';
 
 // Auth
 export { loginUser, signupUser, fetchCurrentUser, validateUsername, passwordlessLoginUser, silentReAuth } from './auth/auth.js';

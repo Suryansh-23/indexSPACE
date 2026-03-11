@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useContext, useCallback } from 'react';
 import {
   generateGaussian,
-  generatePlateau,
+  generateRange,
   generateBelief,
   generateDip,
   generateLeftSkew,
   generateRightSkew,
-  projectPayoutCurve,
+  previewPayoutCurve,
   buy,
   SHAPE_DEFINITIONS,
 } from '@functionspace/core';
@@ -110,9 +110,9 @@ export function ShapeCutter({
         return generateGaussian(targetOutcome, spread * spikeMul, K, L, H);
       }
 
-      case 'plateau':
+      case 'range':
         if (!rangeValues) return null;
-        return generatePlateau(rangeValues[0], rangeValues[1], K, L, H, 1);
+        return generateRange(rangeValues[0], rangeValues[1], K, L, H, 1);
 
       case 'bimodal':
         if (!rangeValues) return null;
@@ -134,7 +134,7 @@ export function ShapeCutter({
         return generateRightSkew(targetOutcome, spread, K, L, H, skewAmount / 100);
 
       case 'uniform':
-        return generatePlateau(L, H, K, L, H, 1);
+        return generateRange(L, H, K, L, H, 1);
 
       default:
         return null;
@@ -152,7 +152,7 @@ export function ShapeCutter({
     }
   }, [generateCurrentBelief]);
 
-  // Debounced payout projection
+  // Debounced payout preview
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -165,7 +165,7 @@ export function ShapeCutter({
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const result = await projectPayoutCurve(ctx.client, marketId, belief, collateral);
+        const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
         if (!mountedRef.current) return;
         setPotentialPayout(result.maxPayout);
         ctx.setPreviewPayout(result);
@@ -191,7 +191,7 @@ export function ShapeCutter({
       case 'leftskew':
       case 'rightskew':
         return targetOutcome!;
-      case 'plateau':
+      case 'range':
         return (rangeValues![0] + rangeValues![1]) / 2;
       case 'bimodal':
         return (peakBias / 100) <= 0.5 ? rangeValues![0] : rangeValues![1];
@@ -262,7 +262,7 @@ export function ShapeCutter({
   const collateral = parseFloat(amount);
   const displayPrediction = (() => {
     if (selectedShape === 'uniform' && market) return (market.config.L + market.config.H) / 2;
-    if (selectedShape === 'plateau' || selectedShape === 'bimodal') {
+    if (selectedShape === 'range' || selectedShape === 'bimodal') {
       if (!rangeValues) return null;
       return selectedShape === 'bimodal'
         ? ((peakBias / 100) <= 0.5 ? rangeValues[0] : rangeValues[1])

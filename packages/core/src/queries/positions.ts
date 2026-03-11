@@ -28,10 +28,11 @@ export function mapPosition(raw: any): Position {
 export async function queryMarketPositions(
   client: FSClient,
   marketId: string | number,
+  options?: { signal?: AbortSignal },
 ): Promise<Position[]> {
   const data = await client.get<any>('/api/market/positions', {
     market_id: String(marketId),
-  });
+  }, options?.signal);
   return (data.positions || []).map(mapPosition);
 }
 
@@ -43,8 +44,9 @@ export async function queryPositionState(
   client: FSClient,
   positionId: number,
   marketId: string | number,
+  options?: { signal?: AbortSignal },
 ): Promise<Position> {
-  const positions = await queryMarketPositions(client, marketId);
+  const positions = await queryMarketPositions(client, marketId, options);
   const match = positions.find(
     (p) => p.positionId === positionId || String(p.positionId) === String(positionId),
   );

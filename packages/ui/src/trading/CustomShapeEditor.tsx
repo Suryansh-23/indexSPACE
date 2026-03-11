@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 import {
   evaluateDensityCurve,
-  projectPayoutCurve,
+  previewPayoutCurve,
   buy,
 } from '@functionspace/core';
 import type { BuyResult } from '@functionspace/core';
@@ -94,7 +94,7 @@ export function CustomShapeEditor({
     }
   }, [shape.pVector]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Phase 2: Debounced payout projection
+  // Phase 2: Debounced payout preview
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -106,7 +106,7 @@ export function CustomShapeEditor({
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const result = await projectPayoutCurve(ctx.client, marketId, shape.pVector!, collateral);
+        const result = await previewPayoutCurve(ctx.client, marketId, shape.pVector!, collateral);
         if (!mountedRef.current) return;
         setPotentialPayout(result.maxPayout);
         ctx.setPreviewPayout(result);
@@ -149,15 +149,15 @@ export function CustomShapeEditor({
     }
 
     // Add payout data (tooltip-only)
-    if (ctx.previewPayout?.projections?.length && market) {
-      const projections = ctx.previewPayout.projections;
+    if (ctx.previewPayout?.previews?.length && market) {
+      const previews = ctx.previewPayout.previews;
       for (const point of points) {
-        let best = projections[0];
+        let best = previews[0];
         let bestDist = Math.abs(best.outcome - point.x);
-        for (let j = 1; j < projections.length; j++) {
-          const dist = Math.abs(projections[j].outcome - point.x);
+        for (let j = 1; j < previews.length; j++) {
+          const dist = Math.abs(previews[j].outcome - point.x);
           if (dist < bestDist) {
-            best = projections[j];
+            best = previews[j];
             bestDist = dist;
           }
         }

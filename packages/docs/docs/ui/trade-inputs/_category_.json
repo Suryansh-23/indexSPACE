@@ -1,0 +1,8 @@
+{
+  "label": "Trade Inputs",
+  "position": 2,
+  "link": {
+    "type": "doc",
+    "id": "ui/trade-inputs/index"
+  }
+}

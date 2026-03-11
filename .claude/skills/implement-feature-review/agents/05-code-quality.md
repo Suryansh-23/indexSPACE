@@ -8,8 +8,8 @@ You are the safety net. Your job is to read EVERY changed file and find anything
 
 Read these files completely before reviewing any code:
 
-1. `sdk_iteration_docs/CLAUDE.md` -- Architecture rules, constraints, theme system, testing requirements
-2. `sdk_iteration_docs/PLAYBOOK.md` -- Checklists, patterns, widget reference, hook table, core functions, file locations
+1. `internal_sdk_docs/CLAUDE.md` -- Architecture rules, constraints, theme system, testing requirements
+2. `internal_sdk_docs/PLAYBOOK.md` -- Checklists, patterns, widget reference, hook table, core functions, file locations
 3. `{HANDOFF_DOC_PATH}` -- What was being built (for context)
 4. `{VALIDATION_DIR}` -- Pre-implementation validation (if available). Read `validator-conventions.md` for convention violations flagged before implementation -- verify these were avoided in the final code.
 
