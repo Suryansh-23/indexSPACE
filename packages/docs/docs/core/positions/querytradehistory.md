@@ -7,7 +7,7 @@ sidebar_position: 5
 
 **`queryTradeHistory(client, marketId, options?)`**
 
-**Layer:** L1. Convenience function that composes `queryMarketPositions` + `positionsToTradeEntries` into a single call. Returns the same `TradeEntry[]` type documented above.
+**Layer:** L2. Convenience function that composes `queryMarketPositions` + `positionsToTradeEntries` into a single call. Returns the same `TradeEntry[]` type documented above.
 
 ```typescript
 async function queryTradeHistory(
@@ -24,7 +24,7 @@ async function queryTradeHistory(
 | `client` | `FSClient` | Authenticated API client |
 | `marketId` | `string \| number` | Market identifier |
 | `options.limit` | `number` | Maximum number of trade entries to return (default: 100) |
-| `options.signal` | `AbortSignal` | Optional AbortController signal for request cancellation (forward-compatible; will be wired through once the underlying query layer supports it) |
+| `options.signal` | `AbortSignal` | Optional AbortController signal for request cancellation (forwarded through to the underlying fetch call) |
 
 **Example:**
 

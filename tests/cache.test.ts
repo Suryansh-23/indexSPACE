@@ -785,9 +785,6 @@ describe('QueryCache', () => {
     });
 
     it('window focus event triggers handleFocus()', async () => {
-      // In Node (no window), we verify the handleFocusEvent handler calls handleFocus.
-      // We test the wiring by spying on handleFocus and invoking the internal handler
-      // via the public handleFocus method (which is what handleFocusEvent delegates to).
       cache = new QueryCache({ staleTime: 0, revalidateOnFocus: true });
       const key: CacheKey = ['market', '1'];
       const queryFn = createQueryFn('data');
@@ -802,8 +799,8 @@ describe('QueryCache', () => {
       // Advance time so the entry becomes stale (staleTime=0, need > 0ms)
       vi.advanceTimersByTime(1);
 
-      // handleFocus with staleTime=0 should trigger a refetch since data is stale
-      cache.handleFocus();
+      // Dispatch a real window focus event to verify the actual listener wiring
+      window.dispatchEvent(new Event('focus'));
       await flushMicrotasks();
 
       expect(queryFn).toHaveBeenCalledTimes(2);
