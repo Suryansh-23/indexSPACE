@@ -59,7 +59,7 @@ Pure TypeScript with zero dependencies. Use this layer directly if you don't nee
 
 **Transactions** -- `buy`, `sell`.
 
-**Projections** -- `projectPayoutCurve`, `projectSell` for trade previews without committing.
+**Previews** -- `previewPayoutCurve`, `previewSell` for trade previews without committing.
 
 **Types** -- `MarketState`, `Position`, `FSConfig`, `PayoutCurve`, `BeliefVector`, `TradeEntry`, `MarketHistory`, `FanChartPoint`, and more.
 
@@ -346,7 +346,7 @@ packages/
 │   ├── math/fanChart.ts      History -> fan chart transform
 │   ├── queries/              Read operations (market, positions, history)
 │   ├── transactions/         Write operations (buy, sell)
-│   ├── projections/          Preview operations (payout curve, sell estimate)
+│   ├── previews/             Preview operations (payout curve, sell estimate)
 │   ├── shapes/               Shape definitions for trade inputs
 │   ├── discovery/            Market listing
 │   ├── auth/                 Authentication (login, signup, user fetching)

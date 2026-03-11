@@ -387,7 +387,7 @@ ctx.authError           // Last auth error (Error | null)
 
 // Write
 ctx.setPreviewBelief(belief)        // Update preview visualization
-ctx.setPreviewPayout(payout)        // Update payout projection
+ctx.setPreviewPayout(payout)        // Update payout preview
 ctx.setSelectedPosition(position)   // Select position (chart/table sync)
 ctx.invalidate(marketId)            // Trigger data refetch after mutations
 ctx.login(username, password)       // Interactive login
@@ -518,7 +518,7 @@ BeliefVector → ctx.setPreviewBelief(belief)     [instant, on every input chang
               → evaluateDensityCurve(belief, L, H, numPoints)  [piecewise-linear interpolation]
                 → rendered as dashed yellow area on chart (type="linear")
 
-BeliefVector + collateral → projectPayoutCurve(client, marketId, belief, collateral)  [debounced 500ms]
+BeliefVector + collateral → previewPayoutCurve(client, marketId, belief, collateral)  [debounced 500ms]
                           → ctx.setPreviewPayout(payoutCurve)
                             → ConsensusChart shows payout in tooltip
 
@@ -620,9 +620,9 @@ Peaks beyond 4x are clipped visually but remain in the tooltip data. This ensure
 - `buy(client, marketId, belief, collateral)` → BuyResult
 - `sell(client, positionId, marketId)` → SellResult
 
-### Projections
-- `projectPayoutCurve(client, marketId, belief, collateral)` → PayoutCurve
-- `projectSell(client, positionId, marketId)` → ProjectSellResult
+### Previews
+- `previewPayoutCurve(client, marketId, belief, collateral)` → PayoutCurve
+- `previewSell(client, positionId, marketId)` → PreviewSellResult
 
 ---
 
@@ -711,7 +711,7 @@ const [activeTab, setActiveTab] = useState(effectiveTabs[0]);
 ```
 When adding a new tabbed widget, follow this exact pattern — do not invent a different approach.
 
-**PositionTable tab-aware data fetching:** The table uses a single `usePositions` call. When the `market-positions` tab is enabled, `username` is omitted to fetch all positions; client-side filtering derives per-tab data. Market value fetching (`projectSell`) only runs for open positions on the active tab — never for Trade History.
+**PositionTable tab-aware data fetching:** The table uses a single `usePositions` call. When the `market-positions` tab is enabled, `username` is omitted to fetch all positions; client-side filtering derives per-tab data. Market value fetching (`previewSell`) only runs for open positions on the active tab — never for Trade History.
 
 **Shared state composition pattern:** `BucketTradePanel` is a "composed widget" — it renders `DistributionChart` + `BucketRangeSelector` and coordinates them via a shared `useDistributionState` instance passed as a prop. This differs from context-based coordination (used by charts + trade panels). Use this pattern when two public widgets need to share derived state that isn't relevant to the broader SDK context.
 
@@ -919,8 +919,8 @@ useEffect(() => {
 }, [generateCurrentBelief]);
 ```
 
-**Phase 2 — Debounced payout projection (500ms):**
-Project the payout curve via API. Debounced because this hits the server.
+**Phase 2 — Debounced payout preview (500ms):**
+Preview the payout curve via API. Debounced because this hits the server.
 ```typescript
 useEffect(() => {
   if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -928,7 +928,7 @@ useEffect(() => {
   const collateral = parseFloat(amount);
   if (!belief || isNaN(collateral) || collateral <= 0) { setPotentialPayout(null); return; }
   debounceRef.current = setTimeout(async () => {
-    const result = await projectPayoutCurve(ctx.client, marketId, belief, collateral);
+    const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
     if (!mountedRef.current) return;
     setPotentialPayout(result.maxPayout);
     ctx.setPreviewPayout(result);
@@ -1003,7 +1003,7 @@ packages/
 │   ├── queries/history.ts    # Market history queries (GET /api/market/history)
 │   ├── queries/positions.ts  # Position queries (queryMarketPositions, queryPositionState)
 │   ├── queries/trades.ts     # Trade history (positionsToTradeEntries, queryTradeHistory)
-│   ├── projections/          # projectPayoutCurve, projectSell
+│   ├── previews/             # previewPayoutCurve, previewSell
 │   ├── transactions/         # buy, sell
 │   ├── discovery/markets.ts  # discoverMarkets
 │   └── auth/auth.ts          # loginUser, signupUser, fetchCurrentUser, validateUsername

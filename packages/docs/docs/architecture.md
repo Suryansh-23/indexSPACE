@@ -24,7 +24,7 @@ The SDK uses a layered architecture where higher layers compose lower layers. De
 | --- | --- | --- | --- |
 | L0 | Pure Math | Protocol-agnostic mathematical operations. No awareness of markets or positions. | `evaluateDensity()`, `evaluatePotential()` |
 | L1 | Core | Direct protocol interactions with full parameter control. Unopinionated and explicit. | `buy()`, `queryMarketState()`, `generateBelief()` |
-| L2 | Convenience | Higher-level wrappers with sensible defaults. Named concepts that map to common use cases. | `generateGaussian()`, `projectBuy()`, `queryClaimShare()` |
+| L2 | Convenience | Higher-level wrappers with sensible defaults. Named concepts that map to common use cases. | `generateGaussian()`, `previewBuy()`, `queryClaimShare()` |
 | L3 | Intent | Domain-specific functions driven by user intent. May reference live market state and orchestrate across categories. | `generateBinary()`, `claimAll()`, `discoverTrending()` |
 
 
@@ -40,7 +40,7 @@ Categories group functions by what they do, independent of their abstraction lay
 | --- | --- | --- | --- |
 | **Transactions** | Writes to the chain; state-changing operations | `buy()`, `sell()`, `createMarket()`, `updatePosition()` | Require wallet signature |
 | **Positions** | Pure computation; transforms inputs into protocol-ready formats | `generateGaussian()`, `generateRange()`, `generateBelief()` | No chain interaction; human interface to compose beliefs |
-| **Projections** | Computes hypothetical outcomes without chain interaction | `projectBuy()`, `projectPayout()`, `projectSell()` | Read current state, simulate results |
+| **Previews** | Computes hypothetical outcomes without chain interaction | `previewBuy()`, `previewPayout()`, `previewSell()` | Read current state, simulate results |
 | **Queries** | Reads and interprets current protocol state | `queryMarketState()`, `queryClaimShare()`, `queryConsensusSummary()` | On-chain reads |
 | **Discovery** | Find and filter markets or positions | `discoverMarkets()`, `discoverTrending()`, `discoverUserPositions()` | Requires indexer |
 
@@ -49,9 +49,9 @@ Categories group functions by what they do, independent of their abstraction lay
 
 **Transactions** are the only category that modifies on-chain state. They require a wallet connection and user signature. All other categories are read-only or pure computation.
 
-**Position** generators are entirely local, they transform human-readable parameters into valid belief expression  vectors without any network calls. Their may output feeds into Transactions and Projections.
+**Position** generators are entirely local, they transform human-readable parameters into valid belief expression  vectors without any network calls. Their may output feeds into Transactions and Previews.
 
-**Projections** read current state and compute hypothetical outcomes. They answer "what if" questions: what happens if I buy, what do I receive if I sell, what is my payout at outcome X. They never modify state.
+**Previews** read current state and compute hypothetical outcomes. They answer "what if" questions: what happens if I buy, what do I receive if I sell, what is my payout at outcome X. They never modify state.
 
 **Queries** read current on-chain state directly. They return facts about markets and positions as they exist now. With the potential to power unique and dynamic interaction points
 
@@ -109,17 +109,17 @@ The following illustrates how a payout-targeted trade crosses multiple categorie
 
 This is one of many complex scenarios that the SDK abstracts away, developers simply pass the user input and the system will convert it to a viable belief vector ready for on chain submission.
 
-The diagram shows a concrete example of layer interaction when a developer wants to create a position targeting a minimum payout. This workflow crosses multiple categories (Positions, Projections, Transactions) and multiple layers (L1, L2, L3).
+The diagram shows a concrete example of layer interaction when a developer wants to create a position targeting a minimum payout. This workflow crosses multiple categories (Positions, Previews, Transactions) and multiple layers (L1, L2, L3).
 
 **Starting Point: Developer Intent (Layer 3)** The developer specifies a goal: "I want at least $X payout if the outcome falls between L and H." This enters at the Payout Design row, Layer 3. The L3 function does not directly generate shapes or submit transactions -- it orchestrates lower layers to achieve the goal.
 
 **Shape Construction (Layers 2 to 1)** The L3 Payout Design function calls the L2 "Range shape" generate to request an appropriate belief shape covering the target range. The L2 generators in turn calls L1 "Raw Shape generation" to produce the actual Bernstein coefficients. This is the Belief row flowing from L3 to L2 to L1.
 
-**Settlement Projection (Layer 2)** The Projection row shows how the system validates the proposed position. L2 "Settlement values between L-H" computes what payout this shape would produce at various outcomes within the target range. This requires market state, which comes from the Cache.
+**Settlement Preview (Layer 2)** The Preview row shows how the system validates the proposed position. L2 "Settlement values between L-H" computes what payout this shape would produce at various outcomes within the target range. This requires market state, which comes from the Cache.
 
-**Iterative Refinement Loop** The grey arrow labeled "Return Iterative Values (Confirm Validity)" shows the feedback loop. Projection results return to Payout Design for validation. If the computed payout doesn't meet the target, L3 adjusts parameters (typically collateral amount) and repeats the projection. This continues until the goal is met or determined impossible.
+**Iterative Refinement Loop** The grey arrow labeled "Return Iterative Values (Confirm Validity)" shows the feedback loop. Preview results return to Payout Design for validation. If the computed payout doesn't meet the target, L3 adjusts parameters (typically collateral amount) and repeats the preview. This continues until the goal is met or determined impossible.
 
 **Transaction Submission (Layer 1)** Once a valid configuration is found, the flow descends to Core layer. The arrow labeled "If Values Are Acceptable" leads to "Submit Buy" at L1, which writes the position to the blockchain.
 
-**Cache Integration** The Cache box at top provides market state to the projection calculations without requiring fresh chain reads on each iteration. This makes the iterative refinement process performant.
+**Cache Integration** The Cache box at top provides market state to the preview calculations without requiring fresh chain reads on each iteration. This makes the iterative refinement process performant.
 

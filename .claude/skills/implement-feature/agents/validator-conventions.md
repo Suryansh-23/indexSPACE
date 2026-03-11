@@ -39,7 +39,7 @@ Verify naming follows established patterns:
 - Hook functions: `use<Name>` (camelCase with "use" prefix)
 - Core query functions: `query<Name>` in `packages/core/src/queries/`
 - Core transaction functions: descriptive verbs in `packages/core/src/transactions/`
-- Core projection functions: `project<Name>` or `calculate<Name>` in `packages/core/src/projections/`
+- Core preview functions: `preview<Name>` or `calculate<Name>` in `packages/core/src/previews/`
 - Component files: `<Name>.tsx` in `packages/ui/src/`
 - Type files: `<name>.ts` or within the module they belong to
 - CSS classes: `fs-<widget-name>` prefix pattern

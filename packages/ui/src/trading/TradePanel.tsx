@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useContext, useCallback } from 'rea
 import {
   generateGaussian,
   generateRange,
-  projectPayoutCurve,
+  previewPayoutCurve,
   buy,
 } from '@functionspace/core';
 import type { BuyResult } from '@functionspace/core';
@@ -98,7 +98,7 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy }: T
     }
   }, [generateCurrentBelief]);
 
-  // Debounced payout projection
+  // Debounced payout preview
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -111,7 +111,7 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy }: T
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const result = await projectPayoutCurve(ctx.client, marketId, belief, collateral);
+        const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
         if (!mountedRef.current) return;
         setPotentialPayout(result.maxPayout);
         ctx.setPreviewPayout(result);

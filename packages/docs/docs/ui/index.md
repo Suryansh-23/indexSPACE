@@ -28,7 +28,7 @@ Every trading component follows the **three-phase trade pattern**:
 | Phase          | Timing                                    | What Happens                                                                                             | Chart Effect                             |
 | -------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | **1. Preview** | Instant (on every input change)           | Generates belief via `generateBelief()` or convenience generator → writes `ctx.setPreviewBelief(belief)` | Dashed overlay appears on ConsensusChart |
-| **2. Payout**  | Debounced (500ms after last input change) | Calls `projectPayoutCurve()` → writes `ctx.setPreviewPayout(result)`                                     | Payout column appears in chart tooltip   |
+| **2. Payout**  | Debounced (500ms after last input change) | Calls `previewPayoutCurve()` → writes `ctx.setPreviewPayout(result)`                                     | Payout column appears in chart tooltip   |
 | **3. Submit**  | On button click                           | Calls `buy()` → resets inputs to defaults → clears preview state → calls `ctx.invalidate(marketId)`      | Preview clears, all data hooks refetch   |
 
 All trading components clear `ctx.setPreviewBelief(null)` and `ctx.setPreviewPayout(null)` on unmount, ensuring charts never show stale previews.

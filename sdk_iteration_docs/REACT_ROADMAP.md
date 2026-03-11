@@ -19,7 +19,7 @@ The React layer currently passes data through. Its job is to become the **value 
 | Caching | None at any layer |
 | Request deduplication | None — `useMarket` + `useConsensus` both hit `/api/market/state` independently |
 | Polling | Only `useTradeHistory` supports `pollInterval`, hand-wired |
-| Mutation hooks | None — UI components import `buy`/`sell`/`projectPayoutCurve` from core directly |
+| Mutation hooks | None — UI components import `buy`/`sell`/`previewPayoutCurve` from core directly |
 | Invalidation | Global — `marketId` parameter is accepted but ignored, all hooks refetch |
 | Stale-while-revalidate | None — every refetch sets `loading: true`, causing UI flicker |
 | Request cancellation | None — unmounted components may receive stale async responses |
@@ -122,7 +122,7 @@ Standard approach: listen to `document.visibilitychange`. When `document.hidden`
 
 ### 1.3 Mutation Hooks
 
-**Problem:** UI components import `buy`, `sell`, `projectPayoutCurve`, and `projectSell` directly from core. Each component manages its own `submitting`/`error` state via `useState`, manually calls `ctx.invalidate()`, and manually refreshes the user's wallet balance. This boilerplate is repeated across every trading component. Consumers building custom trade UIs must import from two packages and know the invalidation protocol.
+**Problem:** UI components import `buy`, `sell`, `previewPayoutCurve`, and `previewSell` directly from core. Each component manages its own `submitting`/`error` state via `useState`, manually calls `ctx.invalidate()`, and manually refreshes the user's wallet balance. This boilerplate is repeated across every trading component. Consumers building custom trade UIs must import from two packages and know the invalidation protocol.
 
 Auth already set the precedent — `useAuth` wraps core's `loginUser`/`signupUser` with managed state and side effects. Trade mutations should follow the same pattern.
 
@@ -147,8 +147,8 @@ On failure, the hook sets the error and does not invalidate.
 |------|-------|-------------------|
 | `useBuy` | `buy()` from core | Invalidate market, refresh wallet |
 | `useSell` | `sell()` from core | Invalidate market, refresh wallet |
-| `useProjectPayout` | `projectPayoutCurve()` from core | Set `previewPayout` on context |
-| `useProjectSell` | `projectSell()` from core | None — returns value for display |
+| `usePreviewPayout` | `previewPayoutCurve()` from core | Set `previewPayout` on context |
+| `usePreviewSell` | `previewSell()` from core | None — returns value for display |
 
 **Where it lives:** React layer. Each hook wraps a core function, adds state management, and triggers cache-level side effects.
 
@@ -160,16 +160,16 @@ On failure, the hook sets the error and does not invalidate.
 
 **Layer implications:**
 
-- **Core:** No changes. `buy()`, `sell()`, projection functions remain pure.
+- **Core:** No changes. `buy()`, `sell()`, preview functions remain pure.
 - **React:** New hooks added. Mutation hooks use the cache's invalidation API rather than the raw context counter.
-- **UI:** Trading components replace direct core imports with hook calls. Removes per-component state management for submission loading/error. The three-phase trade pattern (PLAYBOOK.md) remains — Phase 1 (instant preview) and Phase 2 (debounced projection) still live in the component. Phase 3 (submit) delegates to the mutation hook.
+- **UI:** Trading components replace direct core imports with hook calls. Removes per-component state management for submission loading/error. The three-phase trade pattern (PLAYBOOK.md) remains — Phase 1 (instant preview) and Phase 2 (debounced preview) still live in the component. Phase 3 (submit) delegates to the mutation hook.
 
 **Checklist:**
 
 - [ ] `useBuy` hook with `execute`, `loading`, `error`, `reset`
 - [ ] `useSell` hook with same shape
-- [ ] `useProjectPayout` hook — debounce is caller's responsibility, hook handles the request
-- [ ] `useProjectSell` hook
+- [ ] `usePreviewPayout` hook — debounce is caller's responsibility, hook handles the request
+- [ ] `usePreviewSell` hook
 - [ ] All mutation hooks auto-invalidate affected market on success
 - [ ] All mutation hooks auto-refresh user wallet on success
 - [ ] Error state is clearable via `reset()`
@@ -208,6 +208,45 @@ On failure, the hook sets the error and does not invalidate.
 - [ ] `invalidate(marketId)` only marks matching cache entries as stale
 - [ ] `invalidateAll()` available for global refresh (logout, reconnect)
 - [ ] Mutation hooks (1.3) call targeted invalidation, not global
+
+---
+
+### 1.5 Focus and Reconnect Revalidation
+
+**Problem:** When a user's device loses connectivity (phone signal drop, laptop sleep, WiFi switch) or the browser tab is backgrounded for an extended period, all displayed data goes stale silently. The user returns to a trading screen showing outdated consensus, positions, and market stats with no indication that the data is old. Acting on stale prices in a prediction market is a real user-facing problem -- not a polish item.
+
+With multiple sites embedding the SDK and thousands of users per site, connectivity interruptions are routine, not edge cases. This must be handled before external developers ship to their users.
+
+**What it should do:**
+
+- Automatically refetch all active (subscribed) cache entries when the network reconnects (`online` event).
+- Automatically refetch stale cache entries when the browser tab regains focus (`visibilitychange` event).
+- Each cache entry respects its `staleTime` -- only actually-stale entries refetch on focus. Reconnect triggers unconditional revalidation (the data is untrusted after a connectivity gap).
+- Revalidation is configurable at Provider level: `revalidateOnFocus` (default: true), `revalidateOnReconnect` (default: true).
+
+**Where it lives:** React layer. The Provider registers `visibilitychange` and `online` event listeners. On trigger, it walks active cache entries and marks eligible ones for refetch. The cache's existing fetch/deduplication machinery handles the rest -- no new request path needed.
+
+**Why Tier 1 (not Tier 3):** Polling (1.2) keeps data fresh during active use. But polling pauses when the tab is hidden (by design, to save bandwidth). When the user returns, there is a gap between "polling stopped" and "polling resumes on next interval." Reconnect revalidation fills that gap immediately. Without it, a user returning after 5 minutes of inactivity sees data that is 5 minutes stale until the next poll fires. For a trading SDK, that delay is unacceptable.
+
+**Established practice:**
+
+- **SWR:** Enables `revalidateOnFocus` and `revalidateOnReconnect` by default.
+- **TanStack Query:** Enables `refetchOnWindowFocus` by default. `refetchOnReconnect` also defaults to true.
+- Both treat this as core infrastructure, not an optional addon.
+
+**Layer implications:**
+
+- **Core:** No changes.
+- **React:** Provider registers two event listeners (`visibilitychange`, `online`). On trigger, calls cache method to revalidate active entries. Cleanup on Provider unmount.
+- **UI:** No changes.
+
+**Checklist:**
+
+- [ ] Provider registers `visibilitychange` listener, refetches stale active entries on tab focus
+- [ ] Provider registers `online` listener, refetches all active entries on network reconnect
+- [ ] Both behaviors configurable at Provider level (`revalidateOnFocus`, `revalidateOnReconnect`)
+- [ ] Revalidation respects cache deduplication -- multiple entries triggering simultaneously do not produce duplicate requests
+- [ ] Event listeners are cleaned up on Provider unmount
 
 ---
 
@@ -368,20 +407,6 @@ Replace polling with push-based updates. When another user trades, the server pu
 
 ---
 
-### 3.3 Focus and Reconnect Revalidation
-
-Automatically refetch stale data when:
-- The browser tab regains focus (`visibilitychange` event)
-- The network reconnects (`online` event)
-
-This catches changes that happened while the user was away. Especially important for prediction markets where consensus can shift significantly during a brief absence.
-
-**Established practice:** SWR enables `revalidateOnFocus` and `revalidateOnReconnect` by default. TanStack Query enables `refetchOnWindowFocus` by default. Both are configurable.
-
-**Where it lives:** React layer. The Provider registers event listeners and triggers cache-wide revalidation. Each cache entry respects its `staleTime` — only actually-stale entries refetch.
-
----
-
 ## Component Resilience
 
 These are cross-cutting concerns that apply to all components regardless of tier. They should be incorporated into the component review checklist and addressed progressively.
@@ -481,6 +506,8 @@ The tiers are ordered by priority, but within Tier 1 there is a dependency chain
        └──> 1.4 Targeted Invalidation (needs cache key structure)
        │
        └──> 1.3 Mutation Hooks (needs cache for auto-invalidation)
+       │
+       └──> 1.5 Focus/Reconnect Revalidation (needs cache revalidation API)
 ```
 
 **Tier 2 depends on Tier 1:**

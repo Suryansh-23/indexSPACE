@@ -1,20 +1,20 @@
 ---
-title: "projectSell"
+title: "previewSell"
 sidebar_position: 2
 ---
 
-# projectSell
+# previewSell
 
-**`projectSell(client, positionId, marketId)`**
+**`previewSell(client, positionId, marketId)`**
 
 **Layer:** L1. Previews how much collateral would be returned if a position were sold right now, without actually selling it. Used by `PositionTable` to show live "market value" for each open position.
 
 ```typescript
-async function projectSell(
+async function previewSell(
   client: FSClient,
   positionId: number,
   marketId: string | number,
-): Promise<ProjectSellResult>
+): Promise<PreviewSellResult>
 ```
 
 **Parameters:**
@@ -25,10 +25,10 @@ async function projectSell(
 | `positionId` | `number`           | The position to simulate selling.   |
 | `marketId`   | `string \| number` | The market the position belongs to. |
 
-**Returns `ProjectSellResult`:**
+**Returns `PreviewSellResult`:**
 
 ```typescript
-interface ProjectSellResult {
+interface PreviewSellResult {
   collateralReturned: number; // Estimated collateral you'd receive
   iterations: number;         // Number of solver iterations the server used
 }
@@ -41,7 +41,7 @@ interface ProjectSellResult {
 const positions = await queryMarketPositions(ctx.client, marketId);
 
 for (const pos of positions.filter(p => p.status === 'open')) {
-  const preview = await projectSell(ctx.client, pos.positionId, marketId);
+  const preview = await previewSell(ctx.client, pos.positionId, marketId);
   const pnl = preview.collateralReturned - pos.collateral;
   console.log(`Position ${pos.positionId}: worth $${preview.collateralReturned} (${pnl >= 0 ? '+' : ''}${pnl})`);
 }

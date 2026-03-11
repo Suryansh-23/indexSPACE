@@ -48,7 +48,7 @@ Read the "SDK Expansion Checklist" in PLAYBOOK.md. For the type of change being 
 - [ ] PLAYBOOK.md updated (Available Hooks table)
 
 **For new core functions:**
-- [ ] Placed in correct category directory (queries/, transactions/, projections/)
+- [ ] Placed in correct category directory (queries/, transactions/, previews/)
 - [ ] Types defined or imported
 - [ ] Exported from `packages/core/src/index.ts`
 - [ ] PLAYBOOK.md updated (Core Functions list)

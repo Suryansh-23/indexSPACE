@@ -52,7 +52,7 @@ Every function also belongs to a functional category:
 |----------|-------------|-------|
 | **Positions** | Pure computation — transforms inputs into belief vectors (`generateBelief`, `generateGaussian`, etc.) | Read-only (no network) |
 | **Queries** | Reads and interprets current server state (markets, positions, history, trades) | Read-only |
-| **Projections** | Computes hypothetical outcomes without modifying state | Read-only |
+| **Previews** | Computes hypothetical outcomes without modifying state | Read-only |
 | **Transactions** | State-changing operations (buy, sell) | Write |
 | **Discovery** | Find and filter available markets | Read-only |
 
@@ -135,7 +135,7 @@ That's it. The chart and trade panel automatically coordinate — moving sliders
 
 ### Trading
 
-Functions for constructing beliefs, executing trades, and projecting outcomes.
+Functions for constructing beliefs, executing trades, and previewing outcomes.
 
 #### Position Generators
 
@@ -313,11 +313,11 @@ const belief = generateBelief([
 
 The belief vector is the input to two critical operations:
 
-**1. Preview.** Pass to `ctx.setPreviewBelief(belief)` for instant chart overlay, and to `projectPayoutCurve()` for potential payout visualization:
+**1. Preview.** Pass to `ctx.setPreviewBelief(belief)` for instant chart overlay, and to `previewPayoutCurve()` for potential payout visualization:
 ```typescript
 ctx.setPreviewBelief(belief);  // shows dashed overlay on consensus chart
 
-const payout = await projectPayoutCurve(client, marketId, belief, collateral);
+const payout = await previewPayoutCurve(client, marketId, belief, collateral);
 // payout.outcomes[i] = { outcome, payout, profitLoss }
 ```
 
@@ -451,7 +451,7 @@ interface SellResult {
 }
 ```
 
-The returned collateral depends on the current market state. If the market consensus has shifted toward your belief since you bought, you'll get back more than you put in. If it shifted away, you'll get back less. Use `projectSell` to preview the return before executing.
+The returned collateral depends on the current market state. If the market consensus has shifted toward your belief since you bought, you'll get back more than you put in. If it shifted away, you'll get back less. Use `previewSell` to preview the return before executing.
 
 **Example:**
 ```typescript
@@ -461,16 +461,16 @@ console.log(`Got back ${result.collateralReturned}`);
 ctx.invalidate(marketId); // refresh charts and position tables
 ```
 
-#### Projections
+#### Previews
 
-Projections are read-only API calls that preview what *would* happen without actually executing a trade. They're used by UI components in the "debounced preview" phase of the trade flow.
+Previews are read-only API calls that preview what *would* happen without actually executing a trade. They're used by UI components in the "debounced preview" phase of the trade flow.
 
-##### `projectPayoutCurve(client, marketId, belief, collateral, numOutcomes?)`
+##### `previewPayoutCurve(client, marketId, belief, collateral, numOutcomes?)`
 
-**Layer:** L2. Given a hypothetical belief and collateral, projects what the settlement payout would be for every possible outcome. This is how the SDK shows "if the market resolves at X, you'd get Y" curves.
+**Layer:** L2. Given a hypothetical belief and collateral, previews what the settlement payout would be for every possible outcome. This is how the SDK shows "if the market resolves at X, you'd get Y" curves.
 
 ```typescript
-async function projectPayoutCurve(
+async function previewPayoutCurve(
   client: FSClient,
   marketId: string | number,
   belief: BeliefVector,
@@ -484,7 +484,7 @@ async function projectPayoutCurve(
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `client` | `FSClient` | Authenticated API client. |
-| `marketId` | `string \| number` | The market to project against. |
+| `marketId` | `string \| number` | The market to preview against. |
 | `belief` | `BeliefVector` | The belief vector to simulate. Same format as what you'd pass to `buy`. |
 | `collateral` | `number` | The collateral amount to simulate. |
 | `numOutcomes` | `number?` | Number of outcome points to sample. Defaults to server-side default if omitted. |
@@ -493,7 +493,7 @@ async function projectPayoutCurve(
 
 ```typescript
 interface PayoutCurve {
-  projections: Array<{
+  previews: Array<{
     outcome: number;     // A possible settlement value
     payout: number;      // What you'd receive if the market resolved here
     profitLoss: number;  // payout - collateral (positive = profit, negative = loss)
@@ -504,30 +504,30 @@ interface PayoutCurve {
 }
 ```
 
-**How UI components use this:** Every trade panel calls `projectPayoutCurve` on a 500ms debounce after the trader adjusts any input (prediction slider, confidence, collateral amount). The result is written to `ctx.setPreviewPayout(result)`, which the `ConsensusChart` reads to render a payout overlay in its tooltip.
+**How UI components use this:** Every trade panel calls `previewPayoutCurve` on a 500ms debounce after the trader adjusts any input (prediction slider, confidence, collateral amount). The result is written to `ctx.setPreviewPayout(result)`, which the `ConsensusChart` reads to render a payout overlay in its tooltip.
 
 **Example:**
 ```typescript
 const belief = generateGaussian(75, 5, K, L, H);
-const curve = await projectPayoutCurve(ctx.client, marketId, belief, 100);
+const curve = await previewPayoutCurve(ctx.client, marketId, belief, 100);
 
 console.log(`Best case: $${curve.maxPayout} if outcome = ${curve.maxPayoutOutcome}`);
-console.log(`Worst case: $${Math.min(...curve.projections.map(p => p.payout))}`);
+console.log(`Worst case: $${Math.min(...curve.previews.map(p => p.payout))}`);
 
 // Write to context so the chart renders the payout overlay
 ctx.setPreviewPayout(curve);
 ```
 
-##### `projectSell(client, positionId, marketId)`
+##### `previewSell(client, positionId, marketId)`
 
 **Layer:** L1. Previews how much collateral would be returned if a position were sold right now, without actually selling it. Used by `PositionTable` to show live "market value" for each open position.
 
 ```typescript
-async function projectSell(
+async function previewSell(
   client: FSClient,
   positionId: number,
   marketId: string | number,
-): Promise<ProjectSellResult>
+): Promise<PreviewSellResult>
 ```
 
 **Parameters:**
@@ -538,10 +538,10 @@ async function projectSell(
 | `positionId` | `number` | The position to simulate selling. |
 | `marketId` | `string \| number` | The market the position belongs to. |
 
-**Returns `ProjectSellResult`:**
+**Returns `PreviewSellResult`:**
 
 ```typescript
-interface ProjectSellResult {
+interface PreviewSellResult {
   collateralReturned: number; // Estimated collateral you'd receive
   iterations: number;         // Number of solver iterations the server used
 }
@@ -553,7 +553,7 @@ interface ProjectSellResult {
 const positions = await queryMarketPositions(ctx.client, marketId);
 
 for (const pos of positions.filter(p => p.status === 'open')) {
-  const preview = await projectSell(ctx.client, pos.positionId, marketId);
+  const preview = await previewSell(ctx.client, pos.positionId, marketId);
   const pnl = preview.collateralReturned - pos.collateral;
   console.log(`Position ${pos.positionId}: worth $${preview.collateralReturned} (${pnl >= 0 ? '+' : ''}${pnl})`);
 }
@@ -1211,7 +1211,7 @@ function generateEvenTicks(
 
 ### Client
 
-`FSClient` is the HTTP client that every query, transaction, and projection function accepts as its first argument. It manages authentication tokens, auto-retries on 401, and supports guest mode for read-only access.
+`FSClient` is the HTTP client that every query, transaction, and preview function accepts as its first argument. It manages authentication tokens, auto-retries on 401, and supports guest mode for read-only access.
 
 ##### `FSClient`
 
@@ -1520,7 +1520,7 @@ The exact auto-auth condition: `config.autoAuthenticate !== false && !!config.us
 |-------|------|-------------|
 | `previewBelief` | `number[] \| null` | Trade preview belief vector, written by trading widgets, read by chart components |
 | `setPreviewBelief` | `(belief: number[] \| null) => void` | Setter for `previewBelief` |
-| `previewPayout` | `PayoutCurve \| null` | Trade payout projection, written by trading widgets |
+| `previewPayout` | `PayoutCurve \| null` | Trade payout preview, written by trading widgets |
 | `setPreviewPayout` | `(payout: PayoutCurve \| null) => void` | Setter for `previewPayout` |
 | `selectedPosition` | `Position \| null` | Currently selected position for chart overlay, typically set by a position table row click |
 | `setSelectedPosition` | `(pos: Position \| null) => void` | Setter for `selectedPosition` |
@@ -2499,7 +2499,7 @@ Every trading component follows the **three-phase trade pattern**:
 | Phase | Timing | What Happens | Chart Effect |
 |-------|--------|-------------|--------------|
 | **1. Preview** | Instant (on every input change) | Generates belief via `generateBelief()` or convenience generator → writes `ctx.setPreviewBelief(belief)` | Dashed overlay appears on ConsensusChart |
-| **2. Payout** | Debounced (500ms after last input change) | Calls `projectPayoutCurve()` → writes `ctx.setPreviewPayout(result)` | Payout column appears in chart tooltip |
+| **2. Payout** | Debounced (500ms after last input change) | Calls `previewPayoutCurve()` → writes `ctx.setPreviewPayout(result)` | Payout column appears in chart tooltip |
 | **3. Submit** | On button click | Calls `buy()` → resets inputs to defaults → clears preview state → calls `ctx.invalidate(marketId)` | Preview clears, all data hooks refetch |
 
 All trading components clear `ctx.setPreviewBelief(null)` and `ctx.setPreviewPayout(null)` on unmount, ensuring charts never show stale previews.
@@ -2537,10 +2537,10 @@ import { TradePanel } from '@functionspace/ui';
 **Context interactions:**
 
 - **Reads:** `ctx.client`
-- **Writes:** `ctx.setPreviewBelief(belief)` on input change, `ctx.setPreviewPayout(result)` after debounced projection, clears both on unmount
+- **Writes:** `ctx.setPreviewBelief(belief)` on input change, `ctx.setPreviewPayout(result)` after debounced preview, clears both on unmount
 - **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useMarket`, `generateGaussian`, `generateRange`, `projectPayoutCurve`, `buy`
+**Internal calls:** `useMarket`, `generateGaussian`, `generateRange`, `previewPayoutCurve`, `buy`
 
 **Example:**
 
@@ -2615,10 +2615,10 @@ All resolved thresholds are clamped to `[L, H]`.
 **Context interactions:**
 
 - **Reads:** `ctx.client`
-- **Writes:** `ctx.setPreviewBelief(belief)` on side/threshold change, `ctx.setPreviewPayout(result)` after debounced projection, clears both on unmount
+- **Writes:** `ctx.setPreviewBelief(belief)` on side/threshold change, `ctx.setPreviewPayout(result)` after debounced preview, clears both on unmount
 - **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useMarket`, `generateRange`, `computeStatistics`, `projectPayoutCurve`, `buy`
+**Internal calls:** `useMarket`, `generateRange`, `computeStatistics`, `previewPayoutCurve`, `buy`
 
 **Example:**
 
@@ -2684,10 +2684,10 @@ import { ShapeCutter } from '@functionspace/ui';
 **Context interactions:**
 
 - **Reads:** `ctx.client`
-- **Writes:** `ctx.setPreviewBelief(belief)` on input change, `ctx.setPreviewPayout(result)` after debounced projection, clears both on unmount
+- **Writes:** `ctx.setPreviewBelief(belief)` on input change, `ctx.setPreviewPayout(result)` after debounced preview, clears both on unmount
 - **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useMarket`, `generateGaussian`, `generateRange`, `generateBelief`, `generateDip`, `generateLeftSkew`, `generateRightSkew`, `SHAPE_DEFINITIONS`, `projectPayoutCurve`, `buy`
+**Internal calls:** `useMarket`, `generateGaussian`, `generateRange`, `generateBelief`, `generateDip`, `generateLeftSkew`, `generateRightSkew`, `SHAPE_DEFINITIONS`, `previewPayoutCurve`, `buy`
 
 **Example:**
 
@@ -2746,10 +2746,10 @@ import { CustomShapeEditor } from '@functionspace/ui';
 **Context interactions:**
 
 - **Reads:** `ctx.client`, `ctx.chartColors`, `ctx.selectedPosition` (renders belief overlay), `ctx.previewPayout` (tooltip data)
-- **Writes:** `ctx.setPreviewBelief(belief)` on control value change, `ctx.setPreviewPayout(result)` after debounced projection, clears both on unmount
+- **Writes:** `ctx.setPreviewBelief(belief)` on control value change, `ctx.setPreviewPayout(result)` after debounced preview, clears both on unmount
 - **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useMarket`, `useConsensus`, `useCustomShape`, `evaluateDensityCurve`, `useChartZoom`, `rechartsPlotArea`, `projectPayoutCurve`, `buy`
+**Internal calls:** `useMarket`, `useConsensus`, `useCustomShape`, `evaluateDensityCurve`, `useChartZoom`, `rechartsPlotArea`, `previewPayoutCurve`, `buy`
 
 **Example:**
 
@@ -2807,10 +2807,10 @@ import { BucketRangeSelector } from '@functionspace/ui';
 **Context interactions:**
 
 - **Reads:** `ctx.client`
-- **Writes:** `ctx.setPreviewBelief(belief)` on selection change, `ctx.setPreviewPayout(result)` after debounced projection, clears both on unmount
+- **Writes:** `ctx.setPreviewBelief(belief)` on selection change, `ctx.setPreviewPayout(result)` after debounced preview, clears both on unmount
 - **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useDistributionState`, `generateRange`, `projectPayoutCurve`, `buy`
+**Internal calls:** `useDistributionState`, `generateRange`, `previewPayoutCurve`, `buy`
 
 **Example:**
 
@@ -2977,7 +2977,7 @@ import { ConsensusChart } from '@functionspace/ui';
 **Behavior:**
 
 - **Y-axis capping:** When preview or position overlay curves exceed the consensus maximum, the Y-domain caps overlay influence at 4x the consensus max to prevent the consensus curve from being visually squished.
-- **Payout matching:** Payout projection data is matched to chart X points via nearest-neighbor within 2 steps. Points outside this range show no payout value.
+- **Payout matching:** Payout preview data is matched to chart X points via nearest-neighbor within 2 steps. Points outside this range show no payout value.
 - **Custom tooltip:** Color-coded rows for each active data series (consensus, preview, selected position, payout, overlays). Cursor renders as a dashed crosshair.
 - **Legend:** Auto-generated from active data series with matching colors. The payout series is excluded from the legend (`legendType="none"`) even when payout data exists.
 - **Loading/error:** Renders "Loading consensus data..." or "Error: {message}" inline.
@@ -3112,7 +3112,7 @@ import { TimelineChart } from '@functionspace/ui';
 
 #### `PositionTable`
 
-Paginated data table for viewing and managing positions. Supports three tab views, real-time market value lookup via `projectSell`, inline sell actions, and row selection that coordinates with chart overlays.
+Paginated data table for viewing and managing positions. Supports three tab views, real-time market value lookup via `previewSell`, inline sell actions, and row selection that coordinates with chart overlays.
 
 ```tsx
 import { PositionTable } from '@functionspace/ui';
@@ -3146,9 +3146,9 @@ import { PositionTable } from '@functionspace/ui';
   - **Uncontrolled** (no `onSelectPosition`): Clicking a row writes the position to `ctx.setSelectedPosition`, causing `ConsensusChart` to render the position's belief as a colored overlay. Clicking the selected row again deselects it.
   - **Controlled** (`onSelectPosition` provided): Clicking a row calls `onSelectPosition(id)`. Selection state is determined by the `selectedPositionId` prop, falling back to `ctx.selectedPosition?.positionId` when `selectedPositionId` is not provided.
 - **Per-tab pagination:** Each tab maintains its own page number independently. Pages auto-reset to 1 when tab data count changes.
-- **Market value lookup:** For visible open positions (current page only), `projectSell` is called via `Promise.allSettled` for resilient fetching. Values are cached and update when the page changes.
+- **Market value lookup:** For visible open positions (current page only), `previewSell` is called via `Promise.allSettled` for resilient fetching. Values are cached and update when the page changes.
 - **Sell flow:** The "Sell" button (open-orders tab, open positions only) calls `sell()`, then `ctx.invalidate(marketId)` and `refetch()`. Shows "Selling..." during the operation. Sell errors display as a banner above the table.
-- **P/L calculation (priority order):** 1) Sold/closed positions with a non-null `soldPrice`: `soldPrice - collateral`. 2) Any remaining position with a non-null `settlementPayout`: `settlementPayout - collateral`. 3) Open positions: `marketValue - collateral` (from `projectSell`). Note: sold/closed positions with a `soldPrice` always use path 1, even if they also have a `settlementPayout`. P/L% = `(P/L / collateral) * 100`.
+- **P/L calculation (priority order):** 1) Sold/closed positions with a non-null `soldPrice`: `soldPrice - collateral`. 2) Any remaining position with a non-null `settlementPayout`: `settlementPayout - collateral`. 3) Open positions: `marketValue - collateral` (from `previewSell`). Note: sold/closed positions with a `soldPrice` always use path 1, even if they also have a `settlementPayout`. P/L% = `(P/L / collateral) * 100`.
 - **Owner highlighting:** In the `market-positions` tab, the authenticated user's rows show "(you)" next to the username.
 - **Sorting:** All tab data is sorted by position ID descending.
 - **Loading/error:** Renders a spinner with "Loading positions..." or an error message with a "Retry" button. Empty states show contextual messages per tab.
@@ -3159,7 +3159,7 @@ import { PositionTable } from '@functionspace/ui';
 - **Writes:** `ctx.setSelectedPosition(position | null)` (uncontrolled mode only)
 - **Triggers:** `ctx.invalidate(marketId)` after successful sell
 
-**Internal calls:** `usePositions`, `projectSell`, `sell`
+**Internal calls:** `usePositions`, `previewSell`, `sell`
 
 **Example:**
 
@@ -3179,7 +3179,7 @@ import { PositionTable } from '@functionspace/ui';
 />
 ```
 
-**Related:** `ConsensusChart` (reads `selectedPosition` for overlay) | `usePositions` (data hook) | `projectSell`, `sell` (core functions)
+**Related:** `ConsensusChart` (reads `selectedPosition` for overlay) | `usePositions` (data hook) | `previewSell`, `sell` (core functions)
 
 ---
 
@@ -3513,7 +3513,7 @@ Every trading widget follows the same execution pattern:
 | Phase | Timing | What Happens | Chart Effect |
 |-------|--------|-------------|--------------|
 | **1. Preview** | Instant (on every input change) | `generateBelief()` → `ctx.setPreviewBelief(belief)` | Dashed overlay appears on consensus chart |
-| **2. Payout** | Debounced (500ms after last change) | `projectPayoutCurve()` → `ctx.setPreviewPayout(result)` | Payout column appears in chart tooltip |
+| **2. Payout** | Debounced (500ms after last change) | `previewPayoutCurve()` → `ctx.setPreviewPayout(result)` | Payout column appears in chart tooltip |
 | **3. Submit** | On button click | `buy()` → `ctx.invalidate(marketId)` | Preview clears, all data refreshes |
 
 This pattern ensures responsive feedback (phase 1 is synchronous) while avoiding excessive API calls (phase 2 is debounced).

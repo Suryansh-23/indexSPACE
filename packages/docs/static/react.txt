@@ -1,6 +1,6 @@
 # @functionspace/react -- Agent Implementation Guide
 
-This document is a focused implementation guide for AI coding assistants working with the `@functionspace/react` package. It covers the headless custom UI integration mode -- provider setup, data-fetching hooks, state and action hooks, belief construction, trade execution patterns, projections, and the context API. This mode uses `@functionspace/core` + `@functionspace/react` without pre-built UI widgets, giving full control over rendering.
+This document is a focused implementation guide for AI coding assistants working with the `@functionspace/react` package. It covers the headless custom UI integration mode -- provider setup, data-fetching hooks, state and action hooks, belief construction, trade execution patterns, previews, and the context API. This mode uses `@functionspace/core` + `@functionspace/react` without pre-built UI widgets, giving full control over rendering.
 
 ```
 Packages:
@@ -20,7 +20,7 @@ Install (headless React -- hooks only, no pre-built components):
 - [5. State & Action Hooks](#5-state--action-hooks)
 - [6. Building Beliefs](#6-building-beliefs)
 - [7. Executing Trades (Headless)](#7-executing-trades-headless)
-- [8. Projections](#8-projections)
+- [8. Previews](#8-previews)
 - [9. Context API Quick Reference](#9-context-api-quick-reference)
 - [10. NEVER Rules (Headless)](#10-never-rules-headless)
 - [11. Type Reference](#11-type-reference)
@@ -84,7 +84,7 @@ This document covers `@functionspace/core` + `@functionspace/react` (headless cu
 |---|-----------|--------|------------|
 | 1 | **No query caching or request deduplication.** Each hook instance fires its own independent API request. Mounting `useMarket` and `useConsensus` for the same market produces two separate network calls to the same endpoint. No `staleTime` or `gcTime` behavior exists. | Redundant API traffic scales linearly with the number of mounted hooks. Pages with multiple widgets for one market generate multiple identical requests per invalidation cycle. | Accept the redundant requests. Do not attempt to add TanStack Query, SWR, or any external caching wrapper around the SDK hooks. The internal hook API is not designed to be wrapped by external cache layers, and doing so will break invalidation coordination. |
 | 2 | **No real-time transport (WebSocket/SSE).** The SDK has no push-based data delivery. All data freshness depends on explicit refetch calls or polling. Changes made by other users are not automatically visible. | Market state, consensus curves, and position data go stale between manual refetches. In multi-user scenarios, the local view drifts from server state until the next refetch. | Use `useTradeHistory` with the `pollInterval` option to create a live trade feed (e.g., `useTradeHistory(marketId, { pollInterval: 3000 })`). For other data types, call `ctx.invalidate(marketId)` after local trades to trigger a refetch of all hooks. There is no polling support for hooks other than `useTradeHistory`. |
-| 3 | **No mutation hooks.** `buy()` and `sell()` are imported directly from `@functionspace/core`, not from `@functionspace/react`. No `useBuy` or `useSell` hooks exist. Projection functions (`projectPayoutCurve`, `projectSell`) are also core imports. | Developers building custom trade UIs must import from two packages (`@functionspace/core` for mutations and `@functionspace/react` for data hooks), manage their own `submitting`/`error` state, and manually call `ctx.invalidate(marketId)` and `ctx.refreshUser()` after every trade. | Import `buy` and `sell` from `@functionspace/core`. After a successful trade, call `ctx.invalidate(marketId)` to refresh all data hooks, then call `ctx.refreshUser()` to update the wallet balance. |
+| 3 | **No mutation hooks.** `buy()` and `sell()` are imported directly from `@functionspace/core`, not from `@functionspace/react`. No `useBuy` or `useSell` hooks exist. Preview functions (`previewPayoutCurve`, `previewSell`) are also core imports. | Developers building custom trade UIs must import from two packages (`@functionspace/core` for mutations and `@functionspace/react` for data hooks), manage their own `submitting`/`error` state, and manually call `ctx.invalidate(marketId)` and `ctx.refreshUser()` after every trade. | Import `buy` and `sell` from `@functionspace/core`. After a successful trade, call `ctx.invalidate(marketId)` to refresh all data hooks, then call `ctx.refreshUser()` to update the wallet balance. |
 | 4 | **No market search or filtering.** `discoverMarkets()` returns all available markets as a flat `MarketState[]` array. The function accepts no search, filter, sort, or pagination parameters. | Applications that need to display a subset of markets must fetch the entire market list on every call. There is no server-side filtering. | Call `discoverMarkets(client)` and filter the returned array client-side using standard `Array.filter()`, `Array.sort()`, or `Array.find()` methods. |
 | 5 | **Global invalidation only.** `ctx.invalidate(marketId)` accepts a `marketId` parameter, but the parameter is currently ignored. Calling `invalidate` increments a global counter that causes every mounted data-fetching hook to refetch, regardless of which market the hook watches. | In multi-market dashboards, a trade on one market triggers unnecessary refetches for all other markets. Network traffic and UI re-renders scale with the total number of mounted hooks across all markets, not just the affected market. | Accept the global refetch behavior. Do not attempt to build per-market invalidation logic on top of the SDK. The `marketId` parameter is accepted for forward-compatibility and will be respected in a future release. |
 | 7 | **Settlement not yet implemented.** The `Position` type includes `settlementPayout` and `MarketState` includes `resolvedOutcome` fields, but no settlement functions exist in the SDK. | Positions in resolved markets cannot be settled through the SDK. The `settlementPayout` field is always `null` in current responses. | Monitor the `resolutionState` field on `MarketState` for `'resolved'` or `'voided'` status. Settlement processing must be handled outside the SDK until settlement functions are added. |
@@ -160,8 +160,8 @@ import {
 // Transactions (state-changing)
 import { buy, sell } from '@functionspace/core';
 
-// Projections (read-only previews)
-import { projectPayoutCurve, projectSell } from '@functionspace/core';
+// Previews (read-only previews)
+import { previewPayoutCurve, previewSell } from '@functionspace/core';
 
 // Pure math (no network)
 import {
@@ -180,7 +180,7 @@ import type {
   BuyResult,
   SellResult,
   PayoutCurve,
-  ProjectSellResult,
+  PreviewSellResult,
   ConsensusCurve,
   BucketData,
   Region,
@@ -849,10 +849,10 @@ const belief = generateGaussian(center, spread, K, L, H);
 ctx.setPreviewBelief(belief);
 ```
 
-**Phase 2: Project payout (debounced, 500ms after last input change).**
+**Phase 2: Preview payout (debounced, 500ms after last input change).**
 
 ```typescript
-const payout = await projectPayoutCurve(ctx.client, marketId, belief, collateral);
+const payout = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
 ctx.setPreviewPayout(payout);
 ```
 
@@ -904,7 +904,7 @@ import { FunctionSpaceContext, useMarket } from '@functionspace/react';
 import {
   generateGaussian,
   buy,
-  projectPayoutCurve,
+  previewPayoutCurve,
 } from '@functionspace/core';
 import type { PayoutCurve } from '@functionspace/core';
 
@@ -929,7 +929,7 @@ function CustomTradeForm({ marketId }: { marketId: string }) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Phase 1: Build belief and set preview (instant)
-  // Phase 2: Project payout (debounced 500ms)
+  // Phase 2: Preview payout (debounced 500ms)
   useEffect(() => {
     if (!market) return;
     const { K, L, H } = market.config;
@@ -938,11 +938,11 @@ function CustomTradeForm({ marketId }: { marketId: string }) {
     // Phase 1: instant preview
     ctx.setPreviewBelief(belief);
 
-    // Phase 2: debounced payout projection
+    // Phase 2: debounced payout preview
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       try {
-        const curve = await projectPayoutCurve(ctx.client, marketId, belief, collateral);
+        const curve = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
         setPayout(curve);
         ctx.setPreviewPayout(curve);
       } catch (err) {
@@ -1036,18 +1036,18 @@ export default CustomTradeForm;
 
 ---
 
-## 8. Projections
+## 8. Previews
 
-Projections are read-only API calls that preview what would happen without executing a trade.
+Previews are read-only API calls that preview what would happen without executing a trade.
 
-### `projectPayoutCurve(client, marketId, belief, collateral, numOutcomes?)`
+### `previewPayoutCurve(client, marketId, belief, collateral, numOutcomes?)`
 
-Projects what the settlement payout would be for every possible outcome given a hypothetical belief and collateral amount.
+Previews what the settlement payout would be for every possible outcome given a hypothetical belief and collateral amount.
 
 ```typescript
-import { projectPayoutCurve } from '@functionspace/core';
+import { previewPayoutCurve } from '@functionspace/core';
 
-const curve = await projectPayoutCurve(ctx.client, marketId, belief, collateral);
+const curve = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
 ctx.setPreviewPayout(curve);
 ```
 
@@ -1055,19 +1055,19 @@ ctx.setPreviewPayout(curve);
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `projections` | `Array<{outcome, payout, profitLoss: number}>` | Array of outcome/payout pairs |
+| `previews` | `Array<{outcome, payout, profitLoss: number}>` | Array of outcome/payout pairs |
 | `maxPayout` | `number` | Best-case payout across all outcomes |
 | `maxPayoutOutcome` | `number` | The outcome value that produces the best payout |
 | `inputCollateral` | `number` | Echo of the collateral you passed in |
 
-### `projectSell(client, positionId, marketId)`
+### `previewSell(client, positionId, marketId)`
 
 Previews how much collateral would be returned if a position were sold at the current market state.
 
 ```typescript
-import { projectSell } from '@functionspace/core';
+import { previewSell } from '@functionspace/core';
 
-const preview = await projectSell(ctx.client, positionId, marketId);
+const preview = await previewSell(ctx.client, positionId, marketId);
 // preview = { collateralReturned: number, iterations: number }
 ```
 
@@ -1128,7 +1128,7 @@ These rules prevent the most common integration mistakes. Each maps to a silent 
 
 - **NEVER create `FSClient` manually inside a React tree.** The provider creates and manages the client instance. Access it via `useContext(FunctionSpaceContext).client`. Creating a second client bypasses auth state, token management, and invalidation coordination.
 
-- **NEVER skip the debounced payout projection step.** The three-phase pattern exists for a reason. Without Phase 2, any chart rendering payout information in its tooltip will show stale or null data. Debounce at 500ms to avoid flooding the API with projection requests during rapid slider changes.
+- **NEVER skip the debounced payout preview step.** The three-phase pattern exists for a reason. Without Phase 2, any chart rendering payout information in its tooltip will show stale or null data. Debounce at 500ms to avoid flooding the API with preview requests during rapid slider changes.
 
 - **NEVER import `buy` or `sell` from `@functionspace/react`.** Transaction functions live in `@functionspace/core`. The React package exports hooks and the provider -- not transaction functions. The correct import is `import { buy, sell } from '@functionspace/core'`.
 
@@ -1147,7 +1147,7 @@ See the complete core type reference in `core.txt`. Key types used in headless m
 - **`Position`** -- Returned by `usePositions()`. Contains `positionId`, `belief`, `collateral`, `claims`, `status`, `prediction`.
 - **`BuyResult`** -- Returned by `buy()`. Contains `positionId`, `belief`, `claims`, `collateral`.
 - **`SellResult`** -- Returned by `sell()`. Contains `positionId`, `collateralReturned`.
-- **`PayoutCurve`** -- Returned by `projectPayoutCurve()`. Contains `projections`, `maxPayout`, `maxPayoutOutcome`.
+- **`PayoutCurve`** -- Returned by `previewPayoutCurve()`. Contains `previews`, `maxPayout`, `maxPayoutOutcome`.
 - **`BeliefVector`** -- `number[]` of length `K + 1` summing to 1. Passed to `buy()` and `ctx.setPreviewBelief()`.
 - **`BucketData`** -- Returned by `useBucketDistribution()`. Contains `range`, `min`, `max`, `probability`, `percentage`.
 - **`TradeEntry`** -- Returned by `useTradeHistory()`. Contains `id`, `timestamp`, `side`, `prediction`, `amount`, `username`.

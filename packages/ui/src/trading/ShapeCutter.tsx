@@ -6,7 +6,7 @@ import {
   generateDip,
   generateLeftSkew,
   generateRightSkew,
-  projectPayoutCurve,
+  previewPayoutCurve,
   buy,
   SHAPE_DEFINITIONS,
 } from '@functionspace/core';
@@ -152,7 +152,7 @@ export function ShapeCutter({
     }
   }, [generateCurrentBelief]);
 
-  // Debounced payout projection
+  // Debounced payout preview
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -165,7 +165,7 @@ export function ShapeCutter({
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const result = await projectPayoutCurve(ctx.client, marketId, belief, collateral);
+        const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
         if (!mountedRef.current) return;
         setPotentialPayout(result.maxPayout);
         ctx.setPreviewPayout(result);

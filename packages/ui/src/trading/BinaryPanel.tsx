@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useContext, useMemo } from 'react';
 import {
   generateRange,
   computeStatistics,
-  projectPayoutCurve,
+  previewPayoutCurve,
   buy,
 } from '@functionspace/core';
 import type { BuyResult } from '@functionspace/core';
@@ -132,7 +132,7 @@ export function BinaryPanel({
     }
   }, [belief]);
 
-  // Phase 2: Debounced payout projection
+  // Phase 2: Debounced payout preview
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -143,7 +143,7 @@ export function BinaryPanel({
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const result = await projectPayoutCurve(ctx.client, marketId, belief, collateral);
+        const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
         if (!mountedRef.current) return;
         ctx.setPreviewPayout(result);
       } catch {

@@ -25,7 +25,7 @@ The SDK is organised around two orthogonal principles: **Layers** determine abst
 |-------|------|-------------|----------|
 | L0 | Pure Math | Protocol-agnostic math. No awareness of markets or positions. | `evaluateDensityCurve()`, `computeStatistics()`, `computePercentiles()` |
 | L1 | Core | Direct protocol interactions with full parameter control. Unopinionated and explicit. | `buy()`, `sell()`, `queryMarketState()`, `generateBelief()` |
-| L2 | Convenience | Higher-level wrappers with sensible defaults. Named concepts mapping to common use cases. | `generateGaussian()`, `generateRange()`, `projectPayoutCurve()`, `projectSell()` |
+| L2 | Convenience | Higher-level wrappers with sensible defaults. Named concepts mapping to common use cases. | `generateGaussian()`, `generateRange()`, `previewPayoutCurve()`, `previewSell()` |
 | L3 | Intent | Domain-specific functions driven by user intent. May reference live market state and orchestrate across categories. | Composed workflows, multi-step operations |
 
 ### Categories
@@ -34,7 +34,7 @@ The SDK is organised around two orthogonal principles: **Layers** determine abst
 |----------|-------------|-------|----------|
 | Positions | Pure computation — transforms inputs into belief vectors | Read-only (no network) | `generateBelief()`, `generateGaussian()`, `generateRange()` |
 | Queries | Reads and interprets current server state | Read-only | `queryMarketState()`, `queryMarketPositions()` |
-| Projections | Computes hypothetical outcomes without modifying state | Read-only | `projectPayoutCurve()`, `projectSell()` |
+| Previews | Computes hypothetical outcomes without modifying state | Read-only | `previewPayoutCurve()`, `previewSell()` |
 | Transactions | State-changing operations | Write | `buy()`, `sell()` |
 | Discovery | Find and filter markets or positions | Read-only | `discoverMarkets()` |
 

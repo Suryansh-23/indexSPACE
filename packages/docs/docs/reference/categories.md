@@ -27,12 +27,12 @@ Every SDK function belongs to a **category** that determines its functional doma
 | L2 | `generateCustomShape()` | User-drawn control points |
 | L2 | `generateBellShape()` | Symmetric bell (for editor defaults) |
 
-### Projections (Read-Only Previews)
+### Previews (Read-Only)
 
 | Layer | Function | Phase |
 |-------|----------|-------|
-| L2 | `projectPayoutCurve()` | Pre-entry payout preview |
-| L2 | `projectSell()` | Exit collateral estimate |
+| L2 | `previewPayoutCurve()` | Pre-entry payout preview |
+| L2 | `previewSell()` | Exit collateral estimate |
 
 ### Queries (Server State)
 

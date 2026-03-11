@@ -65,5 +65,5 @@ Higher-level wrappers with sensible defaults. Named concepts mapping to common u
 | `generateRightSkew()` | Position Generator |
 | `generateCustomShape()` | Position Generator |
 | `generateBellShape()` | Position Generator |
-| `projectPayoutCurve()` | Projection |
-| `projectSell()` | Projection |
+| `previewPayoutCurve()` | Preview |
+| `previewSell()` | Preview |

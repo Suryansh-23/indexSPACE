@@ -1,5 +1,5 @@
 import { FunctionSpaceProvider } from '@functionspace/react';
-import { MarketCharts, DistributionChart, ShapeCutter, MarketStats, PositionTable, TimeSales, PasswordlessAuthWidget } from '@functionspace/ui';
+import { MarketCharts, DistributionChart, ShapeCutter, MarketStats, PositionTable, TimeSales, PasswordlessAuthWidget, BinaryPanel } from '@functionspace/ui';
 import { ArticlePage } from './pages/ArticlePage';
 import { config, MARKET_ID, widgetTheme } from './App';
 
@@ -27,6 +27,10 @@ export function ShapeCutterTradingLayout({ marketId, username }: { marketId: str
       <div style={{ display: 'grid', gridTemplateColumns: '1fr' }}>
         <PositionTable marketId={marketId} username={username} tabs={['open-orders', 'trade-history', 'market-positions']} />
       </div>
+      <BinaryPanel
+        marketId={marketId}
+        xPoint={{ mode: 'static', value: 91 }}
+      />
     </>
   );
 }

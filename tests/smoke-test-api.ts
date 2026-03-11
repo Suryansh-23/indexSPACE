@@ -88,7 +88,7 @@ async function run() {
     return `position_id=${data.position_id}, value=${data.current_value_t_star}`;
   });
 
-  // 5. Project Settlement
+  // 5. Preview Settlement
   await test('/api/projection/project_settlement', 'POST', async () => {
     // Build a simple uniform belief vector
     const stateRes = await fetch(`${BASE_URL}/api/market/state?market_id=${MARKET_ID}`, { headers: headers() });

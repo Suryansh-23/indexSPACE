@@ -12,7 +12,7 @@ import type {
   Position,
   BuyResult,
   SellResult,
-  ProjectSellResult,
+  PreviewSellResult,
   PayoutCurve,
   BeliefVector,
   GaussianParams,

@@ -81,7 +81,7 @@ _Preview coordination:_
 | --- | --- | --- |
 | `previewBelief` | `number[] \| null` | Trade preview belief vector, written by trading widgets, read by chart components |
 | `setPreviewBelief` | `(belief: number[] \| null) => void` | Setter for `previewBelief` |
-| `previewPayout` | `PayoutCurve \| null` | Trade payout projection, written by trading widgets |
+| `previewPayout` | `PayoutCurve \| null` | Trade payout preview, written by trading widgets |
 | `setPreviewPayout` | `(payout: PayoutCurve \| null) => void` | Setter for `previewPayout` |
 | `selectedPosition` | `Position \| null` | Currently selected position for chart overlay, typically set by a position table row click |
 | `setSelectedPosition` | `(pos: Position \| null) => void` | Setter for `selectedPosition` |

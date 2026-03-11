@@ -60,10 +60,10 @@ import { ShapeCutter } from '@functionspace/ui';
 **Context interactions:**
 
 * **Reads:** `ctx.client`
-* **Writes:** `ctx.setPreviewBelief(belief)` on input change, `ctx.setPreviewPayout(result)` after debounced projection, clears both on unmount
+* **Writes:** `ctx.setPreviewBelief(belief)` on input change, `ctx.setPreviewPayout(result)` after debounced preview, clears both on unmount
 * **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useMarket`, `generateGaussian`, `generateRange`, `generateBelief`, `generateDip`, `generateLeftSkew`, `generateRightSkew`, `SHAPE_DEFINITIONS`, `projectPayoutCurve`, `buy`
+**Internal calls:** `useMarket`, `generateGaussian`, `generateRange`, `generateBelief`, `generateDip`, `generateLeftSkew`, `generateRightSkew`, `SHAPE_DEFINITIONS`, `previewPayoutCurve`, `buy`
 
 **Example:**
 

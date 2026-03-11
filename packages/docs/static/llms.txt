@@ -29,7 +29,7 @@ This document is a comprehensive implementation guide for AI coding assistants i
   - [5.3 State & Action Hooks](#53-state--action-hooks)
   - [5.4 Building Beliefs](#54-building-beliefs)
   - [5.5 Executing Trades (Headless)](#55-executing-trades-headless)
-  - [5.6 Projections](#56-projections)
+  - [5.6 Previews](#56-previews)
   - [5.7 Context API Quick Reference](#57-context-api-quick-reference)
   - [5.8 NEVER Rules (Headless)](#58-never-rules-headless)
 - [6. Core-Only Non-React](#6-core-only-non-react)
@@ -119,7 +119,7 @@ Higher layers depend on lower layers. Lower layers never import from higher laye
 |---|-----------|--------|------------|
 | 1 | **No query caching or request deduplication.** Each hook instance fires its own independent API request. Mounting `useMarket` and `useConsensus` for the same market produces two separate network calls to the same endpoint. No `staleTime` or `gcTime` behavior exists. | Redundant API traffic scales linearly with the number of mounted hooks. Pages with multiple widgets for one market generate multiple identical requests per invalidation cycle. | Accept the redundant requests. Do not attempt to add TanStack Query, SWR, or any external caching wrapper around the SDK hooks. The internal hook API is not designed to be wrapped by external cache layers, and doing so will break invalidation coordination. |
 | 2 | **No real-time transport (WebSocket/SSE).** The SDK has no push-based data delivery. All data freshness depends on explicit refetch calls or polling. Changes made by other users are not automatically visible. | Market state, consensus curves, and position data go stale between manual refetches. In multi-user scenarios, the local view drifts from server state until the next refetch. | Use `useTradeHistory` with the `pollInterval` option to create a live trade feed (e.g., `useTradeHistory(marketId, { pollInterval: 3000 })`). For other data types, call `ctx.invalidate(marketId)` after local trades to trigger a refetch of all hooks. There is no polling support for hooks other than `useTradeHistory`. |
-| 3 | **No mutation hooks.** `buy()` and `sell()` are imported directly from `@functionspace/core`, not from `@functionspace/react`. No `useBuy` or `useSell` hooks exist. Projection functions (`projectPayoutCurve`, `projectSell`) are also core imports. | Developers building custom trade UIs must import from two packages (`@functionspace/core` for mutations and `@functionspace/react` for data hooks), manage their own `submitting`/`error` state, and manually call `ctx.invalidate(marketId)` and `ctx.refreshUser()` after every trade. | Import `buy` and `sell` from `@functionspace/core`. After a successful trade, call `ctx.invalidate(marketId)` to refresh all data hooks, then call `ctx.refreshUser()` to update the wallet balance. Pre-built UI trading components (`TradePanel`, `ShapeCutter`, `BinaryPanel`, etc.) handle mutation lifecycle internally. |
+| 3 | **No mutation hooks.** `buy()` and `sell()` are imported directly from `@functionspace/core`, not from `@functionspace/react`. No `useBuy` or `useSell` hooks exist. Preview functions (`previewPayoutCurve`, `previewSell`) are also core imports. | Developers building custom trade UIs must import from two packages (`@functionspace/core` for mutations and `@functionspace/react` for data hooks), manage their own `submitting`/`error` state, and manually call `ctx.invalidate(marketId)` and `ctx.refreshUser()` after every trade. | Import `buy` and `sell` from `@functionspace/core`. After a successful trade, call `ctx.invalidate(marketId)` to refresh all data hooks, then call `ctx.refreshUser()` to update the wallet balance. Pre-built UI trading components (`TradePanel`, `ShapeCutter`, `BinaryPanel`, etc.) handle mutation lifecycle internally. |
 | 4 | **No market search or filtering.** `discoverMarkets()` returns all available markets as a flat `MarketState[]` array. The function accepts no search, filter, sort, or pagination parameters. | Applications that need to display a subset of markets must fetch the entire market list on every call. There is no server-side filtering. | Call `discoverMarkets(client)` and filter the returned array client-side using standard `Array.filter()`, `Array.sort()`, or `Array.find()` methods. |
 | 5 | **Global invalidation only.** `ctx.invalidate(marketId)` accepts a `marketId` parameter, but the parameter is currently ignored. Calling `invalidate` increments a global counter that causes every mounted data-fetching hook to refetch, regardless of which market the hook watches. | In multi-market dashboards, a trade on one market triggers unnecessary refetches for all other markets. Network traffic and UI re-renders scale with the total number of mounted hooks across all markets, not just the affected market. | Accept the global refetch behavior. Do not attempt to build per-market invalidation logic on top of the SDK. The `marketId` parameter is accepted for forward-compatibility and will be respected in a future release. |
 | 6 | **Only one trading component at a time.** Mounting multiple trading components simultaneously (e.g., a `TradePanel` and a `ShapeCutter` side-by-side) causes conflicting writes to the shared `previewBelief` and `previewPayout` fields on `FunctionSpaceContext`. The last component to write wins, producing unpredictable chart overlays. | Chart preview overlays show the belief/payout from whichever trading component wrote most recently, not necessarily the one the user is interacting with. | Conditionally render trading components using tabs, modals, or conditional logic. Only one trading component should be mounted in the React tree at any given time. Multiple chart components and data display components can coexist without conflict. |
@@ -139,7 +139,7 @@ The following capabilities are fully implemented and production-ready:
 - **Trade history with polling.** `useTradeHistory` and the `TimeSales` component support configurable `pollInterval` for near-real-time trade feeds.
 - **Six distinct trading interfaces.** `TradePanel` (Gaussian/range), `ShapeCutter` (8 preset shapes), `BinaryPanel` (yes/no), `BucketRangeSelector` (click-to-select buckets), `BucketTradePanel` (composed chart + bucket selector), and `CustomShapeEditor` (drag-to-draw).
 - **Automatic cross-component coordination.** Trading components write preview beliefs to context; chart components read and render preview overlays automatically. No prop-drilling required.
-- **Payout projection.** `projectPayoutCurve` previews payout curves across all outcomes before trade submission. `projectSell` previews sell proceeds for open positions.
+- **Payout preview.** `previewPayoutCurve` previews payout curves across all outcomes before trade submission. `previewSell` previews sell proceeds for open positions.
 - **Complete authentication flow.** `AuthWidget` for UI-based login/signup, `useAuth` hook for programmatic auth, and auto-auth via Provider config.
 
 ---
@@ -746,7 +746,7 @@ All trading widgets follow a three-phase trade pattern:
 | Phase | Timing | What Happens | Chart Effect |
 |-------|--------|-------------|--------------|
 | 1. Preview | Instant, on every input change | Generates belief vector, writes to `ctx.setPreviewBelief(belief)` | Dashed overlay on ConsensusChart |
-| 2. Payout | Debounced, 500ms after last input change | Calls `projectPayoutCurve()`, writes to `ctx.setPreviewPayout(result)` | Payout column in chart tooltip |
+| 2. Payout | Debounced, 500ms after last input change | Calls `previewPayoutCurve()`, writes to `ctx.setPreviewPayout(result)` | Payout column in chart tooltip |
 | 3. Submit | On button click | Calls `buy()`, resets inputs, clears preview, calls `ctx.invalidate(marketId)` | Preview clears, all data hooks refetch |
 
 All trading widgets clear preview state on unmount, preventing stale overlays.
@@ -1131,7 +1131,7 @@ function App() {
 
 **Notes:**
 - Clicking a position row writes the position to `ctx.setSelectedPosition`, causing `ConsensusChart` to render that position's belief as a colored overlay. Clicking the same row again deselects the position.
-- For open positions, the table calls `projectSell` to compute real-time market values. Values update when the user navigates pages.
+- For open positions, the table calls `previewSell` to compute real-time market values. Values update when the user navigates pages.
 - The "Sell" button appears only for open positions on the "Open Orders" tab. After a sell, the table calls `ctx.invalidate(marketId)` to refresh all widgets.
 - In the `market-positions` tab, rows belonging to the authenticated user show "(you)" next to the username.
 
@@ -1351,7 +1351,7 @@ function App() {
 }
 ```
 
-Moving sliders on `TradePanel` instantly shows a dashed preview curve on `ConsensusChart`. When the user pauses, a payout projection appears in the chart tooltip. After submitting a trade, the preview clears and the chart refetches consensus data.
+Moving sliders on `TradePanel` instantly shows a dashed preview curve on `ConsensusChart`. When the user pauses, a payout preview appears in the chart tooltip. After submitting a trade, the preview clears and the chart refetches consensus data.
 
 #### Shared `useDistributionState` Between Chart and Selector
 
@@ -1606,8 +1606,8 @@ import {
 // Transactions (state-changing)
 import { buy, sell } from '@functionspace/core';
 
-// Projections (read-only previews)
-import { projectPayoutCurve, projectSell } from '@functionspace/core';
+// Previews (read-only previews)
+import { previewPayoutCurve, previewSell } from '@functionspace/core';
 
 // Pure math (no network)
 import {
@@ -1626,7 +1626,7 @@ import type {
   BuyResult,
   SellResult,
   PayoutCurve,
-  ProjectSellResult,
+  PreviewSellResult,
   ConsensusCurve,
   BucketData,
   Region,
@@ -2484,11 +2484,11 @@ const belief = generateGaussian(center, spread, K, L, H);
 ctx.setPreviewBelief(belief);
 ```
 
-**Phase 2: Project payout (debounced, 500ms after last input change).**
-Call `projectPayoutCurve` to compute what the payout would look like across all possible outcomes. Write the result to context so charts can display payout information in tooltips.
+**Phase 2: Preview payout (debounced, 500ms after last input change).**
+Call `previewPayoutCurve` to compute what the payout would look like across all possible outcomes. Write the result to context so charts can display payout information in tooltips.
 
 ```typescript
-const payout = await projectPayoutCurve(ctx.client, marketId, belief, collateral);
+const payout = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
 ctx.setPreviewPayout(payout);
 ```
 
@@ -2579,7 +2579,7 @@ import { FunctionSpaceContext, useMarket } from '@functionspace/react';
 import {
   generateGaussian,
   buy,
-  projectPayoutCurve,
+  previewPayoutCurve,
 } from '@functionspace/core';
 import type { PayoutCurve } from '@functionspace/core';
 
@@ -2604,7 +2604,7 @@ function CustomTradeForm({ marketId }: { marketId: string }) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Phase 1: Build belief and set preview (instant)
-  // Phase 2: Project payout (debounced 500ms)
+  // Phase 2: Preview payout (debounced 500ms)
   useEffect(() => {
     if (!market) return;
     const { K, L, H } = market.config;
@@ -2613,15 +2613,15 @@ function CustomTradeForm({ marketId }: { marketId: string }) {
     // Phase 1: instant preview
     ctx.setPreviewBelief(belief);
 
-    // Phase 2: debounced payout projection
+    // Phase 2: debounced payout preview
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       try {
-        const curve = await projectPayoutCurve(ctx.client, marketId, belief, collateral);
+        const curve = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
         setPayout(curve);
         ctx.setPreviewPayout(curve);
       } catch (err) {
-        // Projection errors are non-fatal; clear stale payout
+        // Preview errors are non-fatal; clear stale payout
         setPayout(null);
         ctx.setPreviewPayout(null);
       }
@@ -2741,18 +2741,18 @@ export default CustomTradeForm;
 
 ---
 
-### 5.6 Projections
+### 5.6 Previews
 
-Projections are read-only API calls that preview what would happen without executing a trade. They are the backbone of the debounced preview phase in the three-phase trade pattern.
+Previews are read-only API calls that preview what would happen without executing a trade. They are the backbone of the debounced preview phase in the three-phase trade pattern.
 
-#### `projectPayoutCurve(client, marketId, belief, collateral, numOutcomes?)`
+#### `previewPayoutCurve(client, marketId, belief, collateral, numOutcomes?)`
 
-Projects what the settlement payout would be for every possible outcome given a hypothetical belief and collateral amount.
+Previews what the settlement payout would be for every possible outcome given a hypothetical belief and collateral amount.
 
 ```typescript
-import { projectPayoutCurve } from '@functionspace/core';
+import { previewPayoutCurve } from '@functionspace/core';
 
-async function projectPayoutCurve(
+async function previewPayoutCurve(
   client: FSClient,
   marketId: string | number,
   belief: BeliefVector,
@@ -2766,7 +2766,7 @@ async function projectPayoutCurve(
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `client` | `FSClient` | -- | Authenticated API client |
-| `marketId` | `string \| number` | -- | The market to project against |
+| `marketId` | `string \| number` | -- | The market to preview against |
 | `belief` | `BeliefVector` | -- | The belief vector to simulate |
 | `collateral` | `number` | -- | The collateral amount to simulate |
 | `numOutcomes` | `number` | Server default | Number of outcome points to sample |
@@ -2775,7 +2775,7 @@ async function projectPayoutCurve(
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `projections` | `Array<{outcome, payout, profitLoss: number}>` | Array of outcome/payout pairs. `profitLoss = payout - collateral`. |
+| `previews` | `Array<{outcome, payout, profitLoss: number}>` | Array of outcome/payout pairs. `profitLoss = payout - collateral`. |
 | `maxPayout` | `number` | Best-case payout across all outcomes |
 | `maxPayoutOutcome` | `number` | The outcome value that produces the best payout |
 | `inputCollateral` | `number` | Echo of the collateral you passed in |
@@ -2783,32 +2783,32 @@ async function projectPayoutCurve(
 **How to use in the debounced preview phase:**
 
 ```typescript
-import { generateGaussian, projectPayoutCurve } from '@functionspace/core';
+import { generateGaussian, previewPayoutCurve } from '@functionspace/core';
 
 // Inside a useEffect, debounced 500ms after input change:
 const belief = generateGaussian(center, spread, K, L, H);
-const curve = await projectPayoutCurve(ctx.client, marketId, belief, collateral);
+const curve = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
 
 // Write to context so any mounted chart renders the payout overlay
 ctx.setPreviewPayout(curve);
 
 // Also use locally for UI display
 const bestCase = curve.maxPayout;
-const worstCase = Math.min(...curve.projections.map(p => p.payout));
+const worstCase = Math.min(...curve.previews.map(p => p.payout));
 ```
 
-#### `projectSell(client, positionId, marketId)`
+#### `previewSell(client, positionId, marketId)`
 
 Previews how much collateral would be returned if a position were sold at the current market state.
 
 ```typescript
-import { projectSell } from '@functionspace/core';
+import { previewSell } from '@functionspace/core';
 
-async function projectSell(
+async function previewSell(
   client: FSClient,
   positionId: number,
   marketId: string | number,
-): Promise<ProjectSellResult>
+): Promise<PreviewSellResult>
 ```
 
 **Parameters:**
@@ -2819,7 +2819,7 @@ async function projectSell(
 | `positionId` | `number` | The position to simulate selling |
 | `marketId` | `string \| number` | The market the position belongs to |
 
-**Returns `ProjectSellResult`:**
+**Returns `PreviewSellResult`:**
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -2831,7 +2831,7 @@ async function projectSell(
 ```tsx
 import React, { useContext, useState, useEffect } from 'react';
 import { FunctionSpaceContext, usePositions } from '@functionspace/react';
-import { projectSell } from '@functionspace/core';
+import { previewSell } from '@functionspace/core';
 
 function PositionValues({ marketId }: { marketId: string }) {
   const ctx = useContext(FunctionSpaceContext);
@@ -2846,7 +2846,7 @@ function PositionValues({ marketId }: { marketId: string }) {
 
     Promise.all(
       openPositions.map(async pos => {
-        const preview = await projectSell(ctx.client, pos.positionId, marketId);
+        const preview = await previewSell(ctx.client, pos.positionId, marketId);
         return { id: pos.positionId, value: preview.collateralReturned };
       }),
     ).then(results => {
@@ -2936,7 +2936,7 @@ These rules prevent the most common integration mistakes. Each maps to a silent 
 
 - **NEVER create `FSClient` manually inside a React tree.** The provider creates and manages the client instance. Access it via `useContext(FunctionSpaceContext).client`. Creating a second client bypasses auth state, token management, and invalidation coordination.
 
-- **NEVER skip the debounced payout projection step.** The three-phase pattern exists for a reason. Without Phase 2, any chart rendering payout information in its tooltip will show stale or null data. Debounce at 500ms to avoid flooding the API with projection requests during rapid slider changes.
+- **NEVER skip the debounced payout preview step.** The three-phase pattern exists for a reason. Without Phase 2, any chart rendering payout information in its tooltip will show stale or null data. Debounce at 500ms to avoid flooding the API with preview requests during rapid slider changes.
 
 - **NEVER import `buy` or `sell` from `@functionspace/react`.** Transaction functions live in `@functionspace/core`. The React package exports hooks and the provider -- not transaction functions. The correct import is `import { buy, sell } from '@functionspace/core'`.
 
@@ -3381,27 +3381,27 @@ console.log(`Got back ${result.collateralReturned}`);
 
 #### Previewing Trades
 
-Before committing, use projections to preview outcomes.
+Before committing, use previews to preview outcomes.
 
-**`projectPayoutCurve(client, marketId, belief, collateral, numOutcomes?)`** -- Projects payouts across all possible outcomes without executing a trade. Returns `PayoutCurve`.
+**`previewPayoutCurve(client, marketId, belief, collateral, numOutcomes?)`** -- Previews payouts across all possible outcomes without executing a trade. Returns `PayoutCurve`.
 
 ```typescript
-import { projectPayoutCurve } from '@functionspace/core';
+import { previewPayoutCurve } from '@functionspace/core';
 import type { PayoutCurve } from '@functionspace/core';
 
-const curve: PayoutCurve = await projectPayoutCurve(client, 42, belief, 100);
+const curve: PayoutCurve = await previewPayoutCurve(client, 42, belief, 100);
 console.log(`Best case: $${curve.maxPayout} if outcome = ${curve.maxPayoutOutcome}`);
-console.log(`Worst case: $${Math.min(...curve.projections.map(p => p.payout))}`);
-// curve.projections = [{ outcome, payout, profitLoss }, ...]
+console.log(`Worst case: $${Math.min(...curve.previews.map(p => p.payout))}`);
+// curve.previews = [{ outcome, payout, profitLoss }, ...]
 ```
 
-**`projectSell(client, positionId, marketId)`** -- Previews how much collateral would be returned if a position were sold right now.
+**`previewSell(client, positionId, marketId)`** -- Previews how much collateral would be returned if a position were sold right now.
 
 ```typescript
-import { projectSell } from '@functionspace/core';
-import type { ProjectSellResult } from '@functionspace/core';
+import { previewSell } from '@functionspace/core';
+import type { PreviewSellResult } from '@functionspace/core';
 
-const preview: ProjectSellResult = await projectSell(client, 17, 42);
+const preview: PreviewSellResult = await previewSell(client, 17, 42);
 // preview = { collateralReturned: number, iterations: number }
 console.log(`Current market value: $${preview.collateralReturned}`);
 ```
@@ -3415,7 +3415,7 @@ import {
   FSClient,
   queryMarketState,
   generateGaussian,
-  projectPayoutCurve,
+  previewPayoutCurve,
   buy,
   queryPositionState,
 } from '@functionspace/core';
@@ -3437,7 +3437,7 @@ async function main() {
   const belief = generateGaussian(75, 5, K, L, H);
 
   // 4. Preview the payout before committing
-  const preview = await projectPayoutCurve(client, 42, belief, 100);
+  const preview = await previewPayoutCurve(client, 42, belief, 100);
   console.log(`Best payout: $${preview.maxPayout.toFixed(2)} at outcome ${preview.maxPayoutOutcome}`);
 
   // 5. Execute the trade
@@ -3852,7 +3852,7 @@ Without credentials, the provider runs in guest mode. Charts render normally (re
 
 ### 7.5 Starter Kit: Headless Custom
 
-A custom trade form built entirely with hooks and core functions -- no pre-built trading widgets. Demonstrates direct context access, manual belief construction, payout projection, and trade execution. Copy this entire file as `src/App.tsx`.
+A custom trade form built entirely with hooks and core functions -- no pre-built trading widgets. Demonstrates direct context access, manual belief construction, payout preview, and trade execution. Copy this entire file as `src/App.tsx`.
 
 ```tsx
 // src/App.tsx -- Headless Custom Starter Kit
@@ -3866,7 +3866,7 @@ import {
   generateGaussian,
   computeStatistics,
   buy,
-  projectPayoutCurve,
+  previewPayoutCurve,
 } from '@functionspace/core';
 import type { FSThemeInput } from '@functionspace/react';
 import type { MarketState, PayoutCurve, BuyResult } from '@functionspace/core';
@@ -3898,7 +3898,7 @@ function CustomTradeForm() {
   const [payout, setPayout] = useState<PayoutCurve | null>(null);
   const [status, setStatus] = useState('');
 
-  const projectionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Compute statistics from consensus
   const stats = market
@@ -3907,10 +3907,10 @@ function CustomTradeForm() {
 
   // Three-phase pattern:
   // Phase 1: Build belief and set preview (instant)
-  // Phase 2: Project payout curve (debounced 500ms)
+  // Phase 2: Preview payout curve (debounced 500ms)
   // Phase 3: Submit trade on user action
 
-  // Phase 1 + 2: Update preview and project payout on parameter change
+  // Phase 1 + 2: Update preview and preview payout on parameter change
   useEffect(() => {
     if (!market) return;
     const { K, L, H } = market.config;
@@ -3919,27 +3919,27 @@ function CustomTradeForm() {
     const belief = generateGaussian(center, spread, K, L, H);
     ctx.setPreviewBelief(belief);
 
-    // Phase 2: Debounced payout projection
-    if (projectionTimer.current) clearTimeout(projectionTimer.current);
-    projectionTimer.current = setTimeout(async () => {
+    // Phase 2: Debounced payout preview
+    if (previewTimer.current) clearTimeout(previewTimer.current);
+    previewTimer.current = setTimeout(async () => {
       try {
-        const projected = await projectPayoutCurve(
+        const previewed = await previewPayoutCurve(
           ctx.client,
           MARKET_ID,
           belief,
           collateral,
         );
-        setPayout(projected);
-        ctx.setPreviewPayout(projected);
+        setPayout(previewed);
+        ctx.setPreviewPayout(previewed);
       } catch {
-        // Projection failed -- clear payout preview
+        // Preview failed -- clear payout preview
         setPayout(null);
         ctx.setPreviewPayout(null);
       }
     }, 500);
 
     return () => {
-      if (projectionTimer.current) clearTimeout(projectionTimer.current);
+      if (previewTimer.current) clearTimeout(previewTimer.current);
     };
   }, [market, center, spread, collateral, ctx]);
 
@@ -4125,7 +4125,7 @@ export default function App() {
 
 **Inner component pattern**: `CustomTradeForm` is a separate component rendered inside the `FunctionSpaceProvider`. Hooks from `@functionspace/react` must be called from a component that is a child of the provider. Calling them in the same component that renders the provider will throw.
 
-**Three-phase trade pattern**: (1) Build the belief vector with `generateGaussian` and set `ctx.setPreviewBelief(belief)` immediately for instant chart overlay feedback. (2) Debounce the `projectPayoutCurve` call by 500ms and set `ctx.setPreviewPayout(projected)` to show payout preview on the chart. (3) On user confirmation, call `buy()` with the client from context, then clear previews and call `ctx.invalidate(MARKET_ID)` plus `ctx.refreshUser()`.
+**Three-phase trade pattern**: (1) Build the belief vector with `generateGaussian` and set `ctx.setPreviewBelief(belief)` immediately for instant chart overlay feedback. (2) Debounce the `previewPayoutCurve` call by 500ms and set `ctx.setPreviewPayout(previewed)` to show payout preview on the chart. (3) On user confirmation, call `buy()` with the client from context, then clear previews and call `ctx.invalidate(MARKET_ID)` plus `ctx.refreshUser()`.
 
 **Market parameters**: The `K`, `L`, and `H` values are always destructured from `market.config`. Never hardcode these values -- they are specific to each market.
 
@@ -4383,12 +4383,12 @@ type BeliefVector = number[];
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `projections` | `Array<{outcome: number; payout: number; profitLoss: number}>` | Per-outcome payout projections |
+| `previews` | `Array<{outcome: number; payout: number; profitLoss: number}>` | Per-outcome payout previews |
 | `maxPayout` | `number` | Best-case payout across all outcomes |
 | `maxPayoutOutcome` | `number` | The outcome value that produces `maxPayout` |
-| `inputCollateral` | `number` | Collateral amount used for projection |
+| `inputCollateral` | `number` | Collateral amount used for preview |
 
-**Usage:** Returned by `projectPayoutCurve()`. Set on context via `ctx.setPreviewPayout()` so chart components can render the payout overlay curve.
+**Usage:** Returned by `previewPayoutCurve()`. Set on context via `ctx.setPreviewPayout()` so chart components can render the payout overlay curve.
 
 ---
 
@@ -4437,17 +4437,17 @@ type BeliefVector = number[];
 
 ---
 
-#### `ProjectSellResult`
+#### `PreviewSellResult`
 
 **Package:** `@functionspace/core`
 **Kind:** Interface
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `collateralReturned` | `number` | Projected collateral to be returned |
+| `collateralReturned` | `number` | Previewed collateral to be returned |
 | `iterations` | `number` | Number of solver iterations used |
 
-**Usage:** Returned by `projectSell()`. Used by `PositionTable` to display projected sell value before the user confirms.
+**Usage:** Returned by `previewSell()`. Used by `PositionTable` to display previewed sell value before the user confirms.
 
 ---
 

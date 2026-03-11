@@ -185,12 +185,12 @@ const belief = generateBelief([
 
 The belief vector is the input to two critical operations:
 
-**1. Preview.** Pass to `ctx.setPreviewBelief(belief)` for instant chart overlay, and to `projectPayoutCurve()` for potential payout visualization:
+**1. Preview.** Pass to `ctx.setPreviewBelief(belief)` for instant chart overlay, and to `previewPayoutCurve()` for potential payout visualization:
 
 ```typescript
 ctx.setPreviewBelief(belief);  // shows dashed overlay on consensus chart
 
-const payout = await projectPayoutCurve(client, marketId, belief, collateral);
+const payout = await previewPayoutCurve(client, marketId, belief, collateral);
 // payout.outcomes[i] = { outcome, payout, profitLoss }
 ```
 

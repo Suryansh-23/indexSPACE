@@ -102,10 +102,10 @@ All resolved thresholds are clamped to `[L, H]`.
 **Context interactions:**
 
 * **Reads:** `ctx.client`
-* **Writes:** `ctx.setPreviewBelief(belief)` on side/threshold change, `ctx.setPreviewPayout(result)` after debounced projection, clears both on unmount
+* **Writes:** `ctx.setPreviewBelief(belief)` on side/threshold change, `ctx.setPreviewPayout(result)` after debounced preview, clears both on unmount
 * **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useMarket`, `generateRange`, `computeStatistics`, `projectPayoutCurve`, `buy`
+**Internal calls:** `useMarket`, `generateRange`, `computeStatistics`, `previewPayoutCurve`, `buy`
 
 **Example:**
 

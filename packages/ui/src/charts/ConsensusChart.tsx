@@ -79,15 +79,15 @@ export function ConsensusChartContent({
     }
 
     // Add payout data (tooltip-only)
-    if (ctx.previewPayout?.projections && market) {
-      const projections = ctx.previewPayout.projections;
+    if (ctx.previewPayout?.previews && market) {
+      const previews = ctx.previewPayout.previews;
       for (const point of points) {
-        let best = projections[0];
+        let best = previews[0];
         let bestDist = Math.abs(best.outcome - point.x);
-        for (let j = 1; j < projections.length; j++) {
-          const dist = Math.abs(projections[j].outcome - point.x);
+        for (let j = 1; j < previews.length; j++) {
+          const dist = Math.abs(previews[j].outcome - point.x);
           if (dist < bestDist) {
-            best = projections[j];
+            best = previews[j];
             bestDist = dist;
           }
         }

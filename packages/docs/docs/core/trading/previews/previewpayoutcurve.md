@@ -1,16 +1,16 @@
 ---
-title: "projectPayoutCurve"
+title: "previewPayoutCurve"
 sidebar_position: 1
 ---
 
-# projectPayoutCurve
+# previewPayoutCurve
 
-**`projectPayoutCurve(client, marketId, belief, collateral, numOutcomes?)`**
+**`previewPayoutCurve(client, marketId, belief, collateral, numOutcomes?)`**
 
-**Layer:** L2. Given a hypothetical belief and collateral, projects what the settlement payout would be for every possible outcome. This is how the SDK shows "if the market resolves at X, you'd get Y" curves.
+**Layer:** L2. Given a hypothetical belief and collateral, previews what the settlement payout would be for every possible outcome. This is how the SDK shows "if the market resolves at X, you'd get Y" curves.
 
 ```typescript
-async function projectPayoutCurve(
+async function previewPayoutCurve(
   client: FSClient,
   marketId: string | number,
   belief: BeliefVector,
@@ -24,7 +24,7 @@ async function projectPayoutCurve(
 | Parameter     | Type               | Description                                                                     |
 | ------------- | ------------------ | ------------------------------------------------------------------------------- |
 | `client`      | `FSClient`         | Authenticated API client.                                                       |
-| `marketId`    | `string \| number` | The market to project against.                                                  |
+| `marketId`    | `string \| number` | The market to preview against.                                                  |
 | `belief`      | `BeliefVector`     | The belief vector to simulate. Same format as what you'd pass to `buy`.         |
 | `collateral`  | `number`           | The collateral amount to simulate.                                              |
 | `numOutcomes` | `number?`          | Number of outcome points to sample. Defaults to server-side default if omitted. |
@@ -33,7 +33,7 @@ async function projectPayoutCurve(
 
 ```typescript
 interface PayoutCurve {
-  projections: Array<{
+  previews: Array<{
     outcome: number;     // A possible settlement value
     payout: number;      // What you'd receive if the market resolved here
     profitLoss: number;  // payout - collateral (positive = profit, negative = loss)
@@ -44,16 +44,16 @@ interface PayoutCurve {
 }
 ```
 
-**How UI components use this:** Every trade panel calls `projectPayoutCurve` on a 500ms debounce after the trader adjusts any input (prediction slider, confidence, collateral amount). The result is written to `ctx.setPreviewPayout(result)`, which the `ConsensusChart` reads to render a payout overlay in its tooltip.
+**How UI components use this:** Every trade panel calls `previewPayoutCurve` on a 500ms debounce after the trader adjusts any input (prediction slider, confidence, collateral amount). The result is written to `ctx.setPreviewPayout(result)`, which the `ConsensusChart` reads to render a payout overlay in its tooltip.
 
 **Example:**
 
 ```typescript
 const belief = generateGaussian(75, 5, K, L, H);
-const curve = await projectPayoutCurve(ctx.client, marketId, belief, 100);
+const curve = await previewPayoutCurve(ctx.client, marketId, belief, 100);
 
 console.log(`Best case: $${curve.maxPayout} if outcome = ${curve.maxPayoutOutcome}`);
-console.log(`Worst case: $${Math.min(...curve.projections.map(p => p.payout))}`);
+console.log(`Worst case: $${Math.min(...curve.previews.map(p => p.payout))}`);
 
 // Write to context so the chart renders the payout overlay
 ctx.setPreviewPayout(curve);

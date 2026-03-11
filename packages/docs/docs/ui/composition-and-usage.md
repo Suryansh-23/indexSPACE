@@ -86,7 +86,7 @@ Every trading widget follows the same execution pattern:
 | Phase          | Timing                              | What Happens                                            | Chart Effect                              |
 | -------------- | ----------------------------------- | ------------------------------------------------------- | ----------------------------------------- |
 | **1. Preview** | Instant (on every input change)     | `generateBelief()` → `ctx.setPreviewBelief(belief)`     | Dashed overlay appears on consensus chart |
-| **2. Payout**  | Debounced (500ms after last change) | `projectPayoutCurve()` → `ctx.setPreviewPayout(result)` | Payout column appears in chart tooltip    |
+| **2. Payout**  | Debounced (500ms after last change) | `previewPayoutCurve()` → `ctx.setPreviewPayout(result)` | Payout column appears in chart tooltip    |
 | **3. Submit**  | On button click                     | `buy()` → `ctx.invalidate(marketId)`                    | Preview clears, all data refreshes        |
 
 This pattern ensures responsive feedback (phase 1 is synchronous) while avoiding excessive API calls (phase 2 is debounced).

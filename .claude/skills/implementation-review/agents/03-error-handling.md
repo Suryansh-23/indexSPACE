@@ -83,7 +83,7 @@ For React components and hooks:
 
 If any trade input component was modified (per PLAYBOOK.md):
 - Phase 1: Instant belief generation → `ctx.setPreviewBelief()` (no debounce)
-- Phase 2: Debounced (500ms) payout projection → `ctx.setPreviewPayout()`
+- Phase 2: Debounced (500ms) payout preview → `ctx.setPreviewPayout()`
 - Phase 3: Trade submission → `buy()` → reset → `ctx.invalidate()`
 - Cleanup on unmount: clear both `previewBelief` and `previewPayout`
 - Only ONE trade input should be mounted at a time

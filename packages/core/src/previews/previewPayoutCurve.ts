@@ -2,10 +2,10 @@ import type { FSClient } from '../client.js';
 import type { BeliefVector, PayoutCurve } from '../types.js';
 
 /**
- * Project payouts across all possible outcomes for a hypothetical position.
+ * Preview payouts across all possible outcomes for a hypothetical position.
  * Wraps: POST /api/projection/project_settlement?market_id=X
  */
-export async function projectPayoutCurve(
+export async function previewPayoutCurve(
   client: FSClient,
   marketId: string | number,
   belief: BeliefVector,
@@ -27,7 +27,8 @@ export async function projectPayoutCurve(
   );
 
   return {
-    projections: data.projections.map((p: any) => ({
+    // API response uses "projections" -- remapped to "previews" in SDK types
+    previews: data.projections.map((p: any) => ({
       outcome: p.outcome,
       payout: p.payout,
       profitLoss: p.profit_loss,

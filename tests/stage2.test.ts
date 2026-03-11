@@ -10,8 +10,8 @@ import { queryMarketHistory } from '../packages/core/src/queries/history.js';
 import { positionsToTradeEntries, queryTradeHistory } from '../packages/core/src/queries/trades.js';
 import { buy } from '../packages/core/src/transactions/buy.js';
 import { sell } from '../packages/core/src/transactions/sell.js';
-import { projectSell } from '../packages/core/src/projections/projectSell.js';
-import { projectPayoutCurve } from '../packages/core/src/projections/projectPayoutCurve.js';
+import { previewSell } from '../packages/core/src/previews/previewSell.js';
+import { previewPayoutCurve } from '../packages/core/src/previews/previewPayoutCurve.js';
 
 const BASE_URL = 'http://localhost:8000';
 const USERNAME = '';
@@ -234,8 +234,8 @@ describe('API: queryDensityAt', () => {
   });
 });
 
-describe('API: projectPayoutCurve', () => {
-  it('returns projections with correct fields', async () => {
+describe('API: previewPayoutCurve', () => {
+  it('returns previews with correct fields', async () => {
     const client = makeClient();
     const market = await queryMarketState(client, MARKET_ID);
     const belief = generateGaussian(
@@ -245,18 +245,18 @@ describe('API: projectPayoutCurve', () => {
       market.config.L,
       market.config.H,
     );
-    const payout = await projectPayoutCurve(client, MARKET_ID, belief, 10, 20);
-    expect(payout.projections.length).toBe(20);
+    const payout = await previewPayoutCurve(client, MARKET_ID, belief, 10, 20);
+    expect(payout.previews.length).toBe(20);
     expect(payout.maxPayout).toBeGreaterThan(0);
     expect(payout.inputCollateral).toBe(10);
-    expect(payout.projections[0]).toHaveProperty('outcome');
-    expect(payout.projections[0]).toHaveProperty('payout');
-    expect(payout.projections[0]).toHaveProperty('profitLoss');
+    expect(payout.previews[0]).toHaveProperty('outcome');
+    expect(payout.previews[0]).toHaveProperty('payout');
+    expect(payout.previews[0]).toHaveProperty('profitLoss');
   });
 });
 
 describe('API: Full trade cycle (Gaussian via generateGaussian)', () => {
-  it('generateGaussian → buy → queryPositionState → projectSell → sell', async () => {
+  it('generateGaussian → buy → queryPositionState → previewSell → sell', async () => {
     const client = makeClient();
     const market = await queryMarketState(client, MARKET_ID);
     const center = (market.config.L + market.config.H) / 2;
@@ -279,9 +279,9 @@ describe('API: Full trade cycle (Gaussian via generateGaussian)', () => {
     expect(pos.positionId).toBe(buyResult.positionId);
     expect(pos.status).toBe('open');
 
-    // Project sell
-    const projected = await projectSell(client, buyResult.positionId, MARKET_ID);
-    expect(projected.collateralReturned).toBeGreaterThan(0);
+    // Preview sell
+    const previewed = await previewSell(client, buyResult.positionId, MARKET_ID);
+    expect(previewed.collateralReturned).toBeGreaterThan(0);
 
     // Sell
     const sellResult = await sell(client, buyResult.positionId, MARKET_ID);
@@ -291,7 +291,7 @@ describe('API: Full trade cycle (Gaussian via generateGaussian)', () => {
 });
 
 describe('API: Full trade cycle (Range via generateRange)', () => {
-  it('generateRange -> buy -> projectSell -> sell', async () => {
+  it('generateRange -> buy -> previewSell -> sell', async () => {
     const client = makeClient();
     const market = await queryMarketState(client, MARKET_ID);
     const { L: mL, H: mH, K: mK } = market.config;
@@ -303,8 +303,8 @@ describe('API: Full trade cycle (Range via generateRange)', () => {
     expect(buyResult.positionId).toBeDefined();
     expect(buyResult.claims).toBeGreaterThan(0);
 
-    const projected = await projectSell(client, buyResult.positionId, MARKET_ID);
-    expect(projected.collateralReturned).toBeGreaterThan(0);
+    const previewed = await previewSell(client, buyResult.positionId, MARKET_ID);
+    expect(previewed.collateralReturned).toBeGreaterThan(0);
 
     const sellResult = await sell(client, buyResult.positionId, MARKET_ID);
     expect(sellResult.collateralReturned).toBeGreaterThan(0);
@@ -366,7 +366,7 @@ describe('Cross-validation: local stats vs backend data', () => {
     }
   });
 
-  it('projectSell value is consistent with projectPayoutCurve at consensus mean', async () => {
+  it('previewSell value is consistent with previewPayoutCurve at consensus mean', async () => {
     const client = makeClient();
     const market = await queryMarketState(client, MARKET_ID);
     const center = (market.config.L + market.config.H) / 2;
@@ -375,15 +375,15 @@ describe('Cross-validation: local stats vs backend data', () => {
     // Buy a position
     const buyResult = await buy(client, MARKET_ID, belief, 5, { prediction: center });
 
-    // Get projectSell value
-    const sellProjection = await projectSell(client, buyResult.positionId, MARKET_ID);
+    // Get previewSell value
+    const sellPreview = await previewSell(client, buyResult.positionId, MARKET_ID);
 
     // Get payout curve
-    const payoutCurve = await projectPayoutCurve(client, MARKET_ID, belief, 5, 50);
+    const payoutCurve = await previewPayoutCurve(client, MARKET_ID, belief, 5, 50);
 
-    // projectSell gives the current sell value; payoutCurve gives payout at settlement outcomes
+    // previewSell gives the current sell value; payoutCurve gives payout at settlement outcomes
     // They measure different things, but both should be positive for a valid position
-    expect(sellProjection.collateralReturned).toBeGreaterThan(0);
+    expect(sellPreview.collateralReturned).toBeGreaterThan(0);
     expect(payoutCurve.maxPayout).toBeGreaterThan(0);
     expect(payoutCurve.inputCollateral).toBe(5);
 

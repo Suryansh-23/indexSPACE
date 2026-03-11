@@ -54,10 +54,10 @@ import { BucketRangeSelector } from '@functionspace/ui';
 **Context interactions:**
 
 * **Reads:** `ctx.client`
-* **Writes:** `ctx.setPreviewBelief(belief)` on selection change, `ctx.setPreviewPayout(result)` after debounced projection, clears both on unmount
+* **Writes:** `ctx.setPreviewBelief(belief)` on selection change, `ctx.setPreviewPayout(result)` after debounced preview, clears both on unmount
 * **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useDistributionState`, `generateRange`, `projectPayoutCurve`, `buy`
+**Internal calls:** `useDistributionState`, `generateRange`, `previewPayoutCurve`, `buy`
 
 **Example:**
 

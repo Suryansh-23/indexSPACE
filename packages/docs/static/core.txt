@@ -515,27 +515,27 @@ console.log(`Got back ${result.collateralReturned}`);
 
 ### Previewing Trades
 
-Before committing, use projections to preview outcomes.
+Before committing, use previews to preview outcomes.
 
-**`projectPayoutCurve(client, marketId, belief, collateral, numOutcomes?)`** -- Projects payouts across all possible outcomes without executing a trade. Returns `PayoutCurve`.
+**`previewPayoutCurve(client, marketId, belief, collateral, numOutcomes?)`** -- Previews payouts across all possible outcomes without executing a trade. Returns `PayoutCurve`.
 
 ```typescript
-import { projectPayoutCurve } from '@functionspace/core';
+import { previewPayoutCurve } from '@functionspace/core';
 import type { PayoutCurve } from '@functionspace/core';
 
-const curve: PayoutCurve = await projectPayoutCurve(client, 42, belief, 100);
+const curve: PayoutCurve = await previewPayoutCurve(client, 42, belief, 100);
 console.log(`Best case: $${curve.maxPayout} if outcome = ${curve.maxPayoutOutcome}`);
-console.log(`Worst case: $${Math.min(...curve.projections.map(p => p.payout))}`);
-// curve.projections = [{ outcome, payout, profitLoss }, ...]
+console.log(`Worst case: $${Math.min(...curve.previews.map(p => p.payout))}`);
+// curve.previews = [{ outcome, payout, profitLoss }, ...]
 ```
 
-**`projectSell(client, positionId, marketId)`** -- Previews how much collateral would be returned if a position were sold right now.
+**`previewSell(client, positionId, marketId)`** -- Previews how much collateral would be returned if a position were sold right now.
 
 ```typescript
-import { projectSell } from '@functionspace/core';
-import type { ProjectSellResult } from '@functionspace/core';
+import { previewSell } from '@functionspace/core';
+import type { PreviewSellResult } from '@functionspace/core';
 
-const preview: ProjectSellResult = await projectSell(client, 17, 42);
+const preview: PreviewSellResult = await previewSell(client, 17, 42);
 // preview = { collateralReturned: number, iterations: number }
 console.log(`Current market value: $${preview.collateralReturned}`);
 ```
@@ -549,7 +549,7 @@ import {
   FSClient,
   queryMarketState,
   generateGaussian,
-  projectPayoutCurve,
+  previewPayoutCurve,
   buy,
   queryPositionState,
 } from '@functionspace/core';
@@ -571,7 +571,7 @@ async function main() {
   const belief = generateGaussian(75, 5, K, L, H);
 
   // 4. Preview the payout before committing
-  const preview = await projectPayoutCurve(client, 42, belief, 100);
+  const preview = await previewPayoutCurve(client, 42, belief, 100);
   console.log(`Best payout: $${preview.maxPayout.toFixed(2)} at outcome ${preview.maxPayoutOutcome}`);
 
   // 5. Execute the trade
@@ -962,12 +962,12 @@ type BeliefVector = number[];
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `projections` | `Array<{outcome: number; payout: number; profitLoss: number}>` | Per-outcome payout projections |
+| `previews` | `Array<{outcome: number; payout: number; profitLoss: number}>` | Per-outcome payout previews |
 | `maxPayout` | `number` | Best-case payout across all outcomes |
 | `maxPayoutOutcome` | `number` | The outcome value that produces `maxPayout` |
-| `inputCollateral` | `number` | Collateral amount used for projection |
+| `inputCollateral` | `number` | Collateral amount used for preview |
 
-**Usage:** Returned by `projectPayoutCurve()`.
+**Usage:** Returned by `previewPayoutCurve()`.
 
 ---
 
@@ -1016,17 +1016,17 @@ type BeliefVector = number[];
 
 ---
 
-### `ProjectSellResult`
+### `PreviewSellResult`
 
 **Package:** `@functionspace/core`
 **Kind:** Interface
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `collateralReturned` | `number` | Projected collateral to be returned |
+| `collateralReturned` | `number` | Previewed collateral to be returned |
 | `iterations` | `number` | Number of solver iterations used |
 
-**Usage:** Returned by `projectSell()`.
+**Usage:** Returned by `previewSell()`.
 
 ---
 

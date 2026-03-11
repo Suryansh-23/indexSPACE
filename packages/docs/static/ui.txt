@@ -397,7 +397,7 @@ All trading widgets follow a three-phase trade pattern:
 | Phase | Timing | What Happens | Chart Effect |
 |-------|--------|-------------|--------------|
 | 1. Preview | Instant, on every input change | Generates belief, writes to `ctx.setPreviewBelief(belief)` | Dashed overlay on ConsensusChart |
-| 2. Payout | Debounced, 500ms | Calls `projectPayoutCurve()`, writes to `ctx.setPreviewPayout(result)` | Payout column in chart tooltip |
+| 2. Payout | Debounced, 500ms | Calls `previewPayoutCurve()`, writes to `ctx.setPreviewPayout(result)` | Payout column in chart tooltip |
 | 3. Submit | On button click | Calls `buy()`, clears preview, calls `ctx.invalidate(marketId)` | Preview clears, data hooks refetch |
 
 **Exclusivity rule:** Only one trading widget should be mounted at a time.
@@ -964,7 +964,7 @@ type ShapeId = 'gaussian' | 'spike' | 'range' | 'bimodal' | 'dip' | 'leftskew' |
 - **`BucketData`** -- Contains `range`, `min`, `max`, `probability`, `percentage`.
 - **`TradeEntry`** -- Contains `id`, `timestamp`, `side`, `prediction`, `amount`, `username`.
 - **`UserProfile`** -- Contains `userId`, `username`, `walletValue`, `role`.
-- **`PayoutCurve`** -- Contains `projections`, `maxPayout`, `maxPayoutOutcome`, `inputCollateral`.
+- **`PayoutCurve`** -- Contains `previews`, `maxPayout`, `maxPayoutOutcome`, `inputCollateral`.
 
 For complete core type reference, see `core.txt`. For React/hooks types, see `react.txt`.
 

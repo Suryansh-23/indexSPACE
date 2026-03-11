@@ -7,7 +7,7 @@ export type {
   Position,
   BuyResult,
   SellResult,
-  ProjectSellResult,
+  PreviewSellResult,
   PayoutCurve,
   BeliefVector,
   GaussianParams,
@@ -51,9 +51,9 @@ export { queryMarketHistory } from './queries/history.js';
 export { buy } from './transactions/buy.js';
 export { sell } from './transactions/sell.js';
 
-// Projections
-export { projectSell } from './projections/projectSell.js';
-export { projectPayoutCurve } from './projections/projectPayoutCurve.js';
+// Previews
+export { previewSell } from './previews/previewSell.js';
+export { previewPayoutCurve } from './previews/previewPayoutCurve.js';
 
 // Auth
 export { loginUser, signupUser, fetchCurrentUser, validateUsername, passwordlessLoginUser, silentReAuth } from './auth/auth.js';

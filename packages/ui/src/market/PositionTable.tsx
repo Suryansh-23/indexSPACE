@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
-import { projectSell, sell } from '@functionspace/core';
+import { previewSell, sell } from '@functionspace/core';
 import type { Position, SellResult } from '@functionspace/core';
 import { FunctionSpaceContext, usePositions } from '@functionspace/react';
 import '../styles/base.css';
@@ -129,7 +129,7 @@ export function PositionTable({
 
     const results = await Promise.allSettled(
       openPositions.map((p) =>
-        projectSell(ctx.client, p.positionId as number, marketId).then((r) => ({
+        previewSell(ctx.client, p.positionId as number, marketId).then((r) => ({
           positionId: p.positionId,
           value: r.collateralReturned,
         }))

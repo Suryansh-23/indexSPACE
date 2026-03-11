@@ -1,15 +1,15 @@
 import type { FSClient } from '../client.js';
-import type { ProjectSellResult } from '../types.js';
+import type { PreviewSellResult } from '../types.js';
 
 /**
  * Preview sell payout without executing.
  * Wraps: GET /api/sell/simulate/{positionId}?market_id=X
  */
-export async function projectSell(
+export async function previewSell(
   client: FSClient,
   positionId: number,
   marketId: string | number,
-): Promise<ProjectSellResult> {
+): Promise<PreviewSellResult> {
   const data = await client.get<any>(
     `/api/sell/simulate/${positionId}`,
     { market_id: String(marketId) },

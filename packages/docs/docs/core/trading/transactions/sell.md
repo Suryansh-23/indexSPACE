@@ -36,7 +36,7 @@ interface SellResult {
 }
 ```
 
-The returned collateral depends on the current market state. If the market consensus has shifted toward your belief since you bought, you'll get back more than you put in. If it shifted away, you'll get back less. Use `projectSell` to preview the return before executing.
+The returned collateral depends on the current market state. If the market consensus has shifted toward your belief since you bought, you'll get back more than you put in. If it shifted away, you'll get back less. Use `previewSell` to preview the return before executing.
 
 **Example:**
 
