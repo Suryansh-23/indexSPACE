@@ -9,10 +9,11 @@ import { evaluateDensityPiecewise, evaluateDensityCurve, computeStatistics } fro
 export async function queryMarketState(
   client: FSClient,
   marketId: string | number,
+  options?: { signal?: AbortSignal },
 ): Promise<MarketState> {
   const data = await client.get<any>('/api/market/state', {
     market_id: String(marketId),
-  });
+  }, options?.signal);
 
   const alphaVector: number[] = data.alpha_vector;
   const totalMass = alphaVector.reduce((a: number, b: number) => a + b, 0);
@@ -55,8 +56,9 @@ export async function getConsensusCurve(
   client: FSClient,
   marketId: string | number,
   numPoints: number = 200,
+  options?: { signal?: AbortSignal },
 ): Promise<ConsensusCurve> {
-  const market = await queryMarketState(client, marketId);
+  const market = await queryMarketState(client, marketId, options);
   const points = evaluateDensityCurve(
     market.consensus,
     market.config.L,
@@ -73,8 +75,9 @@ export async function getConsensusCurve(
 export async function queryConsensusSummary(
   client: FSClient,
   marketId: string | number,
+  options?: { signal?: AbortSignal },
 ): Promise<ConsensusSummary> {
-  const market = await queryMarketState(client, marketId);
+  const market = await queryMarketState(client, marketId, options);
   return computeStatistics(market.consensus, market.config.L, market.config.H);
 }
 
@@ -85,8 +88,9 @@ export async function queryDensityAt(
   client: FSClient,
   marketId: string | number,
   x: number,
+  options?: { signal?: AbortSignal },
 ): Promise<{ x: number; density: number }> {
-  const market = await queryMarketState(client, marketId);
+  const market = await queryMarketState(client, marketId, options);
   const density = evaluateDensityPiecewise(
     market.consensus,
     x,

@@ -9,10 +9,12 @@ export async function previewSell(
   client: FSClient,
   positionId: number,
   marketId: string | number,
+  options?: { signal?: AbortSignal },
 ): Promise<PreviewSellResult> {
   const data = await client.get<any>(
     `/api/sell/simulate/${positionId}`,
     { market_id: String(marketId) },
+    options?.signal,
   );
 
   return {

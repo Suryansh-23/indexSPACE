@@ -88,6 +88,7 @@ Every new function must be classifiable by both layer AND category. This keeps t
 | Modify theme system | `packages/react/src/themes.ts` (types + presets + chart colors), `packages/react/src/FunctionSpaceProvider.tsx` (resolution + provider) |
 | Modify chart colors | `packages/react/src/themes.ts` (ChartColors, resolveChartColors, preset overrides) |
 | Add/modify belief shapes | `packages/core/src/shapes/definitions.ts` + `packages/core/src/math/generators.ts` |
+| Add/modify cache behavior | `packages/react/src/cache/` |
 | Add auth functions | `packages/core/src/auth/auth.ts` |
 | Add auth widgets | `packages/ui/src/auth/` (AuthWidget, PasswordlessAuthWidget) |
 | Add chart zoom/pan math | `packages/core/src/chart/zoom.ts` |
@@ -118,7 +119,9 @@ cd packages/docs && npx docusaurus build  # Docs site build verification (requir
 | `tests/chart-zoom.test.ts` | Chart zoom/pan math functions | Changing pixelToDataX, zoom/pan domain computation, data filtering |
 | `tests/themes.test.ts` | Theme preset validation, resolveTheme behavior | Adding/modifying presets or theme resolution logic |
 | `tests/binary.test.ts` | Binary panel-specific tests | Changing BinaryPanel behavior or x-point modes |
-| `tests/components.test.tsx` | Widget smoke tests (provider guard, loading, error, primary action, cleanup) | Adding or modifying UI widgets — see [Widget Component Testing Guide](../Docs/widget-component-testing-guide.md) |
+| `tests/cache.test.ts` | QueryCache class unit tests | Changing cache class, types, or lifecycle behavior |
+| `tests/client-signal.test.ts` | FSClient signal forwarding and request() refactor | Changing FSClient.get(), FSClient.post(), or request() method |
+| `tests/components.test.tsx` | Widget smoke tests (provider guard, loading, error, primary action, cleanup) | Adding or modifying UI widgets -- see [Widget Component Testing Guide](../Docs/widget-component-testing-guide.md) |
 
 **When adding UI widgets:** Add 5 smoke tests to `components.test.tsx` (provider guard, loading state, error state, primary action, unmount cleanup).
 

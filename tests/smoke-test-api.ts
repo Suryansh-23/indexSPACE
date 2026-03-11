@@ -7,10 +7,10 @@
  * Set these environment variables before running (or create a root .env file):
  *   FS_TEST_URL, FS_TEST_USERNAME, FS_TEST_PASSWORD, FS_TEST_MARKET_ID
  */
-const BASE_URL = 'http://localhost:8000';
-const USERNAME = '';
-const PASSWORD =  '';
-const MARKET_ID = '15';
+const BASE_URL = process.env.FS_TEST_URL || 'http://localhost:8000';
+const USERNAME = process.env.FS_TEST_USERNAME || '';
+const PASSWORD = process.env.FS_TEST_PASSWORD || '';
+const MARKET_ID = process.env.FS_TEST_MARKET_ID || '15';
 
 if (!USERNAME || !PASSWORD) {
   console.error('Missing FS_TEST_USERNAME or FS_TEST_PASSWORD environment variables.');

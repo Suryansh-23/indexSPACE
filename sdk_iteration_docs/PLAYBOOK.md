@@ -587,19 +587,20 @@ Peaks beyond 4x are clipped visually but remain in the tooltip data. This ensure
 - `transformHistoryToFanChart(snapshots, L, H, maxPoints?)` → `FanChartPoint[]` (downsample + percentile extraction)
 
 ### Queries
-- `queryMarketState(client, marketId)` → `MarketState` (wraps `GET /api/market/state`)
-- `getConsensusCurve(client, marketId, numPoints?)` → `ConsensusCurve` (market state + client-side density eval)
-- `queryConsensusSummary(client, marketId)` → `ConsensusSummary` (client-side stats from consensus coefficients)
-- `queryDensityAt(client, marketId, x)` → density value at a single outcome point
-- `queryMarketHistory(client, marketId, limit?, offset?)` → `MarketHistory` (wraps `GET /api/market/history`)
-- `queryMarketPositions(client, marketId)` → `Position[]` (wraps `GET /api/market/positions`)
-- `queryPositionState(client, positionId, marketId)` → `Position` (single position by ID)
+All query functions accept an optional trailing `options?: { signal?: AbortSignal }` parameter (backward-compatible). Signal is forwarded through composed call chains.
+- `queryMarketState(client, marketId, options?)` → `MarketState` (wraps `GET /api/market/state`)
+- `getConsensusCurve(client, marketId, numPoints?, options?)` → `ConsensusCurve` (market state + client-side density eval)
+- `queryConsensusSummary(client, marketId, options?)` → `ConsensusSummary` (client-side stats from consensus coefficients)
+- `queryDensityAt(client, marketId, x, options?)` → density value at a single outcome point
+- `queryMarketHistory(client, marketId, limit?, offset?, options?)` → `MarketHistory` (wraps `GET /api/market/history`)
+- `queryMarketPositions(client, marketId, options?)` → `Position[]` (wraps `GET /api/market/positions`)
+- `queryPositionState(client, positionId, marketId, options?)` → `Position` (single position by ID)
 - `mapPosition(raw)` → `Position` (raw API response → typed Position)
 - `positionsToTradeEntries(positions, options?)` → `TradeEntry[]` (pure transform, sorted by timestamp desc)
-- `queryTradeHistory(client, marketId, options?)` → `TradeEntry[]` (composed: queryMarketPositions → positionsToTradeEntries)
+- `queryTradeHistory(client, marketId, options?)` → `TradeEntry[]` (composed: queryMarketPositions → positionsToTradeEntries; options accepts limit and signal)
 
 ### Discovery
-- `discoverMarkets(client)` → `MarketState[]`
+- `discoverMarkets(client, options?)` → `MarketState[]`
 
 ### Auth
 - `loginUser(client, username, password)` → `{ user: UserProfile, token: string }` (raw fetch, bypasses ensureAuth)
@@ -621,8 +622,8 @@ Peaks beyond 4x are clipped visually but remain in the tooltip data. This ensure
 - `sell(client, positionId, marketId)` → SellResult
 
 ### Previews
-- `previewPayoutCurve(client, marketId, belief, collateral)` → PayoutCurve
-- `previewSell(client, positionId, marketId)` → PreviewSellResult
+- `previewPayoutCurve(client, marketId, belief, collateral, numOutcomes?, options?)` → PayoutCurve
+- `previewSell(client, positionId, marketId, options?)` → PreviewSellResult
 
 ---
 
@@ -1014,7 +1015,11 @@ packages/
 │   ├── FunctionSpaceProvider.tsx  # Provider + theme resolution (resolveTheme, applyDefaults)
 │   ├── useAuth.ts            # Auth state/action hook (not data-fetching)
 │   ├── useDistributionState.ts  # Shared distribution state for bucket components
-│   └── use*.ts               # Data-fetching hooks (useMarket, useConsensus, usePositions, etc.)
+│   ├── use*.ts               # Data-fetching hooks (useMarket, useConsensus, usePositions, etc.)
+│   └── cache/                # Internal QueryCache (not exported from package root)
+│       ├── types.ts          # CacheKey, CacheSnapshot, CacheEntry, QueryFn, QueryOptions, CacheConfig
+│       ├── QueryCache.ts     # Cache class (subscribe, getSnapshot, ensureFetching, invalidate, polling, GC)
+│       └── index.ts          # Barrel export
 └── ui/src/
     ├── index.ts              # Re-exports all public components
     ├── theme.ts              # Deprecated static chart colors (use ctx.chartColors instead)

@@ -12,6 +12,7 @@ export default defineConfig(({ mode }) => {
       environmentMatchGlobs: [
         ['tests/hooks.test.tsx', 'jsdom'],
         ['tests/components.test.tsx', 'jsdom'],
+        ['tests/cache.test.ts', 'jsdom'],
         ['tests/*.test.ts', 'node'],
       ],
       env: {

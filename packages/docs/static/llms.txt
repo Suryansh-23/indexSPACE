@@ -3286,7 +3286,7 @@ console.log(position.status, position.collateral, position.claims);
 
 #### `queryTradeHistory(client, marketId, options?)`
 
-Fetches positions and transforms them into a chronological list of `TradeEntry[]` entries. Each position produces a "buy" entry, and if sold, also a "sell" entry.
+Fetches positions and transforms them into a chronological list of `TradeEntry[]` entries. Each position produces a "buy" entry, and if sold, also a "sell" entry. The `options` object accepts `limit` (default 100) and `signal` (AbortSignal for cancellation).
 
 ```typescript
 import { FSClient, queryTradeHistory } from '@functionspace/core';

@@ -11,6 +11,7 @@ export async function previewPayoutCurve(
   belief: BeliefVector,
   collateral: number,
   numOutcomes?: number,
+  options?: { signal?: AbortSignal },
 ): Promise<PayoutCurve> {
   const body: Record<string, unknown> = {
     belief_vector: belief,
@@ -24,6 +25,7 @@ export async function previewPayoutCurve(
     '/api/projection/project_settlement',
     body,
     { market_id: String(marketId) },
+    options?.signal,
   );
 
   return {

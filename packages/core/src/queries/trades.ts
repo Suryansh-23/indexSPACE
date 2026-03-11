@@ -77,8 +77,12 @@ export function positionsToTradeEntries(
 export async function queryTradeHistory(
   client: FSClient,
   marketId: string | number,
-  options?: { limit?: number },
+  options?: { limit?: number; signal?: AbortSignal },
 ): Promise<TradeEntry[]> {
-  const positions = await queryMarketPositions(client, marketId);
+  const positions = await queryMarketPositions(
+    client,
+    marketId,
+    options?.signal ? { signal: options.signal } : undefined,
+  );
   return positionsToTradeEntries(positions, options);
 }

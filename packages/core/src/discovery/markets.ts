@@ -7,8 +7,9 @@ import type { MarketState } from '../types.js';
  */
 export async function discoverMarkets(
   client: FSClient,
+  options?: { signal?: AbortSignal },
 ): Promise<MarketState[]> {
-  const data = await client.get<any[]>('/api/markets');
+  const data = await client.get<any[]>('/api/markets', undefined, options?.signal);
 
   return data.map((item: any) => {
     const alphaVector: number[] = item.alpha_vector;
