@@ -775,6 +775,7 @@ Before creating anything, decide the correct approach (see "When to Create a New
 - [ ] TypeScript types defined in `types.ts`
 - [ ] Exported from `packages/core/src/index.ts`
 - [ ] **Add tests to `stage1.test.ts` (math) or `stage2.test.ts` (API)**
+- [ ] **If the function maps an API endpoint:** Add mocked-fetch contract test to `tests/mappings.test.ts` (raw fixture, field mapping assertion, URL assertion, POST body assertion for writes)
 - [ ] **Run `npx vitest run` — all tests pass**
 - [ ] **Update PLAYBOOK.md** — Core Functions list (correct category + layer)
 
