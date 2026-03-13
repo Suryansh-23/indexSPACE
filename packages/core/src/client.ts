@@ -117,7 +117,7 @@ export class FSClient {
     if (this.token) {
       headers['Authorization'] = `Bearer ${this.token}`;
     } else {
-      headers['X-Username'] = 'guest';
+      headers['Username'] = 'guest';
     }
 
     const res = await fetch(url, {

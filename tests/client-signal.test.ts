@@ -62,7 +62,7 @@ describe('FSClient signal forwarding', () => {
     expect(url).toContain('/api/markets');
     expect(url).toContain('id=15');
     expect(callArgs[1].method).toBe('GET');
-    expect(callArgs[1].headers['X-Username']).toBe('guest');
+    expect(callArgs[1].headers['Username']).toBe('guest');
   });
 
   it('AbortSignal cancellation rejects with AbortError', async () => {

@@ -45,14 +45,16 @@ export interface ConsensusCurve {
 // ── Position Types ──
 
 export interface Position {
-  positionId: number;
+  positionId: string | number;
   belief: number[];
   collateral: number;
   claims: number;
   owner: string;
   status: 'open' | 'sold' | 'settled' | 'closed';
-  prediction: number;
-  stdDev: number;
+  prediction?: number | null;
+  stdDev?: number | null;
+  positionType?: string;
+  positionParams?: Record<string, unknown>;
   createdAt: string;
   closedAt: string | null;
   soldPrice: number | null;
@@ -74,14 +76,14 @@ export interface TradeEntry {
 // ── Trading Types ──
 
 export interface BuyResult {
-  positionId: number;
+  positionId: string | number;
   belief: number[];
   claims: number;
   collateral: number;
 }
 
 export interface SellResult {
-  positionId: number;
+  positionId: string | number;
   collateralReturned: number;
 }
 
