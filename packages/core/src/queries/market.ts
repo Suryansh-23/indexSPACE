@@ -4,21 +4,26 @@ import { evaluateDensityPiecewise, evaluateDensityCurve, computeStatistics } fro
 
 /**
  * Returns complete market state.
- * Wraps: GET /api/market/state?market_id=X
+ * Wraps: GET /api/views/markets/{market_id}
  */
 export async function queryMarketState(
   client: FSClient,
   marketId: string | number,
   options?: { signal?: AbortSignal },
 ): Promise<MarketState> {
-  const data = await client.get<any>('/api/market/state', {
-    market_id: String(marketId),
-  }, options?.signal);
+  const data = await client.get<any>(`/api/views/markets/${marketId}`, undefined, options?.signal);
 
   const alphaVector: number[] = data.alpha_vector;
   const totalMass = alphaVector.reduce((a: number, b: number) => a + b, 0);
   const consensus = alphaVector.map((a: number) => a / totalMass);
-  const mp = data.market_params;
+  const mp = data.market_model_params;
+
+  const K = data.num_buckets;
+  if (K == null) throw new Error('Missing num_buckets (K) in market response');
+  const L = data.metadata?.lower_bound ?? data.lower_bound;
+  if (L == null) throw new Error('Missing lower_bound (L) in market response');
+  const H = data.metadata?.upper_bound ?? data.upper_bound;
+  if (H == null) throw new Error('Missing upper_bound (H) in market response');
 
   return {
     alpha: alphaVector,
@@ -29,9 +34,9 @@ export async function queryMarketState(
     totalVolume: data.total_volume,
     positionsOpen: data.positions_currently_open,
     config: {
-      K: mp.K,
-      L: mp.L,
-      H: mp.H,
+      K,
+      L,
+      H,
       P0: mp.P0,
       mu: mp.mu,
       epsAlpha: mp.eps_alpha,
@@ -40,9 +45,9 @@ export async function queryMarketState(
       lambdaS: mp.lambda_s,
       lambdaD: mp.lambda_d,
     },
-    title: data.title,
-    xAxisUnits: data.x_axis_units,
-    decimals: data.decimals,
+    title: data.metadata?.title ?? data.title,
+    xAxisUnits: data.metadata?.x_axis_units ?? data.x_axis_units ?? '',
+    decimals: data.metadata?.decimals ?? data.decimals ?? 0,
     resolutionState: data.is_settled ? 'resolved' : 'open',
     resolvedOutcome: data.settlement_outcome ?? null,
   };

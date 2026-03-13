@@ -7,13 +7,15 @@ import type { Position } from '../types.js';
 export function mapPosition(raw: any): Position {
   return {
     positionId: raw.position_id,
-    belief: raw.belief_p,
-    collateral: raw.input_collateral_C,
-    claims: raw.minted_claims_m,
+    belief: raw.position_vector,
+    collateral: raw.collateral,
+    claims: raw.minted_claims,
     owner: raw.username,
     status: raw.status,
-    prediction: raw.prediction,
-    stdDev: raw.std_dev,
+    prediction: null,
+    stdDev: raw.position_params?.std_dev ?? null,
+    positionType: raw.position_type,
+    positionParams: raw.position_params ?? {},
     createdAt: raw.created_at,
     closedAt: raw.position_closed_at ?? null,
     soldPrice: raw.sold_price ?? null,
@@ -23,16 +25,14 @@ export function mapPosition(raw: any): Position {
 
 /**
  * Returns all positions for a market.
- * Wraps: GET /api/market/positions?market_id=X
+ * Wraps: GET /api/views/positions/{market_id}
  */
 export async function queryMarketPositions(
   client: FSClient,
   marketId: string | number,
   options?: { signal?: AbortSignal },
 ): Promise<Position[]> {
-  const data = await client.get<any>('/api/market/positions', {
-    market_id: String(marketId),
-  }, options?.signal);
+  const data = await client.get<any>(`/api/views/positions/${marketId}`, undefined, options?.signal);
   return (data.positions || []).map(mapPosition);
 }
 
@@ -42,7 +42,7 @@ export async function queryMarketPositions(
  */
 export async function queryPositionState(
   client: FSClient,
-  positionId: number,
+  positionId: string | number,
   marketId: string | number,
   options?: { signal?: AbortSignal },
 ): Promise<Position> {

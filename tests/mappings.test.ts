@@ -37,11 +37,11 @@ function makeMockClientWithAuth() {
 // -- Raw API fixtures --
 
 const mockMarketStateRaw = {
-  alpha_vector: [10, 20, 30, 20, 10, 10],
-  market_params: {
-    K: 6,
-    L: 0,
-    H: 100,
+  market_id: 1,
+  title: 'Test Market',
+  num_buckets: 6,
+  market_model: 'dirichlet',
+  market_model_params: {
     P0: 100,
     mu: 0.01,
     eps_alpha: 0.001,
@@ -50,15 +50,34 @@ const mockMarketStateRaw = {
     lambda_s: 0.1,
     lambda_d: 0.05,
   },
-  current_pool: 500.0,
-  num_positions: 12,
-  total_volume: 1500.0,
-  positions_currently_open: 5,
-  title: 'Test Market',
-  x_axis_units: 'USD',
-  decimals: 2,
+  alpha_vector: [10, 20, 30, 20, 10, 10],
   is_settled: false,
   settlement_outcome: null,
+  settlement_payouts: null,
+  num_positions: 12,
+  positions_currently_open: 5,
+  current_pool: 500.0,
+  total_deposited: 1000.0,
+  total_withdrawn: 200.0,
+  total_volume: 1500.0,
+  lower_bound: 0,
+  upper_bound: 100,
+  expires_at: null,
+  resolved_at: null,
+  market_type: 'standard',
+  market_subtype: null,
+  metadata: {
+    title: 'Test Market',
+    x_axis_units: 'USD',
+    decimals: 2,
+    market_type: 'standard',
+    market_model: 'dirichlet',
+    market_subtype: null,
+    lower_bound: 0,
+    upper_bound: 100,
+    expires_at: null,
+    resolved_at: null,
+  },
 };
 
 const expectedMarketState = {
@@ -91,31 +110,31 @@ const expectedMarketState = {
 const mockPositionsRaw = {
   positions: [
     {
-      position_id: 42,
-      belief_p: [0.1, 0.2, 0.3, 0.2, 0.1, 0.1],
-      input_collateral_C: 100.0,
-      minted_claims_m: 95.5,
-      username: 'trader1',
+      position_id: 'pos_001',
+      position_vector: [0.1, 0.2, 0.3, 0.2, 0.1, 0.1],
+      minted_claims: 95.5,
+      collateral: 100.0,
       status: 'open',
-      prediction: 50,
-      std_dev: 12.5,
+      sold_price: null,
+      position_type: 'normal',
+      position_params: { mean: 0.45, std_dev: 0.035 },
+      username: 'trader1',
       created_at: '2026-01-15T10:30:00Z',
       position_closed_at: null,
-      sold_price: null,
       settlement_payout: null,
     },
     {
-      position_id: 43,
-      belief_p: [0.05, 0.1, 0.1, 0.3, 0.25, 0.2],
-      input_collateral_C: 50.0,
-      minted_claims_m: 48.2,
-      username: 'trader2',
+      position_id: 'pos_002',
+      position_vector: [0.05, 0.1, 0.1, 0.3, 0.25, 0.2],
+      minted_claims: 48.2,
+      collateral: 50.0,
       status: 'closed',
-      prediction: 70,
-      std_dev: 15.0,
+      sold_price: 55.0,
+      position_type: 'raw',
+      position_params: {},
+      username: 'trader2',
       created_at: '2026-01-16T14:00:00Z',
       position_closed_at: '2026-02-01T09:00:00Z',
-      sold_price: 55.0,
       settlement_payout: null,
     },
   ],
@@ -123,28 +142,32 @@ const mockPositionsRaw = {
 
 const expectedPositions = [
   {
-    positionId: 42,
+    positionId: 'pos_001',
     belief: [0.1, 0.2, 0.3, 0.2, 0.1, 0.1],
     collateral: 100.0,
     claims: 95.5,
     owner: 'trader1',
     status: 'open',
-    prediction: 50,
-    stdDev: 12.5,
+    prediction: null,
+    stdDev: 0.035,
+    positionType: 'normal',
+    positionParams: { mean: 0.45, std_dev: 0.035 },
     createdAt: '2026-01-15T10:30:00Z',
     closedAt: null,
     soldPrice: null,
     settlementPayout: null,
   },
   {
-    positionId: 43,
+    positionId: 'pos_002',
     belief: [0.05, 0.1, 0.1, 0.3, 0.25, 0.2],
     collateral: 50.0,
     claims: 48.2,
     owner: 'trader2',
     status: 'closed',
-    prediction: 70,
-    stdDev: 15.0,
+    prediction: null,
+    stdDev: null,
+    positionType: 'raw',
+    positionParams: {},
     createdAt: '2026-01-16T14:00:00Z',
     closedAt: '2026-02-01T09:00:00Z',
     soldPrice: 55.0,
@@ -160,10 +183,10 @@ const mockHistoryRaw = {
       snapshot_id: 1,
       trade_id: 101,
       side: 'buy',
-      position_id: 42,
+      position_id: 'pos_42',
       alpha_vector: [10, 20, 30, 20, 10, 10],
-      total_deposits: 1000.0,
-      total_withdrawals: 200.0,
+      total_deposited: 1000.0,
+      total_withdrawn: 200.0,
       total_volume: 1200.0,
       current_pool: 800.0,
       num_open_positions: 5,
@@ -173,10 +196,10 @@ const mockHistoryRaw = {
       snapshot_id: 2,
       trade_id: 102,
       side: 'sell',
-      position_id: 43,
+      position_id: 'pos_43',
       alpha_vector: [12, 18, 28, 22, 10, 10],
-      total_deposits: 1000.0,
-      total_withdrawals: 250.0,
+      total_deposited: 1000.0,
+      total_withdrawn: 250.0,
       total_volume: 1250.0,
       current_pool: 750.0,
       num_open_positions: 4,
@@ -193,7 +216,7 @@ const expectedHistory = {
       snapshotId: 1,
       tradeId: 101,
       side: 'buy',
-      positionId: '42',
+      positionId: 'pos_42',
       alphaVector: [10, 20, 30, 20, 10, 10],
       totalDeposits: 1000.0,
       totalWithdrawals: 200.0,
@@ -206,7 +229,7 @@ const expectedHistory = {
       snapshotId: 2,
       tradeId: 102,
       side: 'sell',
-      positionId: '43',
+      positionId: 'pos_43',
       alphaVector: [12, 18, 28, 22, 10, 10],
       totalDeposits: 1000.0,
       totalWithdrawals: 250.0,
@@ -320,42 +343,78 @@ const expectedCurrentUser = {
   role: 'admin',
 };
 
-const mockDiscoverMarketsRaw = [
-  {
-    alpha_vector: [10, 20, 30, 20, 10, 10],
-    market_params: {
-      K: 6, L: 0, H: 100, P0: 100,
-      mu: 0.01, eps_alpha: 0.001, tau: 1.0,
-      gamma: 0.5, lambda_s: 0.1, lambda_d: 0.05,
+const mockDiscoverMarketsRaw = {
+  markets: [
+    {
+      market_id: 1,
+      title: 'Market A',
+      is_settled: false,
+      created_at: '2026-03-13T13:48:25.106364',
+      num_buckets: 6,
+      total_deposited: 1000.0,
+      total_withdrawn: 500.0,
+      current_pool: 500.0,
+      deleted: false,
+      deleted_at: null,
+      alpha_vector: [10, 20, 30, 20, 10, 10],
+      market_model_params: {
+        P0: 100, mu: 0.01, eps_alpha: 0.001, tau: 1.0,
+        gamma: 0.5, lambda_s: 0.1, lambda_d: 0.05,
+      },
+      metadata: {
+        decimals: 2,
+        market_type: 'standard',
+        market_model: 'dirichlet',
+        x_axis_units: 'USD',
+        market_subtype: null,
+      },
+      market_type: 'standard',
+      market_subtype: null,
+      lower_bound: 0,
+      upper_bound: 100,
+      expires_at: null,
+      resolved_at: null,
+      open_positions: 5,
+      total_positions: 12,
+      current_consensus: 0.45,
+      settlement_outcome: null,
     },
-    current_pool: 500.0,
-    num_positions: 12,
-    total_volume: 1500.0,
-    positions_currently_open: 5,
-    title: 'Market A',
-    x_axis_units: 'USD',
-    decimals: 2,
-    is_settled: false,
-    settlement_outcome: null,
-  },
-  {
-    alpha_vector: [5, 5],
-    market_params: {
-      K: 2, L: 0, H: 1, P0: 50,
-      mu: 0.01, eps_alpha: 0.001, tau: 1.0,
-      gamma: 0.5, lambda_s: 0.1, lambda_d: 0.05,
+    {
+      market_id: 2,
+      title: 'Market B',
+      is_settled: true,
+      created_at: '2026-03-13T13:48:25.106364',
+      num_buckets: 2,
+      total_deposited: 150.0,
+      total_withdrawn: 50.0,
+      current_pool: 100.0,
+      deleted: false,
+      deleted_at: null,
+      alpha_vector: [5, 5],
+      market_model_params: {
+        P0: 50, mu: 0.01, eps_alpha: 0.001, tau: 1.0,
+        gamma: 0.5, lambda_s: 0.1, lambda_d: 0.05,
+      },
+      metadata: {
+        decimals: 0,
+        market_type: 'standard',
+        market_model: 'dirichlet',
+        x_axis_units: '',
+        market_subtype: null,
+      },
+      market_type: 'standard',
+      market_subtype: null,
+      lower_bound: 0,
+      upper_bound: 1,
+      expires_at: null,
+      resolved_at: null,
+      open_positions: 1,
+      total_positions: 3,
+      current_consensus: 0.5,
+      settlement_outcome: 0,
     },
-    current_pool: 100.0,
-    num_positions: 3,
-    total_volume: 200.0,
-    positions_currently_open: 1,
-    title: 'Market B',
-    x_axis_units: '',
-    decimals: 0,
-    is_settled: true,
-    settlement_outcome: 0,
-  },
-];
+  ],
+};
 
 const expectedDiscoverMarkets = [
   {
@@ -423,7 +482,7 @@ describe('queryMarketState', () => {
     expect(result).toEqual(expectedMarketState);
   });
 
-  it('sends GET to correct URL with market_id query param', async () => {
+  it('sends GET to correct URL with market_id as path param', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockMarketStateRaw),
@@ -433,8 +492,87 @@ describe('queryMarketState', () => {
     await queryMarketState(client, '123');
 
     const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(url).toContain('/api/market/state');
-    expect(url).toContain('market_id=123');
+    expect(url).toContain('/api/views/markets/123');
+    expect(url).not.toContain('market_id=');
+  });
+
+  it('throws error when num_buckets is missing', async () => {
+    const rawWithoutK = { ...mockMarketStateRaw, num_buckets: undefined };
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(rawWithoutK),
+    });
+
+    const client = makeMockClient();
+    await expect(queryMarketState(client, '123')).rejects.toThrow(
+      'Missing num_buckets (K) in market response',
+    );
+  });
+
+  it('throws error when lower_bound is missing from both metadata and root', async () => {
+    const rawWithoutL = {
+      ...mockMarketStateRaw,
+      lower_bound: undefined,
+      metadata: { ...mockMarketStateRaw.metadata, lower_bound: undefined },
+    };
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(rawWithoutL),
+    });
+
+    const client = makeMockClient();
+    await expect(queryMarketState(client, '123')).rejects.toThrow(
+      'Missing lower_bound (L) in market response',
+    );
+  });
+
+  it('throws error when upper_bound is missing from both metadata and root', async () => {
+    const rawWithoutH = {
+      ...mockMarketStateRaw,
+      upper_bound: undefined,
+      metadata: { ...mockMarketStateRaw.metadata, upper_bound: undefined },
+    };
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(rawWithoutH),
+    });
+
+    const client = makeMockClient();
+    await expect(queryMarketState(client, '123')).rejects.toThrow(
+      'Missing upper_bound (H) in market response',
+    );
+  });
+
+  it('uses metadata lower_bound when root lower_bound is absent', async () => {
+    const rawMetadataOnly = {
+      ...mockMarketStateRaw,
+      lower_bound: undefined,
+      metadata: { ...mockMarketStateRaw.metadata, lower_bound: 5 },
+    };
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(rawMetadataOnly),
+    });
+
+    const client = makeMockClient();
+    const result = await queryMarketState(client, '123');
+    expect(result.config.L).toBe(5);
+  });
+
+  it('uses root lower_bound when metadata lower_bound is absent', async () => {
+    const rawRootOnly = {
+      ...mockMarketStateRaw,
+      lower_bound: 10,
+      metadata: { ...mockMarketStateRaw.metadata, lower_bound: undefined },
+    };
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(rawRootOnly),
+    });
+
+    const client = makeMockClient();
+    const result = await queryMarketState(client, '123');
+    expect(result.config.L).toBe(10);
   });
 });
 
@@ -473,7 +611,7 @@ describe('queryMarketPositions', () => {
     expect(result).toEqual([]);
   });
 
-  it('sends GET to correct URL with market_id query param', async () => {
+  it('sends GET to correct URL with market_id as path param', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockPositionsRaw),
@@ -483,8 +621,70 @@ describe('queryMarketPositions', () => {
     await queryMarketPositions(client, '123');
 
     const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(url).toContain('/api/market/positions');
-    expect(url).toContain('market_id=123');
+    expect(url).toContain('/api/views/positions/123');
+    expect(url).not.toContain('market_id=');
+  });
+
+  it('maps raw position with position_type and extracts stdDev from position_params', async () => {
+    const normalPosition = {
+      positions: [{
+        position_id: 'pos_100',
+        position_vector: [0.5, 0.5],
+        minted_claims: 10,
+        collateral: 10,
+        status: 'open',
+        sold_price: null,
+        position_type: 'normal',
+        position_params: { mean: 0.5, std_dev: 0.1 },
+        username: 'user1',
+        created_at: '2026-01-01T00:00:00Z',
+        position_closed_at: null,
+        settlement_payout: null,
+      }],
+    };
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(normalPosition),
+    });
+
+    const client = makeMockClient();
+    const result = await queryMarketPositions(client, '1');
+
+    expect(result[0].stdDev).toBe(0.1);
+    expect(result[0].positionType).toBe('normal');
+    expect(result[0].positionParams).toEqual({ mean: 0.5, std_dev: 0.1 });
+    expect(result[0].prediction).toBeNull();
+  });
+
+  it('maps raw position with position_type and sets stdDev to null for raw type', async () => {
+    const rawPosition = {
+      positions: [{
+        position_id: 'pos_200',
+        position_vector: [0.3, 0.7],
+        minted_claims: 5,
+        collateral: 5,
+        status: 'open',
+        sold_price: null,
+        position_type: 'raw',
+        position_params: {},
+        username: 'user2',
+        created_at: '2026-01-01T00:00:00Z',
+        position_closed_at: null,
+        settlement_payout: null,
+      }],
+    };
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(rawPosition),
+    });
+
+    const client = makeMockClient();
+    const result = await queryMarketPositions(client, '1');
+
+    expect(result[0].stdDev).toBeNull();
+    expect(result[0].positionType).toBe('raw');
+    expect(result[0].positionParams).toEqual({});
+    expect(result[0].prediction).toBeNull();
   });
 });
 
@@ -511,7 +711,7 @@ describe('queryMarketHistory', () => {
     expect(result).toEqual(expectedHistory);
   });
 
-  it('sends GET to correct URL with market_id and optional limit/offset params', async () => {
+  it('sends GET to correct URL with market_id as path param and limit/offset as query params', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockHistoryRaw),
@@ -521,8 +721,8 @@ describe('queryMarketHistory', () => {
     await queryMarketHistory(client, '123', 10, 5);
 
     const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(url).toContain('/api/market/history');
-    expect(url).toContain('market_id=123');
+    expect(url).toContain('/api/views/history/123');
+    expect(url).not.toContain('market_id=');
     expect(url).toContain('limit=10');
     expect(url).toContain('offset=5');
   });
@@ -1014,7 +1214,7 @@ describe('discoverMarkets', () => {
     globalThis.fetch = originalFetch;
   });
 
-  it('maps array of markets correctly including open and resolved states', async () => {
+  it('maps wrapped markets array correctly including open and resolved states', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockDiscoverMarketsRaw),
@@ -1026,7 +1226,7 @@ describe('discoverMarkets', () => {
     expect(result).toEqual(expectedDiscoverMarkets);
   });
 
-  it('sends GET to /api/markets with no market_id param', async () => {
+  it('sends GET to /api/views/markets/list', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockDiscoverMarketsRaw),
@@ -1036,19 +1236,84 @@ describe('discoverMarkets', () => {
     await discoverMarkets(client);
 
     const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(url).toContain('/api/markets');
-    expect(url).not.toContain('market_id');
+    expect(url).toContain('/api/views/markets/list');
   });
 
-  it('returns empty array when API returns empty array', async () => {
+  it('returns empty array when markets array is empty', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve([]),
+      json: () => Promise.resolve({ markets: [] }),
     });
 
     const client = makeMockClient();
     const result = await discoverMarkets(client);
 
     expect(result).toEqual([]);
+  });
+
+  it('returns empty array when markets key is missing', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({}),
+    });
+
+    const client = makeMockClient();
+    const result = await discoverMarkets(client);
+
+    expect(result).toEqual([]);
+  });
+
+  it('throws error when lower_bound is missing from list item', async () => {
+    const rawWithoutL = {
+      markets: [{
+        ...mockDiscoverMarketsRaw.markets[0],
+        lower_bound: undefined,
+      }],
+    };
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(rawWithoutL),
+    });
+
+    const client = makeMockClient();
+    await expect(discoverMarkets(client)).rejects.toThrow(
+      'Missing lower_bound (L) in market list item',
+    );
+  });
+
+  it('throws error when upper_bound is missing from list item', async () => {
+    const rawWithoutH = {
+      markets: [{
+        ...mockDiscoverMarketsRaw.markets[0],
+        upper_bound: undefined,
+      }],
+    };
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(rawWithoutH),
+    });
+
+    const client = makeMockClient();
+    await expect(discoverMarkets(client)).rejects.toThrow(
+      'Missing upper_bound (H) in market list item',
+    );
+  });
+
+  it('throws error when num_buckets is missing from list item', async () => {
+    const rawWithoutK = {
+      markets: [{
+        ...mockDiscoverMarketsRaw.markets[0],
+        num_buckets: undefined,
+      }],
+    };
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(rawWithoutK),
+    });
+
+    const client = makeMockClient();
+    await expect(discoverMarkets(client)).rejects.toThrow(
+      'Missing num_buckets (K) in market list item',
+    );
   });
 });

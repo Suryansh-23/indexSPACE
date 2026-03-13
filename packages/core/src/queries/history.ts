@@ -3,7 +3,7 @@ import type { MarketHistory } from '../types.js';
 
 /**
  * Returns market history (snapshots of alpha vectors over time).
- * Wraps: GET /api/market/history?market_id=X&limit=N&offset=M
+ * Wraps: GET /api/views/history/{market_id}?limit=N&offset=M
  */
 export async function queryMarketHistory(
   client: FSClient,
@@ -12,13 +12,11 @@ export async function queryMarketHistory(
   offset?: number,
   options?: { signal?: AbortSignal },
 ): Promise<MarketHistory> {
-  const params: Record<string, string> = {
-    market_id: String(marketId),
-  };
+  const params: Record<string, string> = {};
   if (limit !== undefined) params.limit = String(limit);
   if (offset !== undefined) params.offset = String(offset);
 
-  const data = await client.get<any>('/api/market/history', params, options?.signal);
+  const data = await client.get<any>(`/api/views/history/${marketId}`, params, options?.signal);
 
   return {
     marketId: data.market_id,
@@ -29,8 +27,8 @@ export async function queryMarketHistory(
       side: s.side,
       positionId: String(s.position_id),
       alphaVector: s.alpha_vector,
-      totalDeposits: s.total_deposits,
-      totalWithdrawals: s.total_withdrawals,
+      totalDeposits: s.total_deposited,
+      totalWithdrawals: s.total_withdrawn,
       totalVolume: s.total_volume,
       currentPool: s.current_pool,
       numOpenPositions: s.num_open_positions,
