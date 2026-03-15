@@ -669,13 +669,13 @@ const fanData: FanChartPoint[] = transformHistoryToFanChart(history.snapshots, L
 
 ### Data Transforms
 
-**`mapPosition(raw)`** -- Converts a raw API response object (snake_case fields like `position_id`, `belief_p`, `input_collateral_C`) into a typed `Position` with camelCase fields. Useful when calling the API directly outside the SDK query functions.
+**`mapPosition(raw)`** -- Converts a raw API response object (snake_case fields like `position_id`, `position_vector`, `collateral`) into a typed `Position` with camelCase fields. Useful when calling the API directly outside the SDK query functions.
 
 ```typescript
 import { mapPosition } from '@functionspace/core';
 import type { Position } from '@functionspace/core';
 
-const response = await fetch(`${baseUrl}/api/market/positions?market_id=42`);
+const response = await fetch(`${baseUrl}/api/views/positions/42`);
 const data = await response.json();
 const positions: Position[] = data.positions.map(mapPosition);
 ```
@@ -799,7 +799,7 @@ type BeliefVector = number[];
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `positionId` | `number` | ID of the newly created position |
+| `positionId` | `string \| number` | ID of the newly created position |
 | `belief` | `number[]` | The belief vector that was submitted |
 | `claims` | `number` | Number of claims purchased |
 | `collateral` | `number` | Amount of collateral deposited |
@@ -1003,14 +1003,16 @@ type BeliefVector = number[];
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `positionId` | `number` | Unique position identifier |
+| `positionId` | `string \| number` | Unique position identifier |
 | `belief` | `number[]` | The belief vector submitted when opening |
 | `collateral` | `number` | Collateral deposited |
 | `claims` | `number` | Number of claims held |
 | `owner` | `string` | Username of the position owner |
 | `status` | `'open' \| 'sold' \| 'settled' \| 'closed'` | Position lifecycle state |
-| `prediction` | `number` | Predicted outcome value (peak of belief) |
-| `stdDev` | `number` | Standard deviation of the belief distribution |
+| `prediction` | `number \| null` | Predicted outcome value (peak of belief), `null` when not available |
+| `stdDev` | `number \| null` | Standard deviation of the belief distribution, `null` when not available |
+| `positionType` | `string?` | Position type ("raw", "normal", etc.) |
+| `positionParams` | `Record<string, unknown>?` | Type-specific parameters |
 | `createdAt` | `string` | ISO 8601 creation timestamp |
 | `closedAt` | `string \| null` | ISO 8601 close timestamp, `null` if still open |
 | `soldPrice` | `number \| null` | Collateral returned on sell, `null` if not sold |
@@ -1102,7 +1104,7 @@ Regions are the building blocks for `generateBelief()`. Multiple regions combine
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `positionId` | `number` | ID of the sold position |
+| `positionId` | `string \| number` | ID of the sold position |
 | `collateralReturned` | `number` | Collateral amount returned to the trader |
 
 **Usage:** Returned by `sell()`.
