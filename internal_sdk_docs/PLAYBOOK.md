@@ -618,14 +618,16 @@ All query functions accept an optional trailing `options?: { signal?: AbortSigna
 - `generateEvenTicks(domain, count)` → `number[]` (evenly spaced tick values)
 
 ### Transactions
-- `buy(client, marketId, belief, collateral)` → BuyResult
-- `sell(client, positionId, marketId)` → SellResult
+- `buy(client, marketId, belief, collateral, options?)` -- wraps `POST /api/market/trading/buy/{marketId}` → BuyResult
+- `sell(client, positionId, marketId)` -- wraps `POST /api/market/trading/sell/{marketId}/{positionId}` → SellResult
 
 ### Previews
-- `previewPayoutCurve(client, marketId, belief, collateral, numOutcomes?, options?)` → PayoutCurve
-- `previewSell(client, positionId, marketId, options?)` → PreviewSellResult
+- `previewPayoutCurve(client, marketId, belief, collateral, numOutcomes?, options?)` -- wraps `POST /api/views/preview/payout/{marketId}` → PayoutCurve
+- `previewSell(client, positionId, marketId, options?)` -- wraps `GET /api/views/preview/sell/{marketId}/{positionId}` → PreviewSellResult
 
 ---
+
+**Metadata policy:** Mapping functions read fields from their primary source in the API response. L/H/title come from root level. xAxisUnits/decimals come from the metadata dict (their only source). Do not add metadata fallback chains (e.g., `data.metadata?.X ?? data.X`).
 
 ## CSS Class Naming Convention
 
@@ -1002,7 +1004,7 @@ packages/
 │   ├── math/fanChart.ts      # History → FanChartPoint[] transform
 │   ├── shapes/definitions.ts # SHAPE_DEFINITIONS (id, name, svgPath, parameters)
 │   ├── queries/market.ts     # Market state queries (queryMarketState, getConsensusCurve, etc.)
-│   ├── queries/history.ts    # Market history queries (GET /api/market/history)
+│   ├── queries/history.ts    # Market history queries (GET /api/views/history/{market_id})
 │   ├── queries/positions.ts  # Position queries (queryMarketPositions, queryPositionState)
 │   ├── queries/trades.ts     # Trade history (positionsToTradeEntries, queryTradeHistory)
 │   ├── previews/             # previewPayoutCurve, previewSell

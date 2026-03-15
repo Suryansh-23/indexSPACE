@@ -5,6 +5,7 @@ import type { Position } from '../types.js';
  * Map a raw API position object to the Position type.
  */
 export function mapPosition(raw: any): Position {
+  if (raw.position_vector == null) throw new Error('Missing position_vector in position data');
   return {
     positionId: raw.position_id,
     belief: raw.position_vector,
@@ -12,7 +13,7 @@ export function mapPosition(raw: any): Position {
     claims: raw.minted_claims,
     owner: raw.username,
     status: raw.status,
-    prediction: null,
+    prediction: raw.prediction ?? null,
     stdDev: raw.position_params?.std_dev ?? null,
     positionType: raw.position_type,
     positionParams: raw.position_params ?? {},

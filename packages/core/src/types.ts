@@ -80,16 +80,19 @@ export interface BuyResult {
   belief: number[];
   claims: number;
   collateral: number;
+  positionType?: string;
+  positionParams?: Record<string, unknown>;
 }
 
 export interface SellResult {
   positionId: string | number;
   collateralReturned: number;
+  creditedTo?: string;
 }
 
 export interface PreviewSellResult {
   collateralReturned: number;
-  iterations: number;
+  positionId: string | number;
 }
 
 export interface PayoutCurve {

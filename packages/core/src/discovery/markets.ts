@@ -10,13 +10,16 @@ export async function discoverMarkets(
   options?: { signal?: AbortSignal },
 ): Promise<MarketState[]> {
   const data = await client.get<any>('/api/views/markets/list', undefined, options?.signal);
-  const items = data.markets ?? [];
+  const items = Array.isArray(data.markets) ? data.markets : [];
 
   return items.map((item: any) => {
+    if (item.alpha_vector == null) throw new Error('Missing alpha_vector in market list item');
     const alphaVector: number[] = item.alpha_vector;
     const totalMass = alphaVector.reduce((a: number, b: number) => a + b, 0);
+    if (totalMass === 0) throw new Error('alpha_vector sums to zero in market list item');
     const consensus = alphaVector.map((a: number) => a / totalMass);
     const mp = item.market_model_params;
+    if (!mp) throw new Error('Missing market_model_params in market list item');
 
     const K = item.num_buckets;
     if (K == null) throw new Error('Missing num_buckets (K) in market list item');
@@ -31,7 +34,7 @@ export async function discoverMarkets(
       totalMass,
       poolBalance: item.current_pool,
       participantCount: item.total_positions,
-      totalVolume: (item.total_deposited ?? 0) + (item.total_withdrawn ?? 0),
+      totalVolume: item.total_volume ?? 0,
       positionsOpen: item.open_positions,
       config: {
         K,

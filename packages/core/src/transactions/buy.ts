@@ -3,8 +3,11 @@ import type { BeliefVector, BuyResult } from '../types.js';
 
 /**
  * Create a new position.
- * Wraps: POST /api/market/buy?market_id=X
- * Body: { C: collateral, p_vector: belief, prediction: center }
+ * Wraps: POST /api/market/trading/buy/{marketId}
+ * Body: { collateral, position_type, position_params }
+ *
+ * Note: options.prediction is accepted for backward compatibility but is no
+ * longer sent to the server.
  */
 export async function buy(
   client: FSClient,
@@ -14,22 +17,24 @@ export async function buy(
   options?: { prediction?: number },
 ): Promise<BuyResult> {
   const body: Record<string, unknown> = {
-    C: collateral,
-    p_vector: belief,
+    collateral,
+    position_type: 'raw',
+    position_params: { position_vector: belief },
   };
-  if (options?.prediction !== undefined) {
-    body.prediction = options.prediction;
-  }
 
-  const data = await client.post<any>('/api/market/buy', body, {
-    market_id: String(marketId),
-  });
+  const data = await client.post<any>(
+    `/api/market/trading/buy/${marketId}`,
+    body,
+  );
 
   const pos = data.position;
+  if (!pos) throw new Error('Missing position in buy response');
   return {
     positionId: pos.position_id,
-    belief: pos.belief_p,
-    claims: pos.minted_claims_m,
-    collateral: pos.input_collateral_C,
+    belief: pos.position_vector,
+    claims: pos.minted_claims,
+    collateral: pos.collateral,
+    positionType: pos.position_type,
+    positionParams: pos.position_params ?? {},
   };
 }

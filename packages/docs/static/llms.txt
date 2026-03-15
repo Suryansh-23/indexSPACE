@@ -2531,16 +2531,18 @@ async function buy(
 | `marketId` | `string \| number` | The market to trade in |
 | `belief` | `BeliefVector` | The probability distribution to trade on |
 | `collateral` | `number` | Amount of currency to put up (minimum is typically 1) |
-| `options.prediction` | `number` | Optional center-of-mass hint for the API. Not required for the trade to execute. |
+| `options.prediction` | `number` | Optional center-of-mass hint. Accepted for backward compatibility but no longer sent to the server. |
 
 **Returns `BuyResult`:**
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `positionId` | `number` | Unique ID for the new position |
+| `positionId` | `string \| number` | Unique ID for the new position |
 | `belief` | `number[]` | The belief vector as stored server-side |
 | `claims` | `number` | Number of claim tokens minted |
 | `collateral` | `number` | Collateral amount locked |
+| `positionType` | `string?` | Position type ("raw", "normal", etc.) |
+| `positionParams` | `Record<string, unknown>?` | Type-specific parameters |
 
 #### `sell(client, positionId, marketId)`
 
@@ -2551,7 +2553,7 @@ import { sell } from '@functionspace/core';
 
 async function sell(
   client: FSClient,
-  positionId: number,
+  positionId: string | number,
   marketId: string | number,
 ): Promise<SellResult>
 ```
@@ -2561,15 +2563,16 @@ async function sell(
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `client` | `FSClient` | Authenticated API client |
-| `positionId` | `number` | The position to close |
+| `positionId` | `string \| number` | The position to close |
 | `marketId` | `string \| number` | The market the position belongs to |
 
 **Returns `SellResult`:**
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `positionId` | `number` | The closed position's ID |
+| `positionId` | `string \| number` | The closed position's ID |
 | `collateralReturned` | `number` | Amount of currency returned to the trader |
+| `creditedTo` | `string?` | Username the payout was credited to |
 
 The returned collateral depends on the current market state. If the consensus has shifted toward your belief since you bought, you get back more than you put in. If it shifted away, you get back less.
 
@@ -2801,7 +2804,7 @@ const bestCase = curve.maxPayout;
 const worstCase = Math.min(...curve.previews.map(p => p.payout));
 ```
 
-#### `previewSell(client, positionId, marketId)`
+#### `previewSell(client, positionId, marketId, options?)`
 
 Previews how much collateral would be returned if a position were sold at the current market state.
 
@@ -2810,8 +2813,9 @@ import { previewSell } from '@functionspace/core';
 
 async function previewSell(
   client: FSClient,
-  positionId: number,
+  positionId: string | number,
   marketId: string | number,
+  options?: { signal?: AbortSignal },
 ): Promise<PreviewSellResult>
 ```
 
@@ -2820,15 +2824,16 @@ async function previewSell(
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `client` | `FSClient` | Authenticated API client |
-| `positionId` | `number` | The position to simulate selling |
+| `positionId` | `string \| number` | The position to simulate selling |
 | `marketId` | `string \| number` | The market the position belongs to |
+| `options.signal` | `AbortSignal?` | Optional abort signal for request cancellation |
 
 **Returns `PreviewSellResult`:**
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `collateralReturned` | `number` | Estimated collateral you would receive |
-| `iterations` | `number` | Number of solver iterations the server used |
+| `positionId` | `string \| number` | ID of the position being previewed |
 
 **Example -- show live P&L for open positions:**
 
@@ -3361,7 +3366,7 @@ import { buy } from '@functionspace/core';
 import type { BuyResult } from '@functionspace/core';
 
 const result: BuyResult = await buy(client, 42, belief, 100, { prediction: 75 });
-// result = { positionId: number, belief: number[], claims: number, collateral: number }
+// result = { positionId: string | number, belief: number[], claims: number, collateral: number, positionType?: string, positionParams?: Record<string, unknown> }
 console.log(`Opened position ${result.positionId}, claims: ${result.claims}`);
 ```
 
@@ -3373,7 +3378,7 @@ Parameters:
 | `marketId` | `string \| number` | Target market. |
 | `belief` | `BeliefVector` | Normalized probability vector from any generator. |
 | `collateral` | `number` | Amount of currency to commit. |
-| `options.prediction` | `number?` | Optional center-of-mass hint. |
+| `options.prediction` | `number?` | Optional center-of-mass hint. Accepted for backward compatibility but no longer sent to the server. |
 
 **`sell(client, positionId, marketId)`** -- Closes an open position. Returns `SellResult`.
 
@@ -3382,7 +3387,7 @@ import { sell } from '@functionspace/core';
 import type { SellResult } from '@functionspace/core';
 
 const result: SellResult = await sell(client, 17, 42);
-// result = { positionId: number, collateralReturned: number }
+// result = { positionId: string | number, collateralReturned: number, creditedTo?: string }
 console.log(`Got back ${result.collateralReturned}`);
 ```
 
@@ -3402,14 +3407,14 @@ console.log(`Worst case: $${Math.min(...curve.previews.map(p => p.payout))}`);
 // curve.previews = [{ outcome, payout, profitLoss }, ...]
 ```
 
-**`previewSell(client, positionId, marketId)`** -- Previews how much collateral would be returned if a position were sold right now.
+**`previewSell(client, positionId, marketId, options?)`** -- Previews how much collateral would be returned if a position were sold right now.
 
 ```typescript
 import { previewSell } from '@functionspace/core';
 import type { PreviewSellResult } from '@functionspace/core';
 
 const preview: PreviewSellResult = await previewSell(client, 17, 42);
-// preview = { collateralReturned: number, iterations: number }
+// preview = { collateralReturned: number, positionId: string | number }
 console.log(`Current market value: $${preview.collateralReturned}`);
 ```
 
@@ -4227,6 +4232,8 @@ type BeliefVector = number[];
 | `belief` | `number[]` | The belief vector that was submitted |
 | `claims` | `number` | Number of claims purchased |
 | `collateral` | `number` | Amount of collateral deposited |
+| `positionType` | `string?` | Position type ("raw", "normal", etc.) |
+| `positionParams` | `Record<string, unknown>?` | Type-specific parameters |
 
 **Usage:** Returned by `buy()`. Passed to `onBuy` callbacks on trading components (`ShapeCutter`, `TradePanel`, `BinaryPanel`, etc.).
 
@@ -4454,7 +4461,7 @@ type BeliefVector = number[];
 | Field | Type | Description |
 |-------|------|-------------|
 | `collateralReturned` | `number` | Previewed collateral to be returned |
-| `iterations` | `number` | Number of solver iterations used |
+| `positionId` | `string \| number` | ID of the position being previewed |
 
 **Usage:** Returned by `previewSell()`. Used by `PositionTable` to display previewed sell value before the user confirms.
 
@@ -4530,6 +4537,7 @@ Regions are the building blocks for `generateBelief()`. Multiple regions combine
 |-------|------|-------------|
 | `positionId` | `string \| number` | ID of the sold position |
 | `collateralReturned` | `number` | Collateral amount returned to the trader |
+| `creditedTo` | `string?` | Username the payout was credited to |
 
 **Usage:** Returned by `sell()`. Passed to `onSell` callbacks on `PositionTable`.
 

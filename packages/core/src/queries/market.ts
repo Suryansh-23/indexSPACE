@@ -13,16 +13,19 @@ export async function queryMarketState(
 ): Promise<MarketState> {
   const data = await client.get<any>(`/api/views/markets/${marketId}`, undefined, options?.signal);
 
+  if (data.alpha_vector == null) throw new Error('Missing alpha_vector in market response');
   const alphaVector: number[] = data.alpha_vector;
   const totalMass = alphaVector.reduce((a: number, b: number) => a + b, 0);
+  if (totalMass === 0) throw new Error('alpha_vector sums to zero in market response');
   const consensus = alphaVector.map((a: number) => a / totalMass);
   const mp = data.market_model_params;
+  if (!mp) throw new Error('Missing market_model_params in market response');
 
   const K = data.num_buckets;
   if (K == null) throw new Error('Missing num_buckets (K) in market response');
-  const L = data.metadata?.lower_bound ?? data.lower_bound;
+  const L = data.lower_bound;
   if (L == null) throw new Error('Missing lower_bound (L) in market response');
-  const H = data.metadata?.upper_bound ?? data.upper_bound;
+  const H = data.upper_bound;
   if (H == null) throw new Error('Missing upper_bound (H) in market response');
 
   return {
@@ -31,7 +34,7 @@ export async function queryMarketState(
     totalMass,
     poolBalance: data.current_pool,
     participantCount: data.num_positions,
-    totalVolume: data.total_volume,
+    totalVolume: data.total_volume ?? 0,
     positionsOpen: data.positions_currently_open,
     config: {
       K,
@@ -45,9 +48,9 @@ export async function queryMarketState(
       lambdaS: mp.lambda_s,
       lambdaD: mp.lambda_d,
     },
-    title: data.metadata?.title ?? data.title,
-    xAxisUnits: data.metadata?.x_axis_units ?? data.x_axis_units ?? '',
-    decimals: data.metadata?.decimals ?? data.decimals ?? 0,
+    title: data.title,
+    xAxisUnits: data.metadata?.x_axis_units ?? '',
+    decimals: data.metadata?.decimals ?? 0,
     resolutionState: data.is_settled ? 'resolved' : 'open',
     resolvedOutcome: data.settlement_outcome ?? null,
   };

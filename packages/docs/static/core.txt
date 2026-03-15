@@ -492,7 +492,7 @@ import { buy } from '@functionspace/core';
 import type { BuyResult } from '@functionspace/core';
 
 const result: BuyResult = await buy(client, 42, belief, 100, { prediction: 75 });
-// result = { positionId: number, belief: number[], claims: number, collateral: number }
+// result = { positionId: string | number, belief: number[], claims: number, collateral: number, positionType?: string, positionParams?: Record<string, unknown> }
 console.log(`Opened position ${result.positionId}, claims: ${result.claims}`);
 ```
 
@@ -504,7 +504,7 @@ Parameters:
 | `marketId` | `string \| number` | Target market. |
 | `belief` | `BeliefVector` | Normalized probability vector from any generator. |
 | `collateral` | `number` | Amount of currency to commit. |
-| `options.prediction` | `number?` | Optional center-of-mass hint. |
+| `options.prediction` | `number?` | Optional center-of-mass hint. Accepted for backward compatibility but no longer sent to the server. |
 
 **`sell(client, positionId, marketId)`** -- Closes an open position. Returns `SellResult`.
 
@@ -513,7 +513,7 @@ import { sell } from '@functionspace/core';
 import type { SellResult } from '@functionspace/core';
 
 const result: SellResult = await sell(client, 17, 42);
-// result = { positionId: number, collateralReturned: number }
+// result = { positionId: string | number, collateralReturned: number, creditedTo?: string }
 console.log(`Got back ${result.collateralReturned}`);
 ```
 
@@ -533,14 +533,14 @@ console.log(`Worst case: $${Math.min(...curve.previews.map(p => p.payout))}`);
 // curve.previews = [{ outcome, payout, profitLoss }, ...]
 ```
 
-**`previewSell(client, positionId, marketId)`** -- Previews how much collateral would be returned if a position were sold right now.
+**`previewSell(client, positionId, marketId, options?)`** -- Previews how much collateral would be returned if a position were sold right now.
 
 ```typescript
 import { previewSell } from '@functionspace/core';
 import type { PreviewSellResult } from '@functionspace/core';
 
 const preview: PreviewSellResult = await previewSell(client, 17, 42);
-// preview = { collateralReturned: number, iterations: number }
+// preview = { collateralReturned: number, positionId: string | number }
 console.log(`Current market value: $${preview.collateralReturned}`);
 ```
 
@@ -803,6 +803,8 @@ type BeliefVector = number[];
 | `belief` | `number[]` | The belief vector that was submitted |
 | `claims` | `number` | Number of claims purchased |
 | `collateral` | `number` | Amount of collateral deposited |
+| `positionType` | `string?` | Position type ("raw", "normal", etc.) |
+| `positionParams` | `Record<string, unknown>?` | Type-specific parameters |
 
 **Usage:** Returned by `buy()`.
 
@@ -1030,7 +1032,7 @@ type BeliefVector = number[];
 | Field | Type | Description |
 |-------|------|-------------|
 | `collateralReturned` | `number` | Previewed collateral to be returned |
-| `iterations` | `number` | Number of solver iterations used |
+| `positionId` | `string \| number` | ID of the position being previewed |
 
 **Usage:** Returned by `previewSell()`.
 
@@ -1106,6 +1108,7 @@ Regions are the building blocks for `generateBelief()`. Multiple regions combine
 |-------|------|-------------|
 | `positionId` | `string \| number` | ID of the sold position |
 | `collateralReturned` | `number` | Collateral amount returned to the trader |
+| `creditedTo` | `string?` | Username the payout was credited to |
 
 **Usage:** Returned by `sell()`.
 
