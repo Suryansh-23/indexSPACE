@@ -588,19 +588,19 @@ Peaks beyond 4x are clipped visually but remain in the tooltip data. This ensure
 
 ### Queries
 All query functions accept an optional trailing `options?: { signal?: AbortSignal }` parameter (backward-compatible). Signal is forwarded through composed call chains.
-- `queryMarketState(client, marketId, options?)` → `MarketState` (wraps `GET /api/market/state`)
+- `queryMarketState(client, marketId, options?)` → `MarketState` (wraps `GET /api/views/markets/{market_id}`)
 - `getConsensusCurve(client, marketId, numPoints?, options?)` → `ConsensusCurve` (market state + client-side density eval)
 - `queryConsensusSummary(client, marketId, options?)` → `ConsensusSummary` (client-side stats from consensus coefficients)
 - `queryDensityAt(client, marketId, x, options?)` → density value at a single outcome point
-- `queryMarketHistory(client, marketId, limit?, offset?, options?)` → `MarketHistory` (wraps `GET /api/market/history`)
-- `queryMarketPositions(client, marketId, options?)` → `Position[]` (wraps `GET /api/market/positions`)
+- `queryMarketHistory(client, marketId, limit?, offset?, options?)` → `MarketHistory` (wraps `GET /api/views/history/{market_id}`)
+- `queryMarketPositions(client, marketId, options?)` → `Position[]` (wraps `GET /api/views/positions/{market_id}`)
 - `queryPositionState(client, positionId, marketId, options?)` → `Position` (single position by ID)
 - `mapPosition(raw)` → `Position` (raw API response → typed Position)
 - `positionsToTradeEntries(positions, options?)` → `TradeEntry[]` (pure transform, sorted by timestamp desc)
 - `queryTradeHistory(client, marketId, options?)` → `TradeEntry[]` (composed: queryMarketPositions → positionsToTradeEntries; options accepts limit and signal)
 
 ### Discovery
-- `discoverMarkets(client, options?)` → `MarketState[]`
+- `discoverMarkets(client, options?)` → `MarketState[]` (wraps `GET /api/views/markets/list`)
 
 ### Auth
 - `loginUser(client, username, password)` → `{ user: UserProfile, token: string }` (raw fetch, bypasses ensureAuth)
@@ -618,14 +618,16 @@ All query functions accept an optional trailing `options?: { signal?: AbortSigna
 - `generateEvenTicks(domain, count)` → `number[]` (evenly spaced tick values)
 
 ### Transactions
-- `buy(client, marketId, belief, collateral)` → BuyResult
-- `sell(client, positionId, marketId)` → SellResult
+- `buy(client, marketId, belief, collateral, options?)` -- wraps `POST /api/market/trading/buy/{marketId}` → BuyResult
+- `sell(client, positionId, marketId)` -- wraps `POST /api/market/trading/sell/{marketId}/{positionId}` → SellResult
 
 ### Previews
-- `previewPayoutCurve(client, marketId, belief, collateral, numOutcomes?, options?)` → PayoutCurve
-- `previewSell(client, positionId, marketId, options?)` → PreviewSellResult
+- `previewPayoutCurve(client, marketId, belief, collateral, numOutcomes?, options?)` -- wraps `POST /api/views/preview/payout/{marketId}` → PayoutCurve
+- `previewSell(client, positionId, marketId, options?)` -- wraps `GET /api/views/preview/sell/{marketId}/{positionId}` → PreviewSellResult
 
 ---
+
+**Metadata policy:** Mapping functions read fields from their primary source in the API response. L/H/title come from root level. xAxisUnits/decimals come from the metadata dict (their only source). Do not add metadata fallback chains (e.g., `data.metadata?.X ?? data.X`).
 
 ## CSS Class Naming Convention
 
@@ -1002,7 +1004,7 @@ packages/
 │   ├── math/fanChart.ts      # History → FanChartPoint[] transform
 │   ├── shapes/definitions.ts # SHAPE_DEFINITIONS (id, name, svgPath, parameters)
 │   ├── queries/market.ts     # Market state queries (queryMarketState, getConsensusCurve, etc.)
-│   ├── queries/history.ts    # Market history queries (GET /api/market/history)
+│   ├── queries/history.ts    # Market history queries (GET /api/views/history/{market_id})
 │   ├── queries/positions.ts  # Position queries (queryMarketPositions, queryPositionState)
 │   ├── queries/trades.ts     # Trade history (positionsToTradeEntries, queryTradeHistory)
 │   ├── previews/             # previewPayoutCurve, previewSell

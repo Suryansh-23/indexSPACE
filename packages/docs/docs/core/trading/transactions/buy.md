@@ -27,16 +27,18 @@ async function buy(
 | `marketId`           | `string \| number` | The market to trade in.                                                                                                                        |
 | `belief`             | `BeliefVector`     | The probability distribution to trade on. Generated with `generateBelief` or any convenience generator.                                        |
 | `collateral`         | `number`           | Amount of currency to put up. Minimum is typically 1.                                                                                          |
-| `options.prediction` | `number?`          | Optional center-of-mass hint for the API. UI components pass the trader's target outcome value here. Not required for the trade to execute.    |
+| `options.prediction` | `number?`          | Optional center-of-mass hint. Accepted for backward compatibility but no longer sent to the server. |
 
 **Returns `BuyResult`:**
 
 ```typescript
 interface BuyResult {
-  positionId: number;   // Unique ID for the new position
-  belief: number[];     // The belief vector as stored server-side
-  claims: number;       // Number of claim tokens minted
-  collateral: number;   // Collateral amount locked
+  positionId: string | number;              // Unique ID for the new position
+  belief: number[];                         // The belief vector as stored server-side
+  claims: number;                           // Number of claim tokens minted
+  collateral: number;                       // Collateral amount locked
+  positionType?: string;                    // Position type ("raw", "normal", etc.)
+  positionParams?: Record<string, unknown>; // Type-specific parameters
 }
 ```
 
@@ -77,8 +79,8 @@ ctx.invalidate(marketId);
 | Cause                                | Error message pattern                                                          |
 | ------------------------------------ | ------------------------------------------------------------------------------ |
 | Not authenticated (guest mode)       | `"Authentication required. Please sign in to perform this action."`            |
-| HTTP error (e.g., 400, 500)          | `"API error: {status} {statusText} on POST /api/market/buy"`                   |
+| HTTP error (e.g., 400, 500)          | `"API error: {status} {statusText} on POST /api/market/trading/buy/{marketId}"` |
 | API-level failure (`success: false`) | `"API error: {message}"` (message from server response)                        |
 | 401 (expired token)                  | Auto-retries once by re-authenticating. If retry fails, throws the HTTP error. |
 
-Always wrap `buy()` in a try/catch. The SDK's trading UI widgets handle this internally — they catch errors, display them inline, and reset state.
+Always wrap `buy()` in a try/catch. The SDK's trading UI widgets handle this internally -- they catch errors, display them inline, and reset state.

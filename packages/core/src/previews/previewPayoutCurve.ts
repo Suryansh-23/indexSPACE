@@ -3,7 +3,8 @@ import type { BeliefVector, PayoutCurve } from '../types.js';
 
 /**
  * Preview payouts across all possible outcomes for a hypothetical position.
- * Wraps: POST /api/projection/project_settlement?market_id=X
+ * Wraps: POST /api/views/preview/payout/{marketId}
+ * Body: { collateral, position_type, position_params, num_outcomes? }
  */
 export async function previewPayoutCurve(
   client: FSClient,
@@ -14,29 +15,35 @@ export async function previewPayoutCurve(
   options?: { signal?: AbortSignal },
 ): Promise<PayoutCurve> {
   const body: Record<string, unknown> = {
-    belief_vector: belief,
     collateral,
+    position_type: 'raw',
+    position_params: { position_vector: belief },
   };
   if (numOutcomes !== undefined) {
     body.num_outcomes = numOutcomes;
   }
 
   const data = await client.post<any>(
-    '/api/projection/project_settlement',
+    `/api/views/preview/payout/${marketId}`,
     body,
-    { market_id: String(marketId) },
+    undefined,
     options?.signal,
   );
 
+  if (data.max_payout == null) throw new Error('Missing max_payout in payout curve response');
+  if (data.max_payout_outcome == null) throw new Error('Missing max_payout_outcome in payout curve response');
+  if (data.collateral == null) throw new Error('Missing collateral in payout curve response');
+
+  const projections = data.projections ?? [];
   return {
     // API response uses "projections" -- remapped to "previews" in SDK types
-    previews: data.projections.map((p: any) => ({
+    previews: projections.map((p: any) => ({
       outcome: p.outcome,
       payout: p.payout,
       profitLoss: p.profit_loss,
     })),
     maxPayout: data.max_payout,
     maxPayoutOutcome: data.max_payout_outcome,
-    inputCollateral: data.input_collateral,
+    inputCollateral: data.collateral,
   };
 }

@@ -60,11 +60,11 @@ describe('Stage 1: FSClient authentication', () => {
 });
 
 describe('Stage 1: FSClient API calls', () => {
-  it('GET /api/market/state returns data', async () => {
+  it('GET /api/views/markets/{id} returns data', async () => {
     const client = new FSClient({ baseUrl: BASE_URL, username: USERNAME, password: PASSWORD });
-    const data = await client.get<any>('/api/market/state', { market_id: MARKET_ID });
+    const data = await client.get<any>(`/api/views/markets/${MARKET_ID}`);
     expect(data.alpha_vector).toBeDefined();
-    expect(data.market_params).toBeDefined();
+    expect(data.market_model_params).toBeDefined();
     expect(data.title).toBeDefined();
     expect(Array.isArray(data.alpha_vector)).toBe(true);
   });
@@ -72,11 +72,11 @@ describe('Stage 1: FSClient API calls', () => {
   it('retries on 401 (auto-reauth)', async () => {
     const client = new FSClient({ baseUrl: BASE_URL, username: USERNAME, password: PASSWORD });
     // First call authenticates
-    await client.get<any>('/api/market/state', { market_id: MARKET_ID });
-    // Manually invalidate token by calling private field — simulate expiry
+    await client.get<any>(`/api/views/markets/${MARKET_ID}`);
+    // Manually invalidate token by calling private field -- simulate expiry
     (client as any).token = 'expired_token';
     // Second call should auto-reauth and succeed
-    const data = await client.get<any>('/api/market/state', { market_id: MARKET_ID });
+    const data = await client.get<any>(`/api/views/markets/${MARKET_ID}`);
     expect(data.alpha_vector).toBeDefined();
   });
 });

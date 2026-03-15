@@ -12,7 +12,7 @@ sidebar_position: 2
 ```typescript
 async function sell(
   client: FSClient,
-  positionId: number,
+  positionId: string | number,
   marketId: string | number,
 ): Promise<SellResult>
 ```
@@ -23,7 +23,7 @@ async function sell(
 | Parameter | Type | Description |
 | --- | --- | --- |
 | `client` | `FSClient` | Authenticated API client. |
-| `positionId` | `number` | The position to close. Get this from `queryMarketPositions` or from `BuyResult.positionId`. |
+| `positionId` | `string \| number` | The position to close. Get this from `queryMarketPositions` or from `BuyResult.positionId`. |
 | `marketId` | `string \| number` | The market the position belongs to. |
 
 
@@ -31,8 +31,9 @@ async function sell(
 
 ```typescript
 interface SellResult {
-  positionId: number;        // The closed position's ID
-  collateralReturned: number; // Amount of currency returned to the trader
+  positionId: string | number;  // The closed position's ID
+  collateralReturned: number;   // Amount of currency returned to the trader
+  creditedTo?: string;          // Username the payout was credited to
 }
 ```
 

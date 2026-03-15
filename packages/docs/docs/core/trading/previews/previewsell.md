@@ -5,15 +5,16 @@ sidebar_position: 2
 
 # previewSell
 
-**`previewSell(client, positionId, marketId)`**
+**`previewSell(client, positionId, marketId, options?)`**
 
 **Layer:** L1. Previews how much collateral would be returned if a position were sold right now, without actually selling it. Used by `PositionTable` to show live "market value" for each open position.
 
 ```typescript
 async function previewSell(
   client: FSClient,
-  positionId: number,
+  positionId: string | number,
   marketId: string | number,
+  options?: { signal?: AbortSignal },
 ): Promise<PreviewSellResult>
 ```
 
@@ -22,15 +23,16 @@ async function previewSell(
 | Parameter    | Type               | Description                         |
 | ------------ | ------------------ | ----------------------------------- |
 | `client`     | `FSClient`         | Authenticated API client.           |
-| `positionId` | `number`           | The position to simulate selling.   |
+| `positionId` | `string \| number` | The position to simulate selling.   |
 | `marketId`   | `string \| number` | The market the position belongs to. |
+| `options.signal` | `AbortSignal?`     | Optional abort signal for request cancellation. |
 
 **Returns `PreviewSellResult`:**
 
 ```typescript
 interface PreviewSellResult {
-  collateralReturned: number; // Estimated collateral you'd receive
-  iterations: number;         // Number of solver iterations the server used
+  collateralReturned: number;   // Estimated collateral you'd receive
+  positionId: string | number;  // ID of the position being previewed
 }
 ```
 

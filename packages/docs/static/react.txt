@@ -895,7 +895,7 @@ import { sell } from '@functionspace/core';
 
 async function sell(
   client: FSClient,
-  positionId: number,
+  positionId: string | number,
   marketId: string | number,
 ): Promise<SellResult>
 ```
@@ -1064,7 +1064,7 @@ ctx.setPreviewPayout(curve);
 | `maxPayoutOutcome` | `number` | The outcome value that produces the best payout |
 | `inputCollateral` | `number` | Echo of the collateral you passed in |
 
-### `previewSell(client, positionId, marketId)`
+### `previewSell(client, positionId, marketId, options?)`
 
 Previews how much collateral would be returned if a position were sold at the current market state.
 
@@ -1072,7 +1072,7 @@ Previews how much collateral would be returned if a position were sold at the cu
 import { previewSell } from '@functionspace/core';
 
 const preview = await previewSell(ctx.client, positionId, marketId);
-// preview = { collateralReturned: number, iterations: number }
+// preview = { collateralReturned: number, positionId: string | number }
 ```
 
 ---
@@ -1149,8 +1149,8 @@ See the complete core type reference in `core.txt`. Key types used in headless m
 - **`MarketState`** -- Returned by `useMarket()`. Contains `config` (with `K`, `L`, `H`), `consensus`, `title`, `xAxisUnits`, `resolutionState`, and pool statistics.
 - **`ConsensusCurve`** -- Returned by `useConsensus()`. Contains `points: Array<{x, y}>` and `config`.
 - **`Position`** -- Returned by `usePositions()`. Contains `positionId`, `belief`, `collateral`, `claims`, `status`, `prediction`.
-- **`BuyResult`** -- Returned by `buy()`. Contains `positionId`, `belief`, `claims`, `collateral`.
-- **`SellResult`** -- Returned by `sell()`. Contains `positionId`, `collateralReturned`.
+- **`BuyResult`** -- Returned by `buy()`. Contains `positionId`, `belief`, `claims`, `collateral`, `positionType?`, `positionParams?`.
+- **`SellResult`** -- Returned by `sell()`. Contains `positionId`, `collateralReturned`, `creditedTo?`.
 - **`PayoutCurve`** -- Returned by `previewPayoutCurve()`. Contains `previews`, `maxPayout`, `maxPayoutOutcome`.
 - **`BeliefVector`** -- `number[]` of length `K + 1` summing to 1. Passed to `buy()` and `ctx.setPreviewBelief()`.
 - **`BucketData`** -- Returned by `useBucketDistribution()`. Contains `range`, `min`, `max`, `probability`, `percentage`.
