@@ -7,7 +7,7 @@
  * safe endpoint migration.
  *
  * Note: passwordlessLoginUser and silentReAuth already have mocked-fetch tests
- * in stage2.test.ts (lines 461-616). They are not duplicated here.
+ * in api-integration.test.ts (lines 461-616). They are not duplicated here.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -1319,7 +1319,7 @@ describe('previewPayoutCurve', () => {
 });
 
 // -- Auth mappings --
-// Note: passwordlessLoginUser and silentReAuth tested in stage2.test.ts (lines 461-616)
+// Note: passwordlessLoginUser and silentReAuth tested in api-integration.test.ts (lines 461-616)
 
 describe('loginUser', () => {
   let originalFetch: typeof globalThis.fetch;

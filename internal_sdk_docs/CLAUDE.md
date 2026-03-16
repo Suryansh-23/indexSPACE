@@ -113,8 +113,8 @@ cd packages/docs && npx docusaurus build  # Docs site build verification (requir
 |-----------|---------|----------------|
 | `tests/architecture.test.ts` | Enforces layer boundaries, hook patterns, export completeness | Adding new hooks, components, or changing imports |
 | `tests/hooks.test.tsx` | Verifies hook behavior (loading, error, refetch, context) | Adding or modifying hooks |
-| `tests/stage1.test.ts` | Core math functions | Changing position generators or curve evaluation |
-| `tests/stage2.test.ts` | API/transaction functions | Changing buy, sell, or query functions |
+| `tests/client-auth.test.ts` | Client auth, core math functions | Changing position generators, curve evaluation, or auth |
+| `tests/api-integration.test.ts` | API/transaction functions (live backend) | Changing buy, sell, or query functions |
 | `tests/shapes.test.ts` | Belief shape validation (vector properties, shape characteristics) | Adding new L2 generators or modifying kernel functions |
 | `tests/chart-zoom.test.ts` | Chart zoom/pan math functions | Changing pixelToDataX, zoom/pan domain computation, data filtering |
 | `tests/themes.test.ts` | Theme preset validation, resolveTheme behavior | Adding/modifying presets or theme resolution logic |

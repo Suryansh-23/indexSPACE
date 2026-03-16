@@ -780,7 +780,7 @@ Before creating anything, decide the correct approach (see "When to Create a New
 - [ ] Function in appropriate `packages/core/src/` module
 - [ ] TypeScript types defined in `types.ts`
 - [ ] Exported from `packages/core/src/index.ts`
-- [ ] **Add tests to `stage1.test.ts` (math) or `stage2.test.ts` (API)**
+- [ ] **Add tests to `client-auth.test.ts` (math) or `api-integration.test.ts` (API)**
 - [ ] **If the function maps an API endpoint:** Add mocked-fetch contract test to `tests/mappings.test.ts` (raw fixture, field mapping assertion, URL assertion, POST body assertion for writes)
 - [ ] **Run `npx vitest run` — all tests pass**
 - [ ] **Update PLAYBOOK.md** — Core Functions list (correct category + layer)
@@ -1067,8 +1067,8 @@ tests/
 ├── themes.test.ts        # Theme preset validation, resolveTheme behavior
 ├── shapes.test.ts        # Belief shape validation (vector properties, shape characteristics)
 ├── binary.test.ts        # Binary panel-specific tests
-├── stage1.test.ts        # Core math functions
-├── stage2.test.ts        # API/transaction functions
+├── client-auth.test.ts   # Client auth, core math functions
+├── api-integration.test.ts # API/transaction functions (live backend)
 └── components.test.tsx   # Widget smoke tests (jsdom)
 
 packages/docs/            # Docusaurus documentation site
