@@ -1,6 +1,7 @@
 ---
 title: "calculateBucketDistribution"
 sidebar_position: 3
+description: "Integrate a density curve into equal-width histogram buckets."
 ---
 
 # calculateBucketDistribution

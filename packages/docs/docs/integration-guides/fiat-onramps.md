@@ -1,6 +1,7 @@
 ---
 title: "Fiat OnRamps"
 sidebar_position: 2
+description: "Integrating fiat onramp providers (MoonPay, Transak, Coinbase Pay) for in-app USDC purchase."
 ---
 
 # Fiat OnRamps

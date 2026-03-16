@@ -1,6 +1,7 @@
 ---
 title: "queryMarketHistory"
 sidebar_position: 6
+description: "Fetch paginated time-series snapshots of a market's alpha vector after each trade."
 ---
 
 # queryMarketHistory

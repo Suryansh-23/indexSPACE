@@ -1,6 +1,7 @@
 ---
 title: "Sell"
 sidebar_position: 2
+description: "Close an open position and return collateral based on current market consensus."
 ---
 
 # Sell

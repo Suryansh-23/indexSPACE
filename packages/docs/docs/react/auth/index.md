@@ -1,9 +1,11 @@
 ---
-title: "Auth"
+title: "Auth - React"
+sidebar_label: "Auth"
 sidebar_position: 1
+description: "React hooks for authentication state and actions via FunctionSpaceProvider context."
 ---
 
-# Auth
+# Auth - React
 
 React hook for accessing authentication state and actions from `FunctionSpaceProvider`.
 

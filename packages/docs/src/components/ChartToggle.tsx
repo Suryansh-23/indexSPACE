@@ -15,9 +15,9 @@ export default function ChartToggle({ marketId = DEMO_MARKET_ID, height = 300 }:
       <button
         onClick={() => setShow(!show)}
         style={{
-          background: 'var(--fs-surface)',
-          color: 'var(--fs-text-secondary)',
-          border: '1px solid var(--fs-border)',
+          background: 'var(--ifm-color-emphasis-100)',
+          color: 'var(--ifm-color-emphasis-700)',
+          border: '1px solid var(--ifm-color-emphasis-300)',
           borderRadius: '4px',
           padding: '0.25rem 0.75rem',
           fontSize: '0.8rem',

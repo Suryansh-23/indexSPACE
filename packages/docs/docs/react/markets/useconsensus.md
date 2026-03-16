@@ -1,6 +1,7 @@
 ---
 title: "useConsensus"
 sidebar_position: 2
+description: "Fetches the consensus probability density curve as chart-ready { x, y } point arrays."
 ---
 
 # useConsensus

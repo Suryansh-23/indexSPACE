@@ -1,6 +1,7 @@
 ---
 title: "computePercentiles"
 sidebar_position: 2
+description: "Compute 9 percentile values (p2.5 through p97.5) from a coefficient vector."
 ---
 
 # computePercentiles

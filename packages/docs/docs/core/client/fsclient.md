@@ -1,6 +1,7 @@
 ---
 title: "FSClient"
 sidebar_position: 1
+description: "FSClient class API: constructor config, token management, auto-auth, and guest mode."
 ---
 
 # FSClient
@@ -24,8 +25,8 @@ class FSClient {
   getStoredUsername(): string | null         // Retrieve stored username
   clearStoredUsername(): void                // Remove stored username
 
-  get<T>(path: string, params?: Record<string, string>): Promise<T>
-  post<T>(path: string, body?: unknown, params?: Record<string, string>): Promise<T>
+  get<T>(path: string, params?: Record<string, string>, signal?: AbortSignal): Promise<T>
+  post<T>(path: string, body?: unknown, params?: Record<string, string>, signal?: AbortSignal): Promise<T>
 }
 ```
 
@@ -43,7 +44,7 @@ interface FSConfig {
 **Authentication behavior:**
 
 * **With credentials** (`username` + `password` provided): The client auto-authenticates on the first API call that requires a token. If a 401 is received, it clears the token, re-authenticates, and retries the request once.
-* **Guest mode** (no credentials): GET requests go through with an `X-Username: guest` header. POST/mutation requests throw `"Authentication required. Please sign in to perform this action."`.
+* **Guest mode** (no credentials): GET requests go through with a `Username: guest` header. POST/mutation requests throw `"Authentication required. Please sign in to perform this action."`.
 * **Manual token**: Call `setToken(token)` if you obtain a token through your own auth flow (e.g., from `loginUser`).
 
 **Example (standalone usage):**

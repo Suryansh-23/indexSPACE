@@ -1,6 +1,7 @@
 ---
 title: "queryConsensusSummary"
 sidebar_position: 4
+description: "Compute summary statistics (mean, median, mode, variance, stdDev) from the consensus distribution."
 ---
 
 # queryConsensusSummary

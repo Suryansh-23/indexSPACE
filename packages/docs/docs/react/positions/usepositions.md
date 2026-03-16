@@ -1,6 +1,7 @@
 ---
 title: "usePositions"
 sidebar_position: 1
+description: "Fetches all positions for a market and optionally filters client-side by username."
 ---
 
 # usePositions

@@ -18,6 +18,7 @@
     "react-dom": "^18.2.0",
     "recharts": "^2.10.0",
     "rc-slider": "^11.1.9",
+    "@easyops-cn/docusaurus-search-local": "^0.45.0",
     "@functionspace/core": "*",
     "@functionspace/react": "*",
     "@functionspace/ui": "*"

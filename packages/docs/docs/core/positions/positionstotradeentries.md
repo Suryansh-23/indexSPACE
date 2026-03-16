@@ -1,6 +1,7 @@
 ---
 title: "positionsToTradeEntries"
 sidebar_position: 4
+description: "Convert positions into a flat, time-sorted list of buy/sell TradeEntry objects."
 ---
 
 # positionsToTradeEntries

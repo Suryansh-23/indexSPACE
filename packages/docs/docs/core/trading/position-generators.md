@@ -1,6 +1,7 @@
 ---
 title: "Position Generators"
 sidebar_position: 1
+description: "generateBelief and convenience generators for creating belief vectors from regions and shapes."
 ---
 
 # Position Generators
@@ -191,7 +192,7 @@ The belief vector is the input to two critical operations:
 ctx.setPreviewBelief(belief);  // shows dashed overlay on consensus chart
 
 const payout = await previewPayoutCurve(client, marketId, belief, collateral, K);
-// payout.outcomes[i] = { outcome, payout, profitLoss }
+// payout.previews[i] = { outcome, payout, profitLoss }
 ```
 
 **2. Execution.** Pass to `buy()` to open a real position:

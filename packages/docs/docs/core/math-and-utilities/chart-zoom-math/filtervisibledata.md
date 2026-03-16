@@ -1,6 +1,7 @@
 ---
 title: "filterVisibleData"
 sidebar_position: 4
+description: "Filter a data array to items whose X value falls within a given domain range."
 ---
 
 # filterVisibleData

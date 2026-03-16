@@ -1,6 +1,7 @@
 ---
 title: "validateUsername"
 sidebar_position: 4
+description: "Client-side username validation (length, character rules) with no network call."
 ---
 
 # validateUsername

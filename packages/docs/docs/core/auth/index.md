@@ -1,9 +1,11 @@
 ---
-title: "Auth"
+title: "Auth - Core"
 sidebar_position: 1
+sidebar_label: "Auth"
+description: "Pure TypeScript functions for login, signup, silent re-auth, and username validation."
 ---
 
-# Auth
+# Auth - Core
 
 Authentication functions for login, signup, user profile retrieval, and passwordless flows. These use raw `fetch()` internally (bypassing the client's `ensureAuth`) because auth endpoints are the one case where you POST without a token.
 

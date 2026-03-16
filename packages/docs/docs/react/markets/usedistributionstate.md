@@ -1,6 +1,7 @@
 ---
 title: "useDistributionState"
 sidebar_position: 6
+description: "Combines market, consensus, controllable buckets, percentiles, and sub-range queries."
 ---
 
 # useDistributionState

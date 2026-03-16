@@ -50,6 +50,7 @@ export function ShapeCutter({
   const [potentialPayout, setPotentialPayout] = useState<number | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
 
   // Filter shape definitions
@@ -76,6 +77,9 @@ export function ShapeCutter({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
       ctx.setPreviewBelief(null);
       ctx.setPreviewPayout(null);
     };
@@ -154,6 +158,12 @@ export function ShapeCutter({
 
   // Debounced payout preview
   useEffect(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     const belief = generateCurrentBelief();
@@ -165,11 +175,12 @@ export function ShapeCutter({
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral, market.config.K);
+        const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral, market.config.K, undefined, { signal: controller.signal });
         if (!mountedRef.current) return;
         setPotentialPayout(result.maxPayout);
         ctx.setPreviewPayout(result);
-      } catch {
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return;
         if (!mountedRef.current) return;
         setPotentialPayout(null);
         ctx.setPreviewPayout(null);
@@ -177,6 +188,9 @@ export function ShapeCutter({
     }, 500);
 
     return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [generateCurrentBelief, amount, market, marketId]);

@@ -1,6 +1,7 @@
 ---
 title: "queryDensityAt"
 sidebar_position: 5
+description: "Evaluate the consensus probability density at a single outcome point."
 ---
 
 # queryDensityAt

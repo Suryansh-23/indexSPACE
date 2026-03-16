@@ -1,6 +1,7 @@
 ---
 title: "pixelToDataX"
 sidebar_position: 1
+description: "Convert a pixel X coordinate to a data-space value via linear interpolation."
 ---
 
 # pixelToDataX

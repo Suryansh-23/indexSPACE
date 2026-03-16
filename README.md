@@ -334,8 +334,10 @@ npx vitest run
 | `tests/themes.test.ts` | Theme presets, resolveTheme, resolveChartColors, chart color derivation |
 | `tests/shapes.test.ts` | Belief shape validation (vector properties, shape characteristics) |
 | `tests/binary.test.ts` | Binary panel-specific tests |
-| `tests/stage1.test.ts` | Core math functions (position generators, density evaluation) |
-| `tests/stage2.test.ts` | API / transaction functions |
+| `tests/client-auth.test.ts` | Client auth, core math functions (position generators, density evaluation) |
+| `tests/api-integration.test.ts` | API / transaction functions |
+| `tests/mappings.test.ts` | Mocked-fetch mapping contract tests (raw API shape to SDK type, POST body assertions) |
+| `tests/validation.test.ts` | Belief vector validation (validateBeliefVector) |
 | `tests/chart-zoom.test.ts` | Chart zoom/pan utilities (domain computation, pixel mapping, data filtering) |
 | `tests/cache.test.ts` | QueryCache class unit tests (deduplication, staleness, revalidation) |
 | `tests/client-signal.test.ts` | FSClient signal forwarding and request cancellation |

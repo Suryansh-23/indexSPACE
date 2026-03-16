@@ -1,6 +1,7 @@
 ---
 title: "Chart Utilities"
 sidebar_position: 1
+description: "Hooks and helpers for implementing interactive Recharts-based charts with zoom and pan."
 ---
 
 # Chart Utilities

@@ -1,6 +1,7 @@
 ---
 title: "Composition and Usage"
 sidebar_position: 2
+description: "How UI components communicate through context and compose together without prop wiring."
 ---
 
 # Composition and Usage

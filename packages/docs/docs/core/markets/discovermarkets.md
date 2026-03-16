@@ -1,6 +1,7 @@
 ---
 title: "discoverMarkets"
 sidebar_position: 1
+description: "List all available markets with full MarketState data; works without authentication."
 ---
 
 # discoverMarkets

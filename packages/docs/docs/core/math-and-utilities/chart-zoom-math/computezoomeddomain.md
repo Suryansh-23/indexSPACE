@@ -1,6 +1,7 @@
 ---
 title: "computeZoomedDomain"
 sidebar_position: 2
+description: "Compute a cursor-anchored zoomed X domain from a scroll-wheel event."
 ---
 
 # computeZoomedDomain

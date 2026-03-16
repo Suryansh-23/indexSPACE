@@ -1,6 +1,7 @@
 ---
 title: "computeStatistics"
 sidebar_position: 1
+description: "Compute mean, median, mode, variance, and stdDev from a coefficient vector."
 ---
 
 # computeStatistics

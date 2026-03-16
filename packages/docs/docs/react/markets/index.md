@@ -1,9 +1,11 @@
 ---
-title: "Markets"
+title: "Markets - React"
+sidebar_label: "Markets"
 sidebar_position: 1
+description: "Data-fetching hooks for market state, consensus curves, distributions, and trade history."
 ---
 
-# Markets
+# Markets - React
 
 Data-fetching hooks for market state, consensus curves, distribution analysis, and trade history. All follow the `{ named, loading, error, refetch }` return pattern and require `FunctionSpaceProvider`.
 

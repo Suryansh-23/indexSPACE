@@ -1,6 +1,7 @@
 ---
 title: "Math & Utilities"
 sidebar_position: 1
+description: "Pure math functions (L0) for density evaluation, statistics, and chart operations."
 ---
 
 # Math & Utilities

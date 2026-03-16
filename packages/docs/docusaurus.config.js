@@ -16,12 +16,28 @@ const config = {
   // Custom fields accessible via useDocusaurusContext().siteConfig.customFields
   customFields: {
     fsBaseUrl: 'https://fs-core-api.onrender.com',
+    // fsBaseUrl: 'http://localhost:8000',
   },
 
   i18n: {
     defaultLocale: 'en',
     locales: ['en'],
   },
+
+  themes: [
+    [
+      require.resolve('@easyops-cn/docusaurus-search-local'),
+      /** @type {import("@easyops-cn/docusaurus-search-local").PluginOptions} */
+      ({
+        hashed: true,
+        language: ['en'],
+        docsRouteBasePath: '/',
+        indexBlog: false,
+        indexDocs: true,
+        docsDir: 'docs',
+      }),
+    ],
+  ],
 
   plugins: [
     require.resolve('./src/plugins/sdk-webpack-plugin'),

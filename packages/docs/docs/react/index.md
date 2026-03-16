@@ -1,6 +1,7 @@
 ---
 title: "React"
 sidebar_position: 1
+description: "Provider setup, context fields, theme resolution, and data hook patterns for @functionspace/react."
 ---
 
 # React

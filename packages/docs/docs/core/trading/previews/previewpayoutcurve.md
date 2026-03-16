@@ -1,6 +1,7 @@
 ---
 title: "previewPayoutCurve"
 sidebar_position: 1
+description: "Preview settlement payouts for every possible outcome given a hypothetical belief and collateral."
 ---
 
 # previewPayoutCurve
@@ -46,6 +47,20 @@ interface PayoutCurve {
   inputCollateral: number;   // Echo of the collateral you passed in
 }
 ```
+
+**Error handling:**
+
+`previewPayoutCurve()` throws on failure. Belief vector validation runs client-side before the network request:
+
+| Cause                                | Error message pattern                                                              | Stage |
+| ------------------------------------ | ---------------------------------------------------------------------------------- | ----- |
+| Invalid belief vector                | `"Belief vector length X does not match expected K+1 = Y"`                         | Client-side, before network request |
+| Non-finite values                    | `"Belief vector contains non-finite values (NaN or Infinity)"`                     | Client-side |
+| Negative values                      | `"Belief vector contains negative values"`                                         | Client-side |
+| Sum != 1.0                           | `"Belief vector does not sum to 1.0 (sum = X)"`                                   | Client-side |
+| HTTP error (e.g., 400, 500)          | `"API error: {status} {statusText} on POST /api/views/preview/payout/{marketId}"`  | Server response |
+| API-level failure (`success: false`) | `"API error: {message}"` (message from server response)                            | Server response |
+| Missing response fields              | `"Missing max_payout in payout curve response"` (or `max_payout_outcome`, `collateral`) | Response parsing |
 
 **How UI components use this:** Every trade panel calls `previewPayoutCurve` on a 500ms debounce after the trader adjusts any input (prediction slider, confidence, collateral amount). The result is written to `ctx.setPreviewPayout(result)`, which the `ConsensusChart` reads to render a payout overlay in its tooltip.
 

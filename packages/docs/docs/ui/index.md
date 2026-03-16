@@ -1,6 +1,7 @@
 ---
 title: "UI"
 sidebar_position: 1
+description: "Overview of @functionspace/ui components, the TradeInputBaseProps contract, and three-phase trade pattern."
 ---
 
 # UI

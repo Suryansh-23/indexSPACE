@@ -3040,7 +3040,7 @@ client.setToken(token);
 console.log(`Logged in as ${user.username}, wallet: ${user.walletValue}`);
 ```
 
-**Guest mode.** Omit all credentials. The client sends read-only requests with an `X-Username: guest` header. Query functions work; `buy()` and `sell()` will throw `"Authentication required"`.
+**Guest mode.** Omit all credentials. The client sends read-only requests with a `Username: guest` header. Query functions work; `buy()` and `sell()` will throw `"Authentication required"`.
 
 ```typescript
 import { FSClient, discoverMarkets } from '@functionspace/core';
@@ -3290,7 +3290,7 @@ const history: MarketHistory = await queryMarketHistory(client, 42, 100, 0);
 // history.snapshots = MarketSnapshot[] ordered by time
 ```
 
-#### `queryMarketPositions(client, marketId)`
+#### `queryMarketPositions(client, marketId, options?)`
 
 Returns all positions for a market as `Position[]`.
 
@@ -3304,7 +3304,7 @@ const open = positions.filter(p => p.status === 'open');
 const totalLocked = open.reduce((sum, p) => sum + p.collateral, 0);
 ```
 
-#### `queryPositionState(client, positionId, marketId)`
+#### `queryPositionState(client, positionId, marketId, options?)`
 
 Returns a single position by ID. Throws if not found. Internally calls `queryMarketPositions` and filters, so prefer filtering yourself if you already have the list.
 

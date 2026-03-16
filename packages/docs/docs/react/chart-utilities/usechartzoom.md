@@ -1,6 +1,7 @@
 ---
 title: "useChartZoom"
 sidebar_position: 1
+description: "Manages scroll-wheel zoom, cursor-anchored panning, and auto-reset for Recharts containers."
 ---
 
 # useChartZoom

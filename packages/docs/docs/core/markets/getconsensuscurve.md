@@ -1,6 +1,7 @@
 ---
 title: "getConsensusCurve"
 sidebar_position: 3
+description: "Evaluate the consensus PDF into chart-ready { x, y } points for rendering density curves."
 ---
 
 # getConsensusCurve

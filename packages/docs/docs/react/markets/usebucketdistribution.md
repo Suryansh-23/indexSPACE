@@ -1,6 +1,7 @@
 ---
 title: "useBucketDistribution"
 sidebar_position: 5
+description: "Derives outcome bucket probabilities from market config and consensus density curve data."
 ---
 
 # useBucketDistribution

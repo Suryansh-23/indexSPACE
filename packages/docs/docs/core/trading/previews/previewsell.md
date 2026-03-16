@@ -1,6 +1,7 @@
 ---
 title: "previewSell"
 sidebar_position: 2
+description: "Preview how much collateral would be returned if a position were sold."
 ---
 
 # previewSell
@@ -35,6 +36,10 @@ interface PreviewSellResult {
   positionId: string | number;  // ID of the position being previewed
 }
 ```
+
+:::note
+The `iterations` field that appeared in earlier versions of this result type no longer exists. The response now contains only `collateralReturned` and `positionId`.
+:::
 
 **Example:**
 

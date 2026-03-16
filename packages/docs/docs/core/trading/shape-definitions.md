@@ -1,6 +1,7 @@
 ---
 title: "Shape Definitions"
 sidebar_position: 4
+description: "Registry of 8 named belief shapes (gaussian, spike, range, etc.) with metadata and SVG icons."
 ---
 
 # Shape Definitions

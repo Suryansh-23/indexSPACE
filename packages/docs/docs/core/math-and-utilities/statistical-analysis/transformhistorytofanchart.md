@@ -1,6 +1,7 @@
 ---
 title: "transformHistoryToFanChart"
 sidebar_position: 4
+description: "Transform market history snapshots into FanChartPoint[] with statistics and percentile bands."
 ---
 
 # transformHistoryToFanChart

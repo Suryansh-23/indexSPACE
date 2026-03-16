@@ -1,6 +1,7 @@
 ---
 title: "Layering"
 sidebar_position: 1
+description: "SDK function layering system: L0 pure math, L1 core protocol, and L2 convenience wrappers."
 ---
 
 # Layering
@@ -21,6 +22,7 @@ Protocol-agnostic math. No awareness of markets, positions, or network.
 | `transformHistoryToFanChart()` | Math |
 | `mapPosition()` | Utility |
 | `positionsToTradeEntries()` | Utility |
+| `validateBeliefVector()` | Validation |
 | `validateUsername()` | Auth |
 | `pixelToDataX()` | Chart Zoom |
 | `computeZoomedDomain()` | Chart Zoom |

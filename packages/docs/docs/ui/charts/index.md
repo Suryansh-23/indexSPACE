@@ -1,6 +1,7 @@
 ---
 title: "Charts"
 sidebar_position: 1
+description: "Chart components and their two-tier architecture: Content sub-components and Standalone wrappers."
 ---
 
 # Charts

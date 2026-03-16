@@ -1,19 +1,21 @@
 ---
 title: "queryPositionState"
 sidebar_position: 2
+description: "Fetch a single position by ID from a market."
 ---
 
 # queryPositionState
 
-**`queryPositionState(client, positionId, marketId)`**
+**`queryPositionState(client, positionId, marketId, options?)`**
 
 **Layer:** L1. Fetches a single position by ID. Internally calls `queryMarketPositions` and filters. Throws if the position is not found.
 
 ```typescript
 async function queryPositionState(
   client: FSClient,
-  positionId: number,
+  positionId: string | number,
   marketId: string | number,
+  options?: { signal?: AbortSignal },
 ): Promise<Position>
 ```
 

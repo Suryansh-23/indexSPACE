@@ -7,8 +7,13 @@ import { validateBeliefVector } from '../validation.js';
  * Wraps: POST /api/market/trading/buy/{marketId}
  * Body: { collateral, position_type, position_params }
  *
- * Note: options.prediction is accepted for backward compatibility but is no
- * longer sent to the server.
+ * @param client - Authenticated FSClient instance.
+ * @param marketId - The market to buy into.
+ * @param belief - Belief vector for the position.
+ * @param collateral - Amount of collateral to put up.
+ * @param numBuckets - Number of buckets for belief vector validation.
+ * @param options - Optional parameters.
+ * @param options.prediction - @deprecated No longer sent to the server. Accepted for backward compatibility only.
  */
 export async function buy(
   client: FSClient,

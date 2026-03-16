@@ -1,6 +1,7 @@
 ---
 title: "evaluateDensityCurve"
 sidebar_position: 1
+description: "Evaluate a coefficient vector into chart-ready { x, y } density points across the outcome range."
 ---
 
 # evaluateDensityCurve

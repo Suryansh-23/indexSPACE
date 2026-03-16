@@ -1,6 +1,7 @@
 ---
 title: "useCustomShape"
 sidebar_position: 1
+description: "Manages control point values, locks, drag state, and derived belief vectors for the shape editor."
 ---
 
 # useCustomShape

@@ -1,6 +1,7 @@
 ---
 title: "Starter Kits"
 sidebar_position: 1
+description: "Six starter kit layouts demonstrating different widget compositions for trading UIs."
 ---
 
 # Starter Kits

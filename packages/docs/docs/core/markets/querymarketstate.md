@@ -1,6 +1,7 @@
 ---
 title: "queryMarketState"
 sidebar_position: 2
+description: "Fetch complete state for a single market: alpha vector, consensus, config, and metadata."
 ---
 
 # queryMarketState

@@ -1,6 +1,7 @@
 ---
 title: "Wallet Providers"
 sidebar_position: 1
+description: "Connecting wallet providers (Privy, RainbowKit, MetaMask) via EIP-1193 signers."
 ---
 
 # Wallet Providers

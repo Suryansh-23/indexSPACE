@@ -1,6 +1,7 @@
 ---
 title: "Gas Abstraction"
 sidebar_position: 2
+description: "Gas abstraction strategies so users can trade without holding native tokens."
 ---
 
 # Gas Abstraction

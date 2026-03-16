@@ -1,6 +1,7 @@
 ---
 title: "useMarketHistory"
 sidebar_position: 3
+description: "Fetches time-series consensus snapshots for fan chart rendering and historical analysis."
 ---
 
 # useMarketHistory

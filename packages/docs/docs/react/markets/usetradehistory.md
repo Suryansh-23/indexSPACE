@@ -1,6 +1,7 @@
 ---
 title: "useTradeHistory"
 sidebar_position: 4
+description: "Fetches trade history for a market with optional polling interval for live updates."
 ---
 
 # useTradeHistory

@@ -23,7 +23,7 @@ The SDK is organised around two orthogonal principles: **Layers** determine abst
 
 | Layer | Name | Description | Examples |
 |-------|------|-------------|----------|
-| L0 | Pure Math | Protocol-agnostic math. No awareness of markets or positions. | `evaluateDensityCurve()`, `computeStatistics()`, `computePercentiles()` |
+| L0 | Pure Math | Protocol-agnostic math and validation. No awareness of markets or positions. | `evaluateDensityCurve()`, `computeStatistics()`, `computePercentiles()`, `validateBeliefVector()` |
 | L1 | Core | Direct protocol interactions with full parameter control. Unopinionated and explicit. | `buy()`, `sell()`, `queryMarketState()`, `generateBelief()` |
 | L2 | Convenience | Higher-level wrappers with sensible defaults. Named concepts mapping to common use cases. | `generateGaussian()`, `generateRange()`, `previewPayoutCurve()`, `previewSell()` |
 | L3 | Intent | Domain-specific functions driven by user intent. May reference live market state and orchestrate across categories. | Composed workflows, multi-step operations |
@@ -37,6 +37,7 @@ The SDK is organised around two orthogonal principles: **Layers** determine abst
 | Previews | Computes hypothetical outcomes without modifying state | Read-only | `previewPayoutCurve()`, `previewSell()` |
 | Transactions | State-changing operations | Write | `buy()`, `sell()` |
 | Discovery | Find and filter markets or positions | Read-only | `discoverMarkets()` |
+| Validation | Input correctness checks before network calls | Read-only (no network) | `validateBeliefVector()` |
 
 ### Layer × Category Rule
 
@@ -76,6 +77,7 @@ Every new function must be classifiable by both layer AND category. This keeps t
 | Data-fetching hooks return `{ <named>, loading, error, refetch }` | Named property matches hook purpose. State/action hooks (e.g. `useAuth`, `useCustomShape`) return context fields directly. |
 | Export types separately | `export type { Props }` for proper tree-shaking |
 | Chart content components can fetch their own data | TimelineChartContent calls `useMarketHistory` internally — avoids wasteful fetches when tab is hidden |
+| Docs `Root.tsx` SSR fallback must NOT wrap in `FunctionSpaceProvider` | `FunctionSpaceProvider` blocks rendering during SSR (`providerReady` depends on `useEffect`), producing empty HTML that breaks search indexing, SEO, and accessibility |
 
 ## File Locations
 
@@ -96,6 +98,7 @@ Every new function must be classifiable by both layer AND category. This keeps t
 | Edit documentation content | `packages/docs/docs/` (Markdown/MDX files) |
 | Add live widget demos | `packages/docs/src/components/` (WidgetDemo, ChartToggle); starter kit layouts import from `demo-app/src/` via `@demo-app` alias |
 | Edit docs site config | `packages/docs/docusaurus.config.js`, `packages/docs/src/css/custom.css` |
+| Edit docs search config | `packages/docs/docusaurus.config.js` (`themes` array, `@easyops-cn/docusaurus-search-local`) |
 | Edit docs SDK integration | `packages/docs/src/plugins/sdk-webpack-plugin.js`, `packages/docs/src/theme/Root.tsx` |
 | Update AI context files | `packages/docs/static/llms.txt`, `core.txt`, `react.txt`, `ui.txt` |
 
@@ -220,8 +223,8 @@ Multi-agent adversarial review of recent implementation work. Invoked manually w
 
 ## Pending Fixes
 
-- **Race conditions in data hooks.** Hooks that fetch by `marketId` (useMarket, useConsensus, usePositions, useMarketHistory, useDistributionState, useBucketDistribution) do not use an AbortController or generation counter. If `marketId` changes rapidly, an earlier response can overwrite a later one, showing stale data for the wrong market.
-- **Missing mounted guards in data hooks.** The same hooks listed above do not check whether the component is still mounted before calling `setState`. This can cause React "setState on unmounted component" warnings during fast navigation.
+- **Race conditions in data hooks.** Hooks that fetch by `marketId` (useMarket, useConsensus, usePositions, useMarketHistory, useDistributionState, useBucketDistribution) do not use an AbortController or generation counter. If `marketId` changes rapidly, an earlier response can overwrite a later one, showing stale data for the wrong market. *Partially resolved: UI component Phase 2 debounced previews now use AbortController (Stage 3 remediation). Data-fetching hooks deferred to Tier 1 Step 3.*
+- **Missing mounted guards in data hooks.** The same hooks listed above do not check whether the component is still mounted before calling `setState`. This can cause React "setState on unmounted component" warnings during fast navigation. *Deferred to Tier 1 Step 3 -- `useBuy` removes the `setIsSubmitting` pattern entirely, and cache hooks use `useSyncExternalStore` which handles lifecycle automatically.*
 
 ## Commit Style
 

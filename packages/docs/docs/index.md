@@ -2,6 +2,7 @@
 title: "Introduction"
 sidebar_position: 1
 slug: /
+description: "Overview of the FunctionSpace SDK, its package structure, and core concepts for probability trading."
 ---
 
 # Introduction

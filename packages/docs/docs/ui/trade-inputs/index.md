@@ -1,6 +1,7 @@
 ---
 title: "Trade Inputs"
 sidebar_position: 1
+description: "Overview of six trading input widgets: TradePanel, BinaryPanel, BucketRangeSelector, and more."
 ---
 
 # Trade Inputs

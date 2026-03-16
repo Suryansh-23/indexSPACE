@@ -1,6 +1,7 @@
 ---
 title: "Core"
 sidebar_position: 1
+description: "Entry point for @functionspace/core, the framework-agnostic pure TypeScript layer."
 ---
 
 # Core

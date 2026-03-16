@@ -1,9 +1,11 @@
 ---
-title: "Markets"
+title: "Markets - UI Components"
+sidebar_label: "Markets"
 sidebar_position: 1
+description: "Market data display widgets including MarketStats for volume, liquidity, and status."
 ---
 
-# Markets
+# Markets - UI Components
 
 Display widgets for market data. All require `FunctionSpaceProvider`.
 

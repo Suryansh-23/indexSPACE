@@ -1,6 +1,7 @@
 ---
 title: "Chart Zoom Math"
 sidebar_position: 1
+description: "Geometry functions for zoom, pan, and axis ticks on Recharts charts."
 ---
 
 # Chart Zoom Math

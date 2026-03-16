@@ -53,26 +53,9 @@ function BrowserSDKProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// SSR fallback: render provider with default dark theme
-function SSRFallbackProvider({ children }: { children: React.ReactNode }) {
-  const { siteConfig } = useDocusaurusContext();
-  const fsBaseUrl = getBaseUrl(siteConfig.customFields as Record<string, unknown>);
-
-  return (
-    <FunctionSpaceProvider
-      config={{
-        baseUrl: fsBaseUrl,
-      }}
-      theme="fs-dark"
-    >
-      {children}
-    </FunctionSpaceProvider>
-  );
-}
-
 export default function Root({ children }: { children: React.ReactNode }) {
   return (
-    <BrowserOnly fallback={<SSRFallbackProvider>{children}</SSRFallbackProvider>}>
+    <BrowserOnly fallback={<>{children}</>}>
       {() => <BrowserSDKProvider>{children}</BrowserSDKProvider>}
     </BrowserOnly>
   );

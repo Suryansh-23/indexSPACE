@@ -1,6 +1,7 @@
 ---
 title: "Previews"
 sidebar_position: 1
+description: "Read-only API calls that preview trade outcomes without executing a transaction."
 ---
 
 # Previews

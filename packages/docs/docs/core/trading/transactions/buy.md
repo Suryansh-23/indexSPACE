@@ -1,6 +1,7 @@
 ---
 title: "Buy"
 sidebar_position: 1
+description: "Open a new position by posting a validated belief vector and collateral to a market."
 ---
 
 # Buy
@@ -78,11 +79,15 @@ ctx.invalidate(marketId);
 
 `buy()` throws on failure. The error message varies by cause:
 
-| Cause                                | Error message pattern                                                          |
-| ------------------------------------ | ------------------------------------------------------------------------------ |
-| Not authenticated (guest mode)       | `"Authentication required. Please sign in to perform this action."`            |
-| HTTP error (e.g., 400, 500)          | `"API error: {status} {statusText} on POST /api/market/trading/buy/{marketId}"` |
-| API-level failure (`success: false`) | `"API error: {message}"` (message from server response)                        |
-| 401 (expired token)                  | Auto-retries once by re-authenticating. If retry fails, throws the HTTP error. |
+| Cause                                | Error message pattern                                                          | Stage |
+| ------------------------------------ | ------------------------------------------------------------------------------ | ----- |
+| Invalid belief vector                | `"Belief vector length X does not match expected K+1 = Y"`                     | Client-side, before network request |
+| Non-finite values                    | `"Belief vector contains non-finite values (NaN or Infinity)"`                 | Client-side |
+| Negative values                      | `"Belief vector contains negative values"`                                     | Client-side |
+| Sum != 1.0                           | `"Belief vector does not sum to 1.0 (sum = X)"`                               | Client-side |
+| Not authenticated (guest mode)       | `"Authentication required. Please sign in to perform this action."`            | Client-side |
+| HTTP error (e.g., 400, 500)          | `"API error: {status} {statusText} on POST /api/market/trading/buy/{marketId}"` | Server response |
+| API-level failure (`success: false`) | `"API error: {message}"` (message from server response)                        | Server response |
+| 401 (expired token)                  | Auto-retries once by re-authenticating. If retry fails, throws the HTTP error. | Server response |
 
 Always wrap `buy()` in a try/catch. The SDK's trading UI widgets handle this internally -- they catch errors, display them inline, and reset state.

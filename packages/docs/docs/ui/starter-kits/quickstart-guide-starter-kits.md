@@ -1,6 +1,7 @@
 ---
 title: "Quickstart Guide - Starter Kits"
 sidebar_position: 7
+description: "Minimal integration quickstart with standalone config and layout examples."
 ---
 
 # Quickstart Guide - Starter Kits

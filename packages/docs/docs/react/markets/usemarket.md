@@ -1,6 +1,7 @@
 ---
 title: "useMarket"
 sidebar_position: 1
+description: "Fetches complete market state including config, consensus coefficients, and resolution status."
 ---
 
 # useMarket

@@ -1,6 +1,7 @@
 ---
 title: "Getting Started"
 sidebar_position: 3
+description: "Installation, quick start examples, provider configuration, and authentication setup."
 ---
 
 # Getting Started

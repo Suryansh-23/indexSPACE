@@ -1,6 +1,7 @@
 ---
 title: "Implementing Theming"
 sidebar_position: 2
+description: "Step-by-step guide to custom theming with all 30 token descriptions and preset comparison."
 ---
 
 # Implementing Theming

@@ -1,9 +1,11 @@
 ---
-title: "Trading"
+title: "Trading - React"
+sidebar_label: "Trading"
 sidebar_position: 1
+description: "State management hook for custom shape editing and belief vector derivation."
 ---
 
-# Trading
+# Trading - React
 
 State management hook for custom shape editing. Requires `FunctionSpaceProvider`.
 

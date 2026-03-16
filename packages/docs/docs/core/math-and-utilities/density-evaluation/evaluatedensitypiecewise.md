@@ -1,6 +1,7 @@
 ---
 title: "evaluateDensityPiecewise"
 sidebar_position: 2
+description: "Evaluate the probability density at a single point using piecewise-linear interpolation."
 ---
 
 # evaluateDensityPiecewise

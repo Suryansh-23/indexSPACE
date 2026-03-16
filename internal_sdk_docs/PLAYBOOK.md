@@ -519,10 +519,12 @@ BeliefVector → ctx.setPreviewBelief(belief)     [instant, on every input chang
                 → rendered as dashed yellow area on chart (type="linear")
 
 BeliefVector + collateral → previewPayoutCurve(client, marketId, belief, collateral, K)  [debounced 500ms]
+                          → validateBeliefVector(belief, K) runs first [throws on invalid]
                           → ctx.setPreviewPayout(payoutCurve)
                             → ConsensusChart shows payout in tooltip
 
 BeliefVector + collateral + prediction → buy(client, marketId, belief, collateral, K, { prediction })
+                                       → validateBeliefVector(belief, K) runs first [throws on invalid]
                                        → ctx.invalidate(marketId)  [refreshes all hooks]
 ```
 
@@ -625,7 +627,7 @@ All query functions accept an optional trailing `options?: { signal?: AbortSigna
 - `previewPayoutCurve(client, marketId, belief, collateral, numBuckets, numOutcomes?, options?)` -- wraps `POST /api/views/preview/payout/{marketId}` → PayoutCurve
 - `previewSell(client, positionId, marketId, options?)` -- wraps `GET /api/views/preview/sell/{marketId}/{positionId}` → PreviewSellResult
 
-### Validation (L0 / Pure Math)
+### Validation (L0)
 - `validateBeliefVector(vector, K)` -- throws descriptive error if belief vector is invalid (length, finite, non-negative, sum-to-1)
 
 ---
@@ -679,7 +681,7 @@ setState(result);
 ### After Mutations
 ```typescript
 const { K } = market.config;
-await buy(ctx.client, marketId, belief, collateral, K);
+const result = await buy(ctx.client, marketId, belief, collateral, K);
 ctx.invalidate(marketId);  // Triggers useMarket/usePositions refetch
 onSuccess?.(result);       // Notify parent
 ```
@@ -928,20 +930,35 @@ useEffect(() => {
 ```
 
 **Phase 2 — Debounced payout preview (500ms):**
-Preview the payout curve via API. Debounced because this hits the server.
+Preview the payout curve via API. Debounced because this hits the server. Uses an AbortController to cancel in-flight requests when inputs change.
 ```typescript
+const abortControllerRef = useRef<AbortController | null>(null);
+
 useEffect(() => {
   if (debounceRef.current) clearTimeout(debounceRef.current);
+  abortControllerRef.current?.abort();
   const belief = generateCurrentBelief();
   const collateral = parseFloat(amount);
   if (!belief || isNaN(collateral) || collateral <= 0) { setPotentialPayout(null); return; }
+  const controller = new AbortController();
+  abortControllerRef.current = controller;
   debounceRef.current = setTimeout(async () => {
-    const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral, K);
-    if (!mountedRef.current) return;
-    setPotentialPayout(result.maxPayout);
-    ctx.setPreviewPayout(result);
+    try {
+      const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral, K, undefined, { signal: controller.signal });
+      if (!mountedRef.current) return;
+      setPotentialPayout(result.maxPayout);
+      ctx.setPreviewPayout(result);
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return;
+      if (!mountedRef.current) return;
+      setPotentialPayout(null);
+      ctx.setPreviewPayout(null);
+    }
   }, 500);
-  return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  return () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    abortControllerRef.current?.abort();
+  };
 }, [generateCurrentBelief, amount, market, marketId]);
 ```
 

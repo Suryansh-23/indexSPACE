@@ -1,6 +1,7 @@
 ---
 title: "Client"
 sidebar_position: 1
+description: "Overview of FSClient, the HTTP client that manages auth tokens and API communication."
 ---
 
 # Client
