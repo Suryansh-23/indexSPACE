@@ -165,7 +165,7 @@ export function ShapeCutter({
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
+        const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral, market.config.K);
         if (!mountedRef.current) return;
         setPotentialPayout(result.maxPayout);
         ctx.setPreviewPayout(result);
@@ -224,7 +224,7 @@ export function ShapeCutter({
     setError(null);
 
     try {
-      const result = await buy(ctx.client, marketId, belief, collateral, {
+      const result = await buy(ctx.client, marketId, belief, collateral, market.config.K, {
         prediction: getPrediction(),
       });
 

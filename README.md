@@ -80,7 +80,7 @@ import { FSClient, queryMarketState, generateGaussian, buy } from '@functionspac
 const client = new FSClient({ baseUrl: 'https://api.example.com', username: 'alice', password: 'secret' });
 const market = await queryMarketState(client, 1);
 const belief = generateGaussian(50, 5, market.config.K, market.config.L, market.config.H);
-const result = await buy(client, 1, belief, 100);
+const result = await buy(client, 1, belief, 100, market.config.K);
 ```
 
 ### `@functionspace/react`

@@ -186,7 +186,7 @@ describe('API: queryMarketState', () => {
     expect(market.alpha).toBeDefined();
     expect(Array.isArray(market.alpha)).toBe(true);
     expect(market.consensus).toBeDefined();
-    expect(market.config.K).toBe(60);
+    expect(market.config.K).toBe(80);
     expect(market.title).toBeDefined();
     expect(market.totalMass).toBeGreaterThan(0);
     expect(market.poolBalance).toBeDefined();
@@ -206,7 +206,7 @@ describe('API: getConsensusCurve', () => {
     const client = makeClient();
     const curve = await getConsensusCurve(client, MARKET_ID, 100);
     expect(curve.points.length).toBe(100);
-    expect(curve.config.K).toBe(60);
+    expect(curve.config.K).toBe(80);
     expect(curve.points[0].y).toBeGreaterThan(0);
   });
 });
@@ -245,7 +245,7 @@ describe('API: previewPayoutCurve', () => {
       market.config.L,
       market.config.H,
     );
-    const payout = await previewPayoutCurve(client, MARKET_ID, belief, 10, 20);
+    const payout = await previewPayoutCurve(client, MARKET_ID, belief, 10, market.config.K, 20);
     expect(payout.previews.length).toBe(20);
     expect(payout.maxPayout).toBeGreaterThan(0);
     expect(payout.inputCollateral).toBe(10);
@@ -269,7 +269,7 @@ describe('API: Full trade cycle (Gaussian via generateGaussian)', () => {
     );
 
     // Buy
-    const buyResult = await buy(client, MARKET_ID, belief, 1, { prediction: center });
+    const buyResult = await buy(client, MARKET_ID, belief, 1, market.config.K, { prediction: center });
     expect(buyResult.positionId).toBeDefined();
     expect(buyResult.claims).toBeGreaterThan(0);
     expect(buyResult.collateral).toBe(1);
@@ -299,7 +299,7 @@ describe('API: Full trade cycle (Range via generateRange)', () => {
     const high = mL + (mH - mL) * 0.7;
     const belief = generateRange(low, high, mK, mL, mH);
 
-    const buyResult = await buy(client, MARKET_ID, belief, 1, { prediction: (low + high) / 2 });
+    const buyResult = await buy(client, MARKET_ID, belief, 1, mK, { prediction: (low + high) / 2 });
     expect(buyResult.positionId).toBeDefined();
     expect(buyResult.claims).toBeGreaterThan(0);
 
@@ -324,7 +324,7 @@ describe('API: Full trade cycle (generateBelief with mixed regions)', () => {
       mK, mL, mH,
     );
 
-    const buyResult = await buy(client, MARKET_ID, belief, 1);
+    const buyResult = await buy(client, MARKET_ID, belief, 1, mK);
     expect(buyResult.positionId).toBeDefined();
 
     const sellResult = await sell(client, buyResult.positionId, MARKET_ID);
@@ -373,13 +373,13 @@ describe('Cross-validation: local stats vs backend data', () => {
     const belief = generateGaussian(center, (market.config.H - market.config.L) * 0.1, market.config.K, market.config.L, market.config.H);
 
     // Buy a position
-    const buyResult = await buy(client, MARKET_ID, belief, 5, { prediction: center });
+    const buyResult = await buy(client, MARKET_ID, belief, 5, market.config.K, { prediction: center });
 
     // Get previewSell value
     const sellPreview = await previewSell(client, buyResult.positionId, MARKET_ID);
 
     // Get payout curve
-    const payoutCurve = await previewPayoutCurve(client, MARKET_ID, belief, 5, 50);
+    const payoutCurve = await previewPayoutCurve(client, MARKET_ID, belief, 5, market.config.K, 50);
 
     // previewSell gives the current sell value; payoutCurve gives payout at settlement outcomes
     // They measure different things, but both should be positive for a valid position

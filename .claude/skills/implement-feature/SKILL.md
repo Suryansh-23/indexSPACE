@@ -1,5 +1,5 @@
 name: implement-feature
-description: Supervised multi-agent implementation of SDK features. Enforces plan-first workflow with parallel validation, isolated work streams, and living doc updates.
+description: Supervised multi-agent implementation of SDK features. Enforces plan-first workflow with parallel validation, file-ownership-isolated work streams, and living doc updates.
 user_invocable: true
 argument-hint: <handoff-doc-or-plan-path>
 ---
@@ -24,10 +24,10 @@ Orchestrator (you, the main Claude session)
   |     Each supervisor owns: plan -> implement -> validate -> report
   |     |
   |     +-- Layer 3: IMPLEMENTATION SUB-AGENT (1 per supervisor)
-  |          Works in isolated git worktree
+  |          Works directly in parent workspace (file ownership prevents conflicts)
   |          Supervisor validates, loops REVISE if needed (max 2 cycles)
   |
-  +-- Orchestrator: merge worktrees, run regression, update docs
+  +-- Orchestrator: verify changes, run regression, update docs
 ```
 
 ---
@@ -172,14 +172,33 @@ When supervisors return:
 2. If any are PARTIAL or BLOCKED, assess whether the issues are:
    - **Self-contained** -- can be fixed by re-dispatching that supervisor with additional instructions
    - **Cross-stream** -- require changes in another stream's files (escalate to manual fix)
-3. Collect all worktree branch names for the merge phase
+3. **Verify changes landed** -- read a sample of modified files to confirm changes are in the working tree
 
-### Merge Worktrees
+### Post-Implementation Verification
 
 After all supervisors complete successfully:
-1. Merge worktree branches in dependency order (foundation first, then parallel streams)
-2. Resolve any conflicts (should be none if file ownership was enforced)
-3. Clean up worktrees
+1. Run `git status --short` to confirm all expected files show as modified/untracked
+2. Spot-check key files (especially Foundation changes) by reading them
+3. If any changes are missing, investigate and re-apply before proceeding
+
+> **Why no worktree merging:** Sub-agents work directly in the parent workspace, so no merge step
+> is needed. File ownership prevents conflicts between parallel streams. This is simpler and more
+> reliable than isolated worktrees, which require changes to be committed before they can be shared
+> across worktrees. See the "Isolation model" note below for details.
+
+### Isolation Model: File Ownership, Not Git Worktrees
+
+This pipeline uses **file ownership** rather than **git worktree isolation** to prevent conflicts:
+
+- Each work stream declares the exact files it will create or modify
+- No two streams share files (enforced by the plan)
+- Sub-agents are told their file ownership list and must not modify files outside it
+- The orchestrator verifies compliance in supervisor reports
+
+This is preferred over git worktrees because:
+1. **Uncommitted changes are invisible across worktrees.** Worktrees share a repo but not working-tree state. Foundation stream output (uncommitted edits) would not be visible to downstream streams in separate worktrees unless committed first.
+2. **No merge-back step needed.** All changes land directly in the working tree. No branch management, no merge conflicts, no data loss from failed merge-backs.
+3. **Simpler mental model.** One working tree, one set of files, one git status to check.
 
 ## PHASE 5 -- Verify
 

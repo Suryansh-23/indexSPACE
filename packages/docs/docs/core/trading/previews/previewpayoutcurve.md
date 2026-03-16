@@ -5,7 +5,7 @@ sidebar_position: 1
 
 # previewPayoutCurve
 
-**`previewPayoutCurve(client, marketId, belief, collateral, numOutcomes?)`**
+**`previewPayoutCurve(client, marketId, belief, collateral, numBuckets, numOutcomes?, options?)`**
 
 **Layer:** L2. Given a hypothetical belief and collateral, previews what the settlement payout would be for every possible outcome. This is how the SDK shows "if the market resolves at X, you'd get Y" curves.
 
@@ -15,7 +15,9 @@ async function previewPayoutCurve(
   marketId: string | number,
   belief: BeliefVector,
   collateral: number,
+  numBuckets: number,
   numOutcomes?: number,
+  options?: { signal?: AbortSignal },
 ): Promise<PayoutCurve>
 ```
 
@@ -27,6 +29,7 @@ async function previewPayoutCurve(
 | `marketId`    | `string \| number` | The market to preview against.                                                  |
 | `belief`      | `BeliefVector`     | The belief vector to simulate. Same format as what you'd pass to `buy`.         |
 | `collateral`  | `number`           | The collateral amount to simulate.                                              |
+| `numBuckets`  | `number`           | Number of outcome buckets (K from `market.config.K`). Must equal `belief.length - 1`. |
 | `numOutcomes` | `number?`          | Number of outcome points to sample. Defaults to server-side default if omitted. |
 
 **Returns `PayoutCurve`:**
@@ -50,7 +53,7 @@ interface PayoutCurve {
 
 ```typescript
 const belief = generateGaussian(75, 5, K, L, H);
-const curve = await previewPayoutCurve(ctx.client, marketId, belief, 100);
+const curve = await previewPayoutCurve(ctx.client, marketId, belief, 100, K);
 
 console.log(`Best case: $${curve.maxPayout} if outcome = ${curve.maxPayoutOutcome}`);
 console.log(`Worst case: $${Math.min(...curve.previews.map(p => p.payout))}`);

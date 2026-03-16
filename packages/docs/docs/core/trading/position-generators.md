@@ -190,14 +190,14 @@ The belief vector is the input to two critical operations:
 ```typescript
 ctx.setPreviewBelief(belief);  // shows dashed overlay on consensus chart
 
-const payout = await previewPayoutCurve(client, marketId, belief, collateral);
+const payout = await previewPayoutCurve(client, marketId, belief, collateral, K);
 // payout.outcomes[i] = { outcome, payout, profitLoss }
 ```
 
 **2. Execution.** Pass to `buy()` to open a real position:
 
 ```typescript
-const result = await buy(client, marketId, belief, collateral);
+const result = await buy(client, marketId, belief, collateral, K);
 // result = { positionId, belief, claims, collateral }
 ```
 

@@ -38,12 +38,19 @@ Break your work stream into a detailed, ordered action list. For each action:
 
 Dispatch a single implementation sub-agent using the Agent tool with:
 - `subagent_type: "general-purpose"`
-- `isolation: "worktree"` -- the agent works in an isolated git worktree
+- **Do NOT use `isolation: "worktree"`** -- the sub-agent works directly in the current workspace
 - A detailed prompt containing:
   - The action plan from Step 2
   - The file ownership list (agent MUST NOT modify files outside this list)
   - The pattern reference content (paste the actual pattern code, don't just reference file paths)
   - Explicit instructions to use Read/Grep/Glob tools instead of Bash for file operations
+
+> **Why no worktree isolation:** File ownership enforcement already prevents cross-stream conflicts,
+> making worktree isolation redundant for this pipeline. Direct execution in the parent workspace
+> ensures that Foundation stream changes are immediately visible to downstream streams without
+> requiring commits or merge-back steps. Isolated worktrees branch from the last COMMIT, so
+> uncommitted working-tree changes (which is how all stream output lands) are invisible to agents
+> in new worktrees. This caused data loss in practice -- see the note in SKILL.md Phase 4.
 
 The implementation agent prompt MUST start with:
 > "IMPORTANT: For all file reading use the Read tool, for all content searching use the Grep tool, for all file finding use the Glob tool. Do NOT use Bash commands for these operations (no cat, grep, find, head, tail, echo). Only use the Bash tool for commands that truly require shell execution: git commands, npx vitest, npx vite build, and mkdir."
@@ -97,9 +104,9 @@ Return a structured report containing ONLY:
 ### Doc Updates Needed
 - [What the orchestrator needs to update in the living docs based on this work stream]
 
-### Worktree
-- Branch: [branch name from the worktree]
-- Path: [worktree path]
+### Verification
+- Tests: [pass/fail summary]
+- Files modified: [count, confirming ownership compliance]
 ```
 
 ## Critical Rules

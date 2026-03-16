@@ -55,6 +55,9 @@ export { sell } from './transactions/sell.js';
 export { previewSell } from './previews/previewSell.js';
 export { previewPayoutCurve } from './previews/previewPayoutCurve.js';
 
+// Validation
+export { validateBeliefVector } from './validation.js';
+
 // Auth
 export { loginUser, signupUser, fetchCurrentUser, validateUsername, passwordlessLoginUser, silentReAuth } from './auth/auth.js';
 

@@ -518,11 +518,11 @@ BeliefVector → ctx.setPreviewBelief(belief)     [instant, on every input chang
               → evaluateDensityCurve(belief, L, H, numPoints)  [piecewise-linear interpolation]
                 → rendered as dashed yellow area on chart (type="linear")
 
-BeliefVector + collateral → previewPayoutCurve(client, marketId, belief, collateral)  [debounced 500ms]
+BeliefVector + collateral → previewPayoutCurve(client, marketId, belief, collateral, K)  [debounced 500ms]
                           → ctx.setPreviewPayout(payoutCurve)
                             → ConsensusChart shows payout in tooltip
 
-BeliefVector + collateral + prediction → buy(client, marketId, belief, collateral, { prediction })
+BeliefVector + collateral + prediction → buy(client, marketId, belief, collateral, K, { prediction })
                                        → ctx.invalidate(marketId)  [refreshes all hooks]
 ```
 
@@ -618,12 +618,15 @@ All query functions accept an optional trailing `options?: { signal?: AbortSigna
 - `generateEvenTicks(domain, count)` → `number[]` (evenly spaced tick values)
 
 ### Transactions
-- `buy(client, marketId, belief, collateral, options?)` -- wraps `POST /api/market/trading/buy/{marketId}` → BuyResult
+- `buy(client, marketId, belief, collateral, numBuckets, options?)` -- wraps `POST /api/market/trading/buy/{marketId}` → BuyResult
 - `sell(client, positionId, marketId)` -- wraps `POST /api/market/trading/sell/{marketId}/{positionId}` → SellResult
 
 ### Previews
-- `previewPayoutCurve(client, marketId, belief, collateral, numOutcomes?, options?)` -- wraps `POST /api/views/preview/payout/{marketId}` → PayoutCurve
+- `previewPayoutCurve(client, marketId, belief, collateral, numBuckets, numOutcomes?, options?)` -- wraps `POST /api/views/preview/payout/{marketId}` → PayoutCurve
 - `previewSell(client, positionId, marketId, options?)` -- wraps `GET /api/views/preview/sell/{marketId}/{positionId}` → PreviewSellResult
+
+### Validation (L0 / Pure Math)
+- `validateBeliefVector(vector, K)` -- throws descriptive error if belief vector is invalid (length, finite, non-negative, sum-to-1)
 
 ---
 
@@ -675,7 +678,8 @@ setState(result);
 
 ### After Mutations
 ```typescript
-await buy(ctx.client, marketId, belief, collateral);
+const { K } = market.config;
+await buy(ctx.client, marketId, belief, collateral, K);
 ctx.invalidate(marketId);  // Triggers useMarket/usePositions refetch
 onSuccess?.(result);       // Notify parent
 ```
@@ -932,7 +936,7 @@ useEffect(() => {
   const collateral = parseFloat(amount);
   if (!belief || isNaN(collateral) || collateral <= 0) { setPotentialPayout(null); return; }
   debounceRef.current = setTimeout(async () => {
-    const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
+    const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral, K);
     if (!mountedRef.current) return;
     setPotentialPayout(result.maxPayout);
     ctx.setPreviewPayout(result);
@@ -943,7 +947,7 @@ useEffect(() => {
 
 **Phase 3 — Trade submission:**
 ```typescript
-const result = await buy(ctx.client, marketId, belief, collateral, { prediction });
+const result = await buy(ctx.client, marketId, belief, collateral, K, { prediction });
 resetToDefaults();
 ctx.setPreviewBelief(null);
 ctx.setPreviewPayout(null);

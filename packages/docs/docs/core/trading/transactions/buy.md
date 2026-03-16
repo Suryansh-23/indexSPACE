@@ -5,7 +5,7 @@ sidebar_position: 1
 
 # Buy
 
-**`buy(client, marketId, belief, collateral, options?)`**
+**`buy(client, marketId, belief, collateral, numBuckets, options?)`**
 
 **Layer:** L1. Opens a new position by posting a belief vector and collateral amount to the market.
 
@@ -15,6 +15,7 @@ async function buy(
   marketId: string | number,
   belief: BeliefVector,
   collateral: number,
+  numBuckets: number,
   options?: { prediction?: number },
 ): Promise<BuyResult>
 ```
@@ -27,6 +28,7 @@ async function buy(
 | `marketId`           | `string \| number` | The market to trade in.                                                                                                                        |
 | `belief`             | `BeliefVector`     | The probability distribution to trade on. Generated with `generateBelief` or any convenience generator.                                        |
 | `collateral`         | `number`           | Amount of currency to put up. Minimum is typically 1.                                                                                          |
+| `numBuckets`         | `number`           | Number of outcome buckets (K from `market.config.K`). Must equal `belief.length - 1`.                                                          |
 | `options.prediction` | `number?`          | Optional center-of-mass hint. Accepted for backward compatibility but no longer sent to the server. |
 
 **Returns `BuyResult`:**
@@ -54,7 +56,7 @@ const market = await queryMarketState(client, 42);
 const { K, L, H } = market.config;
 const belief = generateGaussian(75, 5, K, L, H);
 
-const result = await buy(client, 42, belief, 100);
+const result = await buy(client, 42, belief, 100, K);
 console.log(`Opened position ${result.positionId}, claims: ${result.claims}`);
 ```
 
@@ -66,7 +68,7 @@ const { market } = useMarket(marketId);
 const { K, L, H } = market.config;
 
 const belief = generateGaussian(75, 5, K, L, H);
-const result = await buy(ctx.client, marketId, belief, 100, { prediction: 75 });
+const result = await buy(ctx.client, marketId, belief, 100, K, { prediction: 75 });
 
 // After a successful buy, invalidate so other components (charts, position tables) refetch
 ctx.invalidate(marketId);
