@@ -287,6 +287,23 @@ client.setToken(token);
 console.log(`Account created: ${user.username}`);
 ```
 
+### Validating Belief Vectors
+
+**`validateBeliefVector(vector, K)`** -- Pure client-side validation (no network call). Throws a descriptive error if the belief vector is invalid. Checks: length matches K+1, all elements finite, all elements non-negative, elements sum to 1.0 within tolerance (1e-6).
+
+```typescript
+import { validateBeliefVector } from '@functionspace/core';
+
+const { K } = market.config;
+const belief = generateGaussian(75, 5, K, L, H);
+
+// Validates the belief vector before submission -- throws on invalid input
+validateBeliefVector(belief, K);
+
+// Safe to pass to buy() or previewPayoutCurve()
+const result = await buy(client, marketId, belief, 100, K);
+```
+
 ---
 
 ## 4. Reading Market Data
@@ -485,13 +502,13 @@ All L2 generators (`generateGaussian`, `generateRange`, `generateDip`, `generate
 
 ### Step 3: Execute the Trade
 
-**`buy(client, marketId, belief, collateral, options?)`** -- Opens a new position. Returns `BuyResult`.
+**`buy(client, marketId, belief, collateral, numBuckets, options?)`** -- Opens a new position. Returns `BuyResult`.
 
 ```typescript
 import { buy } from '@functionspace/core';
 import type { BuyResult } from '@functionspace/core';
 
-const result: BuyResult = await buy(client, 42, belief, 100, { prediction: 75 });
+const result: BuyResult = await buy(client, 42, belief, 100, K, { prediction: 75 });
 // result = { positionId: string | number, belief: number[], claims: number, collateral: number, positionType?: string, positionParams?: Record<string, unknown> }
 console.log(`Opened position ${result.positionId}, claims: ${result.claims}`);
 ```
@@ -504,6 +521,7 @@ Parameters:
 | `marketId` | `string \| number` | Target market. |
 | `belief` | `BeliefVector` | Normalized probability vector from any generator. |
 | `collateral` | `number` | Amount of currency to commit. |
+| `numBuckets` | `number` | Number of outcome buckets (K from `market.config.K`). Must equal `belief.length - 1`. |
 | `options.prediction` | `number?` | Optional center-of-mass hint. Accepted for backward compatibility but no longer sent to the server. |
 
 **`sell(client, positionId, marketId)`** -- Closes an open position. Returns `SellResult`.
@@ -521,13 +539,13 @@ console.log(`Got back ${result.collateralReturned}`);
 
 Before committing, use previews to preview outcomes.
 
-**`previewPayoutCurve(client, marketId, belief, collateral, numOutcomes?)`** -- Previews payouts across all possible outcomes without executing a trade. Returns `PayoutCurve`.
+**`previewPayoutCurve(client, marketId, belief, collateral, numBuckets, numOutcomes?, options?)`** -- Previews payouts across all possible outcomes without executing a trade. Returns `PayoutCurve`.
 
 ```typescript
 import { previewPayoutCurve } from '@functionspace/core';
 import type { PayoutCurve } from '@functionspace/core';
 
-const curve: PayoutCurve = await previewPayoutCurve(client, 42, belief, 100);
+const curve: PayoutCurve = await previewPayoutCurve(client, 42, belief, 100, K);
 console.log(`Best case: $${curve.maxPayout} if outcome = ${curve.maxPayoutOutcome}`);
 console.log(`Worst case: $${Math.min(...curve.previews.map(p => p.payout))}`);
 // curve.previews = [{ outcome, payout, profitLoss }, ...]
@@ -575,11 +593,11 @@ async function main() {
   const belief = generateGaussian(75, 5, K, L, H);
 
   // 4. Preview the payout before committing
-  const preview = await previewPayoutCurve(client, 42, belief, 100);
+  const preview = await previewPayoutCurve(client, 42, belief, 100, K);
   console.log(`Best payout: $${preview.maxPayout.toFixed(2)} at outcome ${preview.maxPayoutOutcome}`);
 
   // 5. Execute the trade
-  const result = await buy(client, 42, belief, 100, { prediction: 75 });
+  const result = await buy(client, 42, belief, 100, K, { prediction: 75 });
   console.log(`Position opened: #${result.positionId}, claims: ${result.claims}`);
 
   // 6. Verify the position
@@ -769,7 +787,7 @@ Flat alphabetical listing of every public type in the `@functionspace/core` pack
 type BeliefVector = number[];
 ```
 
-**Invariants:** A valid belief vector has length `K + 1`, where `K` is from `market.config.K`. All elements are non-negative. The elements sum to exactly 1 (normalized probability distribution). These invariants are enforced by the `generate*` builder functions.
+**Invariants:** A valid belief vector has length `K + 1`, where `K` is from `market.config.K`. All elements are non-negative. The elements sum to exactly 1 (normalized probability distribution). These invariants are enforced by the `generate*` builder functions and can be checked explicitly with `validateBeliefVector(vector, K)`.
 
 **Usage:** Passed to `buy()` as the trader's belief about outcome probabilities.
 

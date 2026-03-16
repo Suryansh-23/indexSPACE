@@ -398,6 +398,14 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('ZoomParams');
       expect(indexContent).toContain('PanParams');
     });
+
+    it('exports validateBeliefVector from core', () => {
+      const coreIndex = fs.readFileSync(
+        path.join(__dirname, '../packages/core/src/index.ts'),
+        'utf-8'
+      );
+      expect(coreIndex).toContain('validateBeliefVector');
+    });
   });
 
   describe('Component Props Patterns', () => {

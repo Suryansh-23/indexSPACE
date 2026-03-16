@@ -106,7 +106,7 @@ export function CustomShapeEditor({
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const result = await previewPayoutCurve(ctx.client, marketId, shape.pVector!, collateral);
+        const result = await previewPayoutCurve(ctx.client, marketId, shape.pVector!, collateral, market.config.K);
         if (!mountedRef.current) return;
         setPotentialPayout(result.maxPayout);
         ctx.setPreviewPayout(result);
@@ -280,7 +280,7 @@ export function CustomShapeEditor({
     setError(null);
 
     try {
-      const result = await buy(ctx.client, marketId, shape.pVector, collateral, {
+      const result = await buy(ctx.client, marketId, shape.pVector, collateral, market.config.K, {
         prediction: shape.prediction ?? undefined,
       });
 

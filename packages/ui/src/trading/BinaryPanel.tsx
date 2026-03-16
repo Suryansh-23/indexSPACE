@@ -143,7 +143,7 @@ export function BinaryPanel({
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
+        const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral, market.config.K);
         if (!mountedRef.current) return;
         ctx.setPreviewPayout(result);
       } catch {
@@ -167,7 +167,7 @@ export function BinaryPanel({
     setError(null);
 
     try {
-      const result = await buy(ctx.client, marketId, belief, collateral, {
+      const result = await buy(ctx.client, marketId, belief, collateral, market.config.K, {
         prediction: resolvedX!,
       });
 

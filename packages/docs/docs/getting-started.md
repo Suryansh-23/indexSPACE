@@ -94,7 +94,8 @@ const { user, token } = await loginUser(client, 'trader1', 'password');
 client.setToken(token);
 
 // Now authenticated -- transaction functions will include the token
-await buy(client, marketId, belief, collateral);
+const { K } = market.config;
+await buy(client, marketId, belief, collateral, K);
 ```
 
 For passwordless authentication, use `passwordlessLoginUser` which handles login or auto-signup with just a username. See the [Auth](/core/auth) docs for details.

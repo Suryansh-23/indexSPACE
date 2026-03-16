@@ -122,6 +122,7 @@ cd packages/docs && npx docusaurus build  # Docs site build verification (requir
 | `tests/cache.test.ts` | QueryCache class unit tests | Changing cache class, types, or lifecycle behavior |
 | `tests/client-signal.test.ts` | FSClient signal forwarding and request() refactor | Changing FSClient.get(), FSClient.post(), or request() method |
 | `tests/mappings.test.ts` | Mocked-fetch mapping contract tests (raw API shape to SDK type, POST body assertions) | Changing any mapping function, API endpoint shapes, or POST request bodies |
+| `tests/validation.test.ts` | Belief vector validation (validateBeliefVector) | Changing validation logic or adding new validation functions |
 | `tests/components.test.tsx` | Widget smoke tests (provider guard, loading, error, primary action, cleanup) | Adding or modifying UI widgets -- see [Widget Component Testing Guide](../Docs/widget-component-testing-guide.md) |
 
 **When adding UI widgets:** Add 5 smoke tests to `components.test.tsx` (provider guard, loading state, error state, primary action, unmount cleanup).

@@ -942,7 +942,7 @@ describe('buy', () => {
     });
 
     const client = makeMockClientWithAuth();
-    await buy(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, { prediction: 50 });
+    await buy(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5, { prediction: 50 });
 
     const [, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(init.body);
@@ -960,7 +960,7 @@ describe('buy', () => {
     });
 
     const client = makeMockClientWithAuth();
-    await buy(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, { prediction: 50 });
+    await buy(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5, { prediction: 50 });
 
     const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toContain('/api/market/trading/buy/123');
@@ -975,7 +975,7 @@ describe('buy', () => {
     });
 
     const client = makeMockClientWithAuth();
-    const result = await buy(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, { prediction: 50 });
+    const result = await buy(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5, { prediction: 50 });
 
     expect(result).toEqual(expectedBuyResult);
   });
@@ -987,7 +987,7 @@ describe('buy', () => {
     });
 
     const client = makeMockClientWithAuth();
-    await buy(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10);
+    await buy(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5);
 
     const [, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(init.body);
@@ -1015,7 +1015,7 @@ describe('buy', () => {
     });
 
     const client = makeMockClientWithAuth();
-    const result = await buy(client, '123', [0.5, 0.5], 10);
+    const result = await buy(client, '123', [0.5, 0.5], 10, 1);
 
     expect(result.positionId).toBe(99);
     expect(result.positionType).toBeUndefined();
@@ -1029,7 +1029,7 @@ describe('buy', () => {
     });
 
     const client = makeMockClientWithAuth();
-    await expect(buy(client, '123', [0.5, 0.5], 10)).rejects.toThrow(
+    await expect(buy(client, '123', [0.5, 0.5], 10, 1)).rejects.toThrow(
       'Missing position in buy response',
     );
   });
@@ -1223,7 +1223,7 @@ describe('previewPayoutCurve', () => {
     });
 
     const client = makeMockClientWithAuth();
-    await previewPayoutCurve(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 100);
+    await previewPayoutCurve(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5, 100);
 
     const [, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(init.body);
@@ -1242,7 +1242,7 @@ describe('previewPayoutCurve', () => {
     });
 
     const client = makeMockClientWithAuth();
-    await previewPayoutCurve(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10);
+    await previewPayoutCurve(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5);
 
     const [, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(init.body);
@@ -1261,7 +1261,7 @@ describe('previewPayoutCurve', () => {
     });
 
     const client = makeMockClientWithAuth();
-    await previewPayoutCurve(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 100);
+    await previewPayoutCurve(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5, 100);
 
     const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toContain('/api/views/preview/payout/123');
@@ -1276,7 +1276,7 @@ describe('previewPayoutCurve', () => {
     });
 
     const client = makeMockClientWithAuth();
-    const result = await previewPayoutCurve(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 100);
+    const result = await previewPayoutCurve(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5, 100);
 
     expect(result).toEqual(expectedPayoutCurve);
   });
@@ -1289,7 +1289,7 @@ describe('previewPayoutCurve', () => {
 
     const client = makeMockClientWithAuth();
     await expect(
-      previewPayoutCurve(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 100),
+      previewPayoutCurve(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5, 100),
     ).rejects.toThrow('Missing max_payout in payout curve response');
   });
 
@@ -1301,7 +1301,7 @@ describe('previewPayoutCurve', () => {
 
     const client = makeMockClientWithAuth();
     await expect(
-      previewPayoutCurve(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 100),
+      previewPayoutCurve(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5, 100),
     ).rejects.toThrow('Missing max_payout_outcome in payout curve response');
   });
 
@@ -1313,7 +1313,7 @@ describe('previewPayoutCurve', () => {
 
     const client = makeMockClientWithAuth();
     await expect(
-      previewPayoutCurve(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 100),
+      previewPayoutCurve(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5, 100),
     ).rejects.toThrow('Missing collateral in payout curve response');
   });
 });
@@ -1798,5 +1798,55 @@ describe('queryMarketHistory (N5)', () => {
     expect(url).toContain('/api/views/history/123');
     expect(url).not.toContain('limit=');
     expect(url).not.toContain('offset=');
+  });
+});
+
+// -- Validation integration tests --
+
+describe('buy validation integration', () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it('rejects wrong-length belief vector before fetch is called', async () => {
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock;
+
+    const client = makeMockClientWithAuth();
+    await expect(
+      buy(client, '123', [0.5, 0.5], 10, 5),
+    ).rejects.toThrow('length 2');
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('previewPayoutCurve validation integration', () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it('rejects wrong-length belief vector before fetch is called', async () => {
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock;
+
+    const client = makeMockClientWithAuth();
+    await expect(
+      previewPayoutCurve(client, '123', [0.5, 0.5], 10, 5, 100),
+    ).rejects.toThrow('length 2');
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

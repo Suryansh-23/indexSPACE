@@ -1,5 +1,6 @@
 import type { FSClient } from '../client.js';
 import type { BeliefVector, BuyResult } from '../types.js';
+import { validateBeliefVector } from '../validation.js';
 
 /**
  * Create a new position.
@@ -14,8 +15,11 @@ export async function buy(
   marketId: string | number,
   belief: BeliefVector,
   collateral: number,
+  numBuckets: number,
   options?: { prediction?: number },
 ): Promise<BuyResult> {
+  validateBeliefVector(belief, numBuckets);
+
   const body: Record<string, unknown> = {
     collateral,
     position_type: 'raw',

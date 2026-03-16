@@ -2492,7 +2492,7 @@ ctx.setPreviewBelief(belief);
 Call `previewPayoutCurve` to compute what the payout would look like across all possible outcomes. Write the result to context so charts can display payout information in tooltips.
 
 ```typescript
-const payout = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
+const payout = await previewPayoutCurve(ctx.client, marketId, belief, collateral, K);
 ctx.setPreviewPayout(payout);
 ```
 
@@ -2500,14 +2500,14 @@ ctx.setPreviewPayout(payout);
 Execute the trade, clear the preview state, invalidate caches so all data hooks refetch, and refresh the user profile to update the wallet balance.
 
 ```typescript
-const result = await buy(ctx.client, marketId, belief, collateral, { prediction });
+const result = await buy(ctx.client, marketId, belief, collateral, K, { prediction });
 ctx.setPreviewBelief(null);
 ctx.setPreviewPayout(null);
 ctx.invalidate(marketId);
 await ctx.refreshUser();
 ```
 
-#### `buy(client, marketId, belief, collateral, options?)`
+#### `buy(client, marketId, belief, collateral, numBuckets, options?)`
 
 Opens a new position. Imported from `@functionspace/core`.
 
@@ -2519,6 +2519,7 @@ async function buy(
   marketId: string | number,
   belief: BeliefVector,
   collateral: number,
+  numBuckets: number,
   options?: { prediction?: number },
 ): Promise<BuyResult>
 ```
@@ -2531,6 +2532,7 @@ async function buy(
 | `marketId` | `string \| number` | The market to trade in |
 | `belief` | `BeliefVector` | The probability distribution to trade on |
 | `collateral` | `number` | Amount of currency to put up (minimum is typically 1) |
+| `numBuckets` | `number` | Number of outcome buckets (K from `market.config.K`). Must equal `belief.length - 1`. |
 | `options.prediction` | `number` | Optional center-of-mass hint. Accepted for backward compatibility but no longer sent to the server. |
 
 **Returns `BuyResult`:**
@@ -2624,7 +2626,7 @@ function CustomTradeForm({ marketId }: { marketId: string }) {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       try {
-        const curve = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
+        const curve = await previewPayoutCurve(ctx.client, marketId, belief, collateral, K);
         setPayout(curve);
         ctx.setPreviewPayout(curve);
       } catch (err) {
@@ -2657,7 +2659,7 @@ function CustomTradeForm({ marketId }: { marketId: string }) {
       const { K, L, H } = market.config;
       const belief = generateGaussian(center, spread, K, L, H);
 
-      const result = await buy(ctx.client, marketId, belief, collateral, {
+      const result = await buy(ctx.client, marketId, belief, collateral, K, {
         prediction: center,
       });
 
@@ -2752,7 +2754,7 @@ export default CustomTradeForm;
 
 Previews are read-only API calls that preview what would happen without executing a trade. They are the backbone of the debounced preview phase in the three-phase trade pattern.
 
-#### `previewPayoutCurve(client, marketId, belief, collateral, numOutcomes?)`
+#### `previewPayoutCurve(client, marketId, belief, collateral, numBuckets, numOutcomes?, options?)`
 
 Previews what the settlement payout would be for every possible outcome given a hypothetical belief and collateral amount.
 
@@ -2764,7 +2766,9 @@ async function previewPayoutCurve(
   marketId: string | number,
   belief: BeliefVector,
   collateral: number,
+  numBuckets: number,
   numOutcomes?: number,
+  options?: { signal?: AbortSignal },
 ): Promise<PayoutCurve>
 ```
 
@@ -2776,6 +2780,7 @@ async function previewPayoutCurve(
 | `marketId` | `string \| number` | -- | The market to preview against |
 | `belief` | `BeliefVector` | -- | The belief vector to simulate |
 | `collateral` | `number` | -- | The collateral amount to simulate |
+| `numBuckets` | `number` | -- | Number of outcome buckets (K from `market.config.K`). Must equal `belief.length - 1`. |
 | `numOutcomes` | `number` | Server default | Number of outcome points to sample |
 
 **Returns `PayoutCurve`:**
@@ -2794,7 +2799,7 @@ import { generateGaussian, previewPayoutCurve } from '@functionspace/core';
 
 // Inside a useEffect, debounced 500ms after input change:
 const belief = generateGaussian(center, spread, K, L, H);
-const curve = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
+const curve = await previewPayoutCurve(ctx.client, marketId, belief, collateral, K);
 
 // Write to context so any mounted chart renders the payout overlay
 ctx.setPreviewPayout(curve);
@@ -3158,6 +3163,25 @@ client.setToken(token);
 console.log(`Account created: ${user.username}`);
 ```
 
+#### Validating Belief Vectors
+
+**`validateBeliefVector(vector, K)`** -- Pure client-side validation (no network call). Throws a descriptive error if the belief vector is invalid. Checks length matches K+1, all elements are finite, all elements are non-negative, and elements sum to 1.0 within tolerance (1e-6).
+
+```typescript
+import { validateBeliefVector } from '@functionspace/core';
+
+const { K } = market.config;
+const belief = generateGaussian(75, 5, K, L, H);
+
+// Validates the belief vector before submission -- throws on invalid input
+validateBeliefVector(belief, K);
+
+// Safe to pass to buy() or previewPayoutCurve()
+const result = await buy(client, marketId, belief, 100, K);
+```
+
+Use `validateBeliefVector` before calling `buy()` or `previewPayoutCurve()` to catch malformed belief vectors early with clear error messages. The `generate*` functions produce valid vectors, but custom or manually constructed vectors should be validated.
+
 ---
 
 ### 6.2 Reading Market Data
@@ -3359,13 +3383,13 @@ All L2 generators (`generateGaussian`, `generateRange`, `generateDip`, `generate
 
 #### Step 3: Execute the Trade
 
-**`buy(client, marketId, belief, collateral, options?)`** -- Opens a new position. Returns `BuyResult`.
+**`buy(client, marketId, belief, collateral, numBuckets, options?)`** -- Opens a new position. Returns `BuyResult`.
 
 ```typescript
 import { buy } from '@functionspace/core';
 import type { BuyResult } from '@functionspace/core';
 
-const result: BuyResult = await buy(client, 42, belief, 100, { prediction: 75 });
+const result: BuyResult = await buy(client, 42, belief, 100, K, { prediction: 75 });
 // result = { positionId: string | number, belief: number[], claims: number, collateral: number, positionType?: string, positionParams?: Record<string, unknown> }
 console.log(`Opened position ${result.positionId}, claims: ${result.claims}`);
 ```
@@ -3378,6 +3402,7 @@ Parameters:
 | `marketId` | `string \| number` | Target market. |
 | `belief` | `BeliefVector` | Normalized probability vector from any generator. |
 | `collateral` | `number` | Amount of currency to commit. |
+| `numBuckets` | `number` | Number of outcome buckets (K from `market.config.K`). Must equal `belief.length - 1`. |
 | `options.prediction` | `number?` | Optional center-of-mass hint. Accepted for backward compatibility but no longer sent to the server. |
 
 **`sell(client, positionId, marketId)`** -- Closes an open position. Returns `SellResult`.
@@ -3395,13 +3420,13 @@ console.log(`Got back ${result.collateralReturned}`);
 
 Before committing, use previews to preview outcomes.
 
-**`previewPayoutCurve(client, marketId, belief, collateral, numOutcomes?)`** -- Previews payouts across all possible outcomes without executing a trade. Returns `PayoutCurve`.
+**`previewPayoutCurve(client, marketId, belief, collateral, numBuckets, numOutcomes?, options?)`** -- Previews payouts across all possible outcomes without executing a trade. Returns `PayoutCurve`.
 
 ```typescript
 import { previewPayoutCurve } from '@functionspace/core';
 import type { PayoutCurve } from '@functionspace/core';
 
-const curve: PayoutCurve = await previewPayoutCurve(client, 42, belief, 100);
+const curve: PayoutCurve = await previewPayoutCurve(client, 42, belief, 100, K);
 console.log(`Best case: $${curve.maxPayout} if outcome = ${curve.maxPayoutOutcome}`);
 console.log(`Worst case: $${Math.min(...curve.previews.map(p => p.payout))}`);
 // curve.previews = [{ outcome, payout, profitLoss }, ...]
@@ -3449,11 +3474,11 @@ async function main() {
   const belief = generateGaussian(75, 5, K, L, H);
 
   // 4. Preview the payout before committing
-  const preview = await previewPayoutCurve(client, 42, belief, 100);
+  const preview = await previewPayoutCurve(client, 42, belief, 100, K);
   console.log(`Best payout: $${preview.maxPayout.toFixed(2)} at outcome ${preview.maxPayoutOutcome}`);
 
   // 5. Execute the trade
-  const result = await buy(client, 42, belief, 100, { prediction: 75 });
+  const result = await buy(client, 42, belief, 100, K, { prediction: 75 });
   console.log(`Position opened: #${result.positionId}, claims: ${result.claims}`);
 
   // 6. Verify the position
@@ -3940,6 +3965,7 @@ function CustomTradeForm() {
           MARKET_ID,
           belief,
           collateral,
+          K,
         );
         setPayout(previewed);
         ctx.setPreviewPayout(previewed);
@@ -3976,6 +4002,7 @@ function CustomTradeForm() {
         MARKET_ID,
         belief,
         collateral,
+        K,
       );
       setStatus(`Position #${result.positionId} opened. Claims: ${result.claims.toFixed(2)}`);
 
@@ -4137,7 +4164,7 @@ export default function App() {
 
 **Inner component pattern**: `CustomTradeForm` is a separate component rendered inside the `FunctionSpaceProvider`. Hooks from `@functionspace/react` must be called from a component that is a child of the provider. Calling them in the same component that renders the provider will throw.
 
-**Three-phase trade pattern**: (1) Build the belief vector with `generateGaussian` and set `ctx.setPreviewBelief(belief)` immediately for instant chart overlay feedback. (2) Debounce the `previewPayoutCurve` call by 500ms and set `ctx.setPreviewPayout(previewed)` to show payout preview on the chart. (3) On user confirmation, call `buy()` with the client from context, then clear previews and call `ctx.invalidate(MARKET_ID)` plus `ctx.refreshUser()`.
+**Three-phase trade pattern**: (1) Build the belief vector with `generateGaussian` and set `ctx.setPreviewBelief(belief)` immediately for instant chart overlay feedback. (2) Debounce the `previewPayoutCurve` call (passing `K` as `numBuckets`) by 500ms and set `ctx.setPreviewPayout(previewed)` to show payout preview on the chart. (3) On user confirmation, call `buy()` with the client from context (passing `K` as `numBuckets`), then clear previews and call `ctx.invalidate(MARKET_ID)` plus `ctx.refreshUser()`.
 
 **Market parameters**: The `K`, `L`, and `H` values are always destructured from `market.config`. Never hardcode these values -- they are specific to each market.
 

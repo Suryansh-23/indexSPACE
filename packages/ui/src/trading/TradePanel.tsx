@@ -111,7 +111,7 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy }: T
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
+        const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral, market.config.K);
         if (!mountedRef.current) return;
         setPotentialPayout(result.maxPayout);
         ctx.setPreviewPayout(result);
@@ -141,7 +141,7 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy }: T
         ? prediction!
         : (rangeValues![0] + rangeValues![1]) / 2;
 
-      const result = await buy(ctx.client, marketId, belief, collateral, {
+      const result = await buy(ctx.client, marketId, belief, collateral, market.config.K, {
         prediction: predValue,
       });
 

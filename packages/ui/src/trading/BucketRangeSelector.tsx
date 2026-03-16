@@ -166,7 +166,7 @@ export function BucketRangeSelector({
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
+        const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral, market.config.K);
         if (!mountedRef.current) return;
         setPotentialPayout(result.maxPayout);
         ctx.setPreviewPayout(result);
@@ -201,7 +201,7 @@ export function BucketRangeSelector({
       ];
       const prediction = allRanges.reduce((sum, r) => sum + (r.min + r.max) / 2, 0) / allRanges.length;
 
-      const result = await buy(ctx.client, marketId, belief, collateral, {
+      const result = await buy(ctx.client, marketId, belief, collateral, market.config.K, {
         prediction,
       });
 

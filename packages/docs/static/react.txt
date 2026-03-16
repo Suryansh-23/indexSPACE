@@ -856,21 +856,21 @@ ctx.setPreviewBelief(belief);
 **Phase 2: Preview payout (debounced, 500ms after last input change).**
 
 ```typescript
-const payout = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
+const payout = await previewPayoutCurve(ctx.client, marketId, belief, collateral, K);
 ctx.setPreviewPayout(payout);
 ```
 
 **Phase 3: Submit trade (on user confirmation).**
 
 ```typescript
-const result = await buy(ctx.client, marketId, belief, collateral, { prediction });
+const result = await buy(ctx.client, marketId, belief, collateral, K, { prediction });
 ctx.setPreviewBelief(null);
 ctx.setPreviewPayout(null);
 ctx.invalidate(marketId);
 await ctx.refreshUser();
 ```
 
-### `buy(client, marketId, belief, collateral, options?)`
+### `buy(client, marketId, belief, collateral, numBuckets, options?)`
 
 Opens a new position. Imported from `@functionspace/core`.
 
@@ -882,6 +882,7 @@ async function buy(
   marketId: string | number,
   belief: BeliefVector,
   collateral: number,
+  numBuckets: number,
   options?: { prediction?: number },
 ): Promise<BuyResult>
 ```
@@ -946,7 +947,7 @@ function CustomTradeForm({ marketId }: { marketId: string }) {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       try {
-        const curve = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
+        const curve = await previewPayoutCurve(ctx.client, marketId, belief, collateral, K);
         setPayout(curve);
         ctx.setPreviewPayout(curve);
       } catch (err) {
@@ -978,7 +979,7 @@ function CustomTradeForm({ marketId }: { marketId: string }) {
       const { K, L, H } = market.config;
       const belief = generateGaussian(center, spread, K, L, H);
 
-      const result = await buy(ctx.client, marketId, belief, collateral, {
+      const result = await buy(ctx.client, marketId, belief, collateral, K, {
         prediction: center,
       });
 
@@ -1044,14 +1045,14 @@ export default CustomTradeForm;
 
 Previews are read-only API calls that preview what would happen without executing a trade.
 
-### `previewPayoutCurve(client, marketId, belief, collateral, numOutcomes?)`
+### `previewPayoutCurve(client, marketId, belief, collateral, numBuckets, numOutcomes?, options?)`
 
 Previews what the settlement payout would be for every possible outcome given a hypothetical belief and collateral amount.
 
 ```typescript
 import { previewPayoutCurve } from '@functionspace/core';
 
-const curve = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
+const curve = await previewPayoutCurve(ctx.client, marketId, belief, collateral, K);
 ctx.setPreviewPayout(curve);
 ```
 
@@ -1152,7 +1153,7 @@ See the complete core type reference in `core.txt`. Key types used in headless m
 - **`BuyResult`** -- Returned by `buy()`. Contains `positionId`, `belief`, `claims`, `collateral`, `positionType?`, `positionParams?`.
 - **`SellResult`** -- Returned by `sell()`. Contains `positionId`, `collateralReturned`, `creditedTo?`.
 - **`PayoutCurve`** -- Returned by `previewPayoutCurve()`. Contains `previews`, `maxPayout`, `maxPayoutOutcome`.
-- **`BeliefVector`** -- `number[]` of length `K + 1` summing to 1. Passed to `buy()` and `ctx.setPreviewBelief()`.
+- **`BeliefVector`** -- `number[]` of length `K + 1` summing to 1. Passed to `buy()` and `ctx.setPreviewBelief()`. Can be validated with `validateBeliefVector(vector, K)`.
 - **`BucketData`** -- Returned by `useBucketDistribution()`. Contains `range`, `min`, `max`, `probability`, `percentage`.
 - **`TradeEntry`** -- Returned by `useTradeHistory()`. Contains `id`, `timestamp`, `side`, `prediction`, `amount`, `username`.
 

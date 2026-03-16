@@ -1,19 +1,31 @@
 import type { FSClient } from '../client.js';
 import type { BeliefVector, PayoutCurve } from '../types.js';
+import { validateBeliefVector } from '../validation.js';
 
 /**
  * Preview payouts across all possible outcomes for a hypothetical position.
  * Wraps: POST /api/views/preview/payout/{marketId}
  * Body: { collateral, position_type, position_params, num_outcomes? }
+ *
+ * @param client - The FSClient instance for API communication
+ * @param marketId - The market identifier
+ * @param belief - Probability distribution across buckets (length K+1)
+ * @param collateral - Amount of collateral to use for the hypothetical position
+ * @param numBuckets - The market's num_buckets (K); belief vector must have length K+1
+ * @param numOutcomes - Optional number of outcome points to compute in the payout curve
+ * @param options - Optional request options (e.g. AbortSignal)
  */
 export async function previewPayoutCurve(
   client: FSClient,
   marketId: string | number,
   belief: BeliefVector,
   collateral: number,
+  numBuckets: number,
   numOutcomes?: number,
   options?: { signal?: AbortSignal },
 ): Promise<PayoutCurve> {
+  validateBeliefVector(belief, numBuckets);
+
   const body: Record<string, unknown> = {
     collateral,
     position_type: 'raw',
