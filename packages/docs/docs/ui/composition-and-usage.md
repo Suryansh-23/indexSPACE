@@ -62,7 +62,7 @@ FunctionSpaceProvider
     <MarketCharts marketId={1} views={['consensus', 'distribution', 'timeline']} zoomable />
     <ShapeCutter marketId={1} />
   
-  <PositionTable marketId={1} username={user.username} />
+  <PositionTable marketId={1} />
 </FunctionSpaceProvider>
 ```
 

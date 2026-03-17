@@ -8,7 +8,6 @@ export type PositionTabId = 'open-orders' | 'trade-history' | 'market-positions'
 
 export interface PositionTableProps {
   marketId: string | number;
-  username: string;
   onSell?: (result: SellResult) => void;
   pageSize?: number;
   selectedPositionId?: number | null;
@@ -51,7 +50,6 @@ const sortByIdDesc = (positions: Position[]): Position[] => {
 
 export function PositionTable({
   marketId,
-  username,
   onSell,
   pageSize = 20,
   selectedPositionId,
@@ -60,6 +58,8 @@ export function PositionTable({
 }: PositionTableProps) {
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('PositionTable must be used within FunctionSpaceProvider');
+
+  const effectiveUsername = ctx.user?.username;
 
   // Tab management (follows MarketCharts pattern)
   const effectiveTabs: PositionTabId[] = tabs && tabs.length > 0 ? tabs : ['open-orders', 'trade-history'];
@@ -70,14 +70,14 @@ export function PositionTable({
   const hasMarketTab = effectiveTabs.includes('market-positions');
   const { positions: rawPositions, loading, error, refetch } = usePositions(
     marketId,
-    hasMarketTab ? undefined : username
+    hasMarketTab ? undefined : effectiveUsername
   );
 
   // Per-tab data filtering
   const userPositions = useMemo(() => {
     if (!rawPositions) return [];
-    return hasMarketTab ? rawPositions.filter(p => p.owner === username) : rawPositions;
-  }, [rawPositions, hasMarketTab, username]);
+    return hasMarketTab ? rawPositions.filter(p => p.owner === effectiveUsername) : rawPositions;
+  }, [rawPositions, hasMarketTab, effectiveUsername]);
 
   const tabData = useMemo((): Record<PositionTabId, Position[]> => ({
     'open-orders': userPositions.filter(p => p.status === 'open'),
@@ -294,9 +294,9 @@ export function PositionTable({
           <>
             {idCell}{timestampCell}
             <td>
-              <span className={p.owner === username ? 'fs-owner-you' : ''}>
+              <span className={p.owner === effectiveUsername ? 'fs-owner-you' : ''}>
                 {p.owner}
-                {p.owner === username && <span className="fs-owner-tag"> (you)</span>}
+                {p.owner === effectiveUsername && <span className="fs-owner-tag"> (you)</span>}
               </span>
             </td>
             {statusCell}{predictionCell}{costCell}

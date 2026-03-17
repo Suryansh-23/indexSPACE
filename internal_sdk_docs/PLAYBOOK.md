@@ -720,7 +720,7 @@ const [activeTab, setActiveTab] = useState(effectiveTabs[0]);
 ```
 When adding a new tabbed widget, follow this exact pattern — do not invent a different approach.
 
-**PositionTable tab-aware data fetching:** The table uses a single `usePositions` call. When the `market-positions` tab is enabled, `username` is omitted to fetch all positions; client-side filtering derives per-tab data. Market value fetching (`previewSell`) only runs for open positions on the active tab — never for Trade History.
+**PositionTable tab-aware data fetching:** The table uses a single `usePositions` call. When the `market-positions` tab is enabled, username is omitted from the query to fetch all positions; client-side filtering by `ctx.user?.username` derives per-tab data. The authenticated user is read from context automatically -- no `username` prop is needed. Market value fetching (`previewSell`) only runs for open positions on the active tab -- never for Trade History.
 
 **Shared state composition pattern:** `BucketTradePanel` is a "composed widget" — it renders `DistributionChart` + `BucketRangeSelector` and coordinates them via a shared `useDistributionState` instance passed as a prop. This differs from context-based coordination (used by charts + trade panels). Use this pattern when two public widgets need to share derived state that isn't relevant to the broader SDK context.
 
@@ -842,7 +842,7 @@ UI components work together automatically via shared context. Consumers just pla
 ```tsx
 <FunctionSpaceProvider config={config}>
   <ConsensusChart marketId={ID} />
-  <PositionTable marketId={ID} username={user} />
+  <PositionTable marketId={ID} />
 </FunctionSpaceProvider>
 // Click row → curve appears on chart. No code needed.
 ```

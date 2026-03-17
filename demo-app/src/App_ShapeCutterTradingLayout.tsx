@@ -4,7 +4,7 @@ import { ArticlePage } from './pages/ArticlePage';
 import { config, MARKET_ID, widgetTheme } from './App';
 
 // Reusable layout content (used by both demo-app and docs site)
-export function ShapeCutterTradingLayout({ marketId, username }: { marketId: string | number; username?: string }) {
+export function ShapeCutterTradingLayout({ marketId }: { marketId: string | number }) {
   return (
     <>
       <div style={{ display: 'flex', gap: '1rem' }}>
@@ -25,12 +25,8 @@ export function ShapeCutterTradingLayout({ marketId, username }: { marketId: str
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr' }}>
-        <PositionTable marketId={marketId} username={username} tabs={['open-orders', 'trade-history', 'market-positions']} />
+        <PositionTable marketId={marketId} tabs={['open-orders', 'trade-history', 'market-positions']} />
       </div>
-      <BinaryPanel
-        marketId={marketId}
-        xPoint={{ mode: 'static', value: 91 }}
-      />
     </>
   );
 }
@@ -40,7 +36,7 @@ export default function App_ShapeCutterTradingLayout() {
   return (
     <ArticlePage widgetWidth="150%">
       <FunctionSpaceProvider config={config} theme={widgetTheme}>
-        <ShapeCutterTradingLayout marketId={MARKET_ID} username={config.username} />
+        <ShapeCutterTradingLayout marketId={MARKET_ID} />
       </FunctionSpaceProvider>
     </ArticlePage>
   );

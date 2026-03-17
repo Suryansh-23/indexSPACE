@@ -1433,7 +1433,7 @@ function App() {
           <TradePanel marketId="15" />
         </div>
       </div>
-      <PositionTable marketId="15" username="trader1" />
+      <PositionTable marketId="15" />
     </FunctionSpaceProvider>
   );
 }
@@ -3847,7 +3847,7 @@ export default function App() {
 - `MarketCharts` with `views={['consensus', 'distribution', 'timeline']}` renders a tabbed container with all three chart types. Omit entries from the array to hide tabs.
 - `ShapeCutter` and `MarketCharts` coordinate automatically through context. When the user adjusts shape parameters, a preview overlay appears on the consensus chart. No prop-drilling is required.
 - `AuthWidget` takes no props. It reads all authentication state from context.
-- `username` on `PositionTable` can be an empty string `""` for unauthenticated users. When a user logs in via `AuthWidget`, positions for that user are highlighted automatically.
+- `PositionTable` reads the authenticated user from context automatically. No `username` prop is needed. When a user logs in via `AuthWidget`, positions for that user are filtered and highlighted automatically.
 - `zoomable` enables scroll-wheel zoom and drag-to-pan on chart components.
 
 ---

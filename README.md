@@ -146,7 +146,7 @@ Pre-built React components organized by purpose. Each widget is self-contained -
 | Component | Props | Description |
 |-----------|-------|-------------|
 | `MarketStats` | `marketId` | Read-only statistics bar (mean, median, mode, pool, volume) |
-| `PositionTable` | `marketId`, `username`, `pageSize?`, `tabs?`, `onSell?` | Tabbed position/trade table with row selection and sell actions |
+| `PositionTable` | `marketId`, `pageSize?`, `tabs?`, `onSell?` | Tabbed position/trade table with row selection and sell actions |
 | `TimeSales` | `marketId` | Real-time trade log |
 
 **Auth** (`auth/`)
@@ -160,7 +160,7 @@ Pre-built React components organized by purpose. Each widget is self-contained -
 ```tsx
 <FunctionSpaceProvider config={config} theme="fs-dark">
   <MarketCharts marketId={1} views={['consensus', 'distribution']} />
-  <PositionTable marketId={1} username="alice" />
+  <PositionTable marketId={1} />
   <TradePanel marketId={1} />
 </FunctionSpaceProvider>
 ```
@@ -187,7 +187,7 @@ function App() {
     >
       <ConsensusChart marketId={1} height={400} />
       <TradePanel marketId={1} />
-      <PositionTable marketId={1} username="alice" />
+      <PositionTable marketId={1} />
     </FunctionSpaceProvider>
   );
 }

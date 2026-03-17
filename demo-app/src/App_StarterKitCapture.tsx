@@ -34,7 +34,7 @@ function BasicTradingLayout() {
             <TradePanel marketId={MARKET_ID} modes={['gaussian', 'range']} />
           </div>
         </div>
-        <PositionTable marketId={MARKET_ID} username="" tabs={['open-orders', 'trade-history', 'market-positions']} />
+        <PositionTable marketId={MARKET_ID}  tabs={['open-orders', 'trade-history', 'market-positions']} />
       </FunctionSpaceProvider>
     </div>
   );
@@ -69,7 +69,7 @@ function BinaryPanelLayout() {
             <BinaryPanel marketId={MARKET_ID} xPoint={{ mode: 'dynamic-mean', allowOverride: true }} />
           </div>
         </div>
-        <PositionTable marketId={MARKET_ID} username="" />
+        <PositionTable marketId={MARKET_ID}  />
       </FunctionSpaceProvider>
     </div>
   );
@@ -86,7 +86,7 @@ function CustomShapeLayout() {
         <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
           <CustomShapeEditor marketId={MARKET_ID} zoomable />
         </div>
-        <PositionTable marketId={MARKET_ID} username="" tabs={['open-orders', 'trade-history', 'market-positions']} />
+        <PositionTable marketId={MARKET_ID}  tabs={['open-orders', 'trade-history', 'market-positions']} />
       </FunctionSpaceProvider>
     </div>
   );
@@ -134,7 +134,7 @@ function ShapeCutterLayout() {
         <div style={{ marginBottom: '1rem' }}>
           <ShapeCutter marketId={MARKET_ID} />
         </div>
-        <PositionTable marketId={MARKET_ID} username="" tabs={['open-orders', 'trade-history', 'market-positions']} />
+        <PositionTable marketId={MARKET_ID}  tabs={['open-orders', 'trade-history', 'market-positions']} />
       </FunctionSpaceProvider>
     </div>
   );

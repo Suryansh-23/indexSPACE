@@ -76,7 +76,7 @@ function AllComponentsInner() {
       </div>
 
       <div data-capture="PositionTable" style={{ marginBottom: '2rem' }}>
-        <PositionTable marketId={MARKET_ID} username={config.username} tabs={['open-orders', 'trade-history', 'market-positions']} />
+        <PositionTable marketId={MARKET_ID} tabs={['open-orders', 'trade-history', 'market-positions']} />
       </div>
 
       <div data-capture="TimeSales" style={{ marginBottom: '2rem', maxWidth: 600 }}>

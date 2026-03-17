@@ -19,7 +19,7 @@ import { PositionTable } from '@functionspace/ui';
 ```
 
 <WidgetDemo title="Live Demo" height="300px">
-  <PositionTable marketId={DEMO_MARKET_ID} username={DEMO_USERNAME} tabs={['open-orders', 'trade-history', 'market-positions']}/>
+  <PositionTable marketId={DEMO_MARKET_ID} tabs={['open-orders', 'trade-history', 'market-positions']}/>
 </WidgetDemo>
 
 **CSS class:** `fs-table-container`
@@ -30,7 +30,6 @@ import { PositionTable } from '@functionspace/ui';
 | Prop | Type | Default | Description |
 | --- | --- | --- | --- |
 | `marketId` | `string \| number` | required | Market to display positions for |
-| `username` | `string` | required | Authenticated username (filters positions and enables "(you)" highlighting) |
 | `tabs` | `PositionTabId[]` | `['open-orders', 'trade-history']` | Which tabs to show. Tab bar hidden when only one tab. |
 | `pageSize` | `number` | `20` | Rows per page |
 | `selectedPositionId` | `number \| null` | -- | Controlled selection: externally managed selected position ID |
@@ -57,13 +56,13 @@ import { PositionTable } from '@functionspace/ui';
 * **Market value lookup:** For visible open positions (current page only), `previewSell` is called via `Promise.allSettled` for resilient fetching. Values are cached and update when the page changes.
 * **Sell flow:** The "Sell" button (open-orders tab, open positions only) calls `sell()`, then `ctx.invalidate(marketId)` and `refetch()`. Shows "Selling..." during the operation. Sell errors display as a banner above the table.
 * **P/L calculation (priority order):** 1) Sold/closed positions with a non-null `soldPrice`: `soldPrice - collateral`. 2) Any remaining position with a non-null `settlementPayout`: `settlementPayout - collateral`. 3) Open positions: `marketValue - collateral` (from `previewSell`). Note: sold/closed positions with a `soldPrice` always use path 1, even if they also have a `settlementPayout`. P/L% = `(P/L / collateral) * 100`.
-* **Owner highlighting:** In the `market-positions` tab, the authenticated user's rows show "(you)" next to the username.
+* **Owner highlighting:** In the `market-positions` tab, the authenticated user's rows (matched via `ctx.user?.username`) show "(you)" next to the username. No `username` prop is needed -- the widget reads the authenticated user from context automatically.
 * **Sorting:** All tab data is sorted by position ID descending.
 * **Loading/error:** Renders a spinner with "Loading positions..." or an error message with a "Retry" button. Empty states show contextual messages per tab.
 
 **Context interactions:**
 
-* **Reads:** `ctx.client`, `ctx.selectedPosition?.positionId` (for uncontrolled selection highlighting)
+* **Reads:** `ctx.client`, `ctx.user?.username` (for position filtering and "(you)" highlighting), `ctx.selectedPosition?.positionId` (for uncontrolled selection highlighting)
 * **Writes:** `ctx.setSelectedPosition(position | null)` (uncontrolled mode only)
 * **Triggers:** `ctx.invalidate(marketId)` after successful sell
 
@@ -73,14 +72,13 @@ import { PositionTable } from '@functionspace/ui';
 
 ```tsx
 <FunctionSpaceProvider config={config} theme="fs-dark">
-  <PositionTable marketId={42} username="trader1" />
+  <PositionTable marketId={42} />
 </FunctionSpaceProvider>
 ```
 
 ```tsx
 <PositionTable
   marketId={42}
-  username="trader1"
   tabs={['open-orders', 'trade-history', 'market-positions']}
   pageSize={10}
   onSell={(result) => console.log('Sold, returned:', result.collateralReturned)}

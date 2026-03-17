@@ -6,7 +6,7 @@ import { config, MARKET_ID, widgetTheme } from './App';
 // Reusable layout content (used by both demo-app and docs site)
 // All 4 xPoint modes displayed together for visual/functional testing.
 // In practice, a consumer would mount only one BinaryPanel at a time.
-export function BinaryPanelLayout({ marketId, username }: { marketId: string | number; username?: string }) {
+export function BinaryPanelLayout({ marketId }: { marketId: string | number }) {
   return (
     <>
       <div style={{ display: 'flex', gap: '1rem' }}>
@@ -78,7 +78,7 @@ export function BinaryPanelLayout({ marketId, username }: { marketId: string | n
         </div>
       </div>
 
-      <PositionTable marketId={marketId} username={username} />
+      <PositionTable marketId={marketId} />
     </>
   );
 }
@@ -87,7 +87,7 @@ export default function App_BinaryPanel() {
   return (
     <ArticlePage>
       <FunctionSpaceProvider config={config} theme={widgetTheme}>
-        <BinaryPanelLayout marketId={MARKET_ID} username={config.username} />
+        <BinaryPanelLayout marketId={MARKET_ID} />
       </FunctionSpaceProvider>
     </ArticlePage>
   );

@@ -7,7 +7,7 @@ const CHART_RATIO = 7
 const PANEL_RATIO = 3;
 
 // Reusable layout content (used by both demo-app and docs site)
-export function BasicTradingLayout({ marketId, username }: { marketId: string | number; username?: string }) {
+export function BasicTradingLayout({ marketId }: { marketId: string | number }) {
   return (
     <>
       <div style={{ display: 'flex', gap: '1rem' }}>
@@ -28,7 +28,7 @@ export function BasicTradingLayout({ marketId, username }: { marketId: string | 
         </div>
       </div>
 
-      <PositionTable marketId={marketId} username={username} tabs={['open-orders', 'trade-history', 'market-positions']} />
+      <PositionTable marketId={marketId} tabs={['open-orders', 'trade-history', 'market-positions']} />
     </>
   );
 }
@@ -38,7 +38,7 @@ export default function App_BasicTradingLayout() {
   return (
     <ArticlePage widgetWidth='150%'>
       <FunctionSpaceProvider config={config} theme={widgetTheme}>
-        <BasicTradingLayout marketId={MARKET_ID} username={config.username} />
+        <BasicTradingLayout marketId={MARKET_ID} />
       </FunctionSpaceProvider>
     </ArticlePage>
   );

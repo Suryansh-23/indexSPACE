@@ -46,7 +46,7 @@ export default function App() {
         
       
 
-      <PositionTable marketId={MARKET_ID} username={config.username ?? ''} />
+      <PositionTable marketId={MARKET_ID} />
     </FunctionSpaceProvider>
   );
 }
