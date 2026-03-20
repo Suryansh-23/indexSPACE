@@ -18,6 +18,7 @@ Read these review reports from `{OUTPUT_DIR}/`:
 8. `08-docs-deferred.md` -- Agent 8 findings (documentation & deferred items)
 
 Also read:
+
 - `internal_sdk_docs/CLAUDE.md` -- for doc update recommendations
 - `internal_sdk_docs/PLAYBOOK.md` -- for doc update recommendations
 - `{HANDOFF_DOC_PATH}` -- original requirements
@@ -35,16 +36,19 @@ Create a table showing which files were reviewed by which agents. Flag any file 
 Cross-reference findings **within** each domain first. Compound issues found within a domain are higher confidence because the agents share context.
 
 **Domain A: Spec & Architecture** (Agents 1, 2, 3)
+
 - Plan compliance + architecture violations = implementation that doesn't match spec AND breaks structural rules
 - Plan compliance + theme violations = implementation that drops visual requirements
 - Missing requirements + architecture gaps = features that were both unbuilt and would have been wrong anyway
 
 **Domain B: Correctness & Quality** (Agents 5, 4, 7)
+
 - Error handling gaps + SDK practice violations = functions that are both fragile and non-compliant
 - Error handling gaps + code quality issues = same function flagged from multiple angles confirms real weakness
 - Race conditions + missing type safety = unsafe concurrent access without type protection
 
 **Domain C: Tests & Documentation** (Agents 6, 8)
+
 - Rigged/weak tests + missing doc updates = false confidence with no documentation trail
 - Test coverage gaps + deferred items = known gaps that aren't tested and might be forgotten
 - Test quality issues + doc inaccuracy = the test doesn't verify the right behavior and the docs describe the wrong behavior
@@ -59,6 +63,7 @@ After within-domain analysis, cross-reference **across** domains for compound is
 - **Domain A + Domain B + Domain C**: Missing requirement + error handling gap + no test = highest severity compound issue
 
 When compound issues are found, escalate severity:
+
 - Two agents in same domain confirm same issue -> higher confidence, keep severity
 - Two agents across domains find related issues on same file/function -> escalate one level
 - Three+ agents across domains converge -> always CRITICAL
@@ -70,12 +75,26 @@ The same issue found by multiple agents should appear ONCE in the final report, 
 ### 5. Resolve Contradictions
 
 If one agent says PASS and another found a violation for the same concern:
+
 - Read the relevant code yourself to determine who is correct
 - Note the contradiction and your resolution in the report
 
-### 6. Run Regression
+### 5.5. Cross-Stream Integration Verification
 
-Run the full test suite and build:
+If the completion report or agent findings mention multiple work streams:
+
+1. Read the completion report for cross-stream dependency mentions
+2. For each dependency (e.g., "WS-React uses queryOrderDepth from WS-Core"):
+   - Verify the consumer file actually imports the dependency (grep for the import)
+   - Verify the import is used (not just imported and unused)
+   - Verify the types match (consumer uses the correct type from the producer)
+3. Check for silent reimplementation: did a downstream stream create its own version of something foundation already provided?
+   - Grep for similar function names across work stream boundaries
+4. Flag cross-stream integration issues as CRITICAL -- these are invisible to per-stream testing
+
+### 6. Run Regression (MANDATORY -- NO OPT-OUT)
+
+You MUST run each of the following commands and paste the COMPLETE terminal output. Do not summarize, paraphrase, or abbreviate. If a command fails, paste the full error output. There is no opt-out -- these commands MUST be executed.
 
 ```bash
 npx vitest run --reporter=verbose 2>&1
@@ -89,11 +108,23 @@ cd demo-app && npx vite build 2>&1
 cd packages/docs && npx docusaurus build 2>&1
 ```
 
-Report the full output. Any failures here are CRITICAL regardless of what the code-reading agents found.
+Any failures here are CRITICAL regardless of what the code-reading agents found.
+
+### 6.5. Completeness Verification (MANDATORY before writing output)
+
+Before writing the final report:
+
+1. **Severity documentation:** If any sub-agent marked a finding as CRITICAL and you are changing its severity in the final report, you MUST:
+   - Read the code yourself at the specific file:line the sub-agent cited
+   - Document the change: "Changed from CRITICAL to [WARNING/NOTE]: [sub-agent] found [X] at [file:line], but reading the code shows [Y]. Evidence: [what you found]."
+   - If you cannot articulate specific code evidence for the change, keep the original severity.
+
+2. **Coverage matrix:** Build a file coverage matrix showing which changed files were reviewed by which agents. Any file reviewed by fewer than 2 agents should be flagged for the user's attention in the final report under a "Coverage Blind Spots" section.
 
 ### 7. Assess Living Doc Accuracy
 
 Incorporate Agent 8's documentation findings. If Agent 8 failed or produced no output, perform a brief check yourself:
+
 - Are new hooks listed in the Available Hooks table?
 - Are new components listed in the File Locations section?
 - Are new core functions in the Core Functions list?
@@ -122,13 +153,17 @@ Write to `{OUTPUT_DIR}/review-{FEATURE_NAME}.md`:
 
 ### Tests
 ```
+
 [Full npx vitest run output]
+
 ```
 **Status:** ALL PASS / X FAILURES
 
 ### Build
 ```
+
 [Full npx vite build output]
+
 ```
 **Status:** SUCCESS / FAILURE
 
@@ -246,20 +281,25 @@ Based on the implementation review of {FEATURE_NAME}.
 ## internal_sdk_docs/CLAUDE.md
 
 ### Additions
+
 [Exact text to add, with the section it belongs in]
 
 ### Corrections
+
 [Exact text to change, with before/after]
 
 ### Warnings to Add
+
 [New patterns or anti-patterns discovered during review that should be documented]
 
 ## internal_sdk_docs/PLAYBOOK.md
 
 ### Additions
+
 [Exact text to add, with the section it belongs in]
 
 ### Corrections
+
 [Exact text to change, with before/after]
 ```
 

@@ -20,4 +20,13 @@ export type { UseCustomShapeReturn } from './useCustomShape.js';
 export { useChartZoom } from './useChartZoom.js';
 export type { ChartZoomOptions, ChartZoomResult } from './useChartZoom.js';
 export { rechartsPlotArea } from './rechartsHelpers.js';
+export type { CacheConfig, QueryOptions } from './cache/index.js';
+export { useBuy } from './useBuy.js';
+export type { UseBuyReturn } from './useBuy.js';
+export { useSell } from './useSell.js';
+export type { UseSellReturn } from './useSell.js';
+export { usePreviewPayout } from './usePreviewPayout.js';
+export type { UsePreviewPayoutReturn } from './usePreviewPayout.js';
+export { usePreviewSell } from './usePreviewSell.js';
+export type { UsePreviewSellReturn } from './usePreviewSell.js';
 

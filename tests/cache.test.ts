@@ -484,7 +484,7 @@ describe('QueryCache', () => {
   // ---------------------------------------------------------------------------
   // 16. Destroyed-state guard
   // ---------------------------------------------------------------------------
-  it('16. event handlers are no-ops after destroy', async () => {
+  it('16. destroy() aborts in-flight and removes listeners; cache remains functional for StrictMode', async () => {
     cache = new QueryCache();
     const key: CacheKey = ['market', '1'];
     const queryFn = createQueryFn('data');
@@ -498,17 +498,16 @@ describe('QueryCache', () => {
 
     cache.destroy();
 
-    // These should all be no-ops
+    // After destroy, operations still work (no destroyed flag) -- this is
+    // required for React StrictMode where child effects re-fire before the
+    // parent calls init(). The cache is functional but has no event listeners.
     cache.ensureFetching(key);
-    cache.handleFocus();
-    cache.handleReconnect();
-    cache.invalidate('1');
-    cache.invalidateAll();
-    cache.setVisible(true);
-    await cache.refetch(key);
     await flushMicrotasks();
+    // ensureFetching triggers a new fetch (abortController was cleared by destroy)
+    expect(queryFn).toHaveBeenCalledTimes(2);
 
-    expect(queryFn).toHaveBeenCalledTimes(1); // no additional calls
+    // init() re-registers event listeners for StrictMode remount
+    cache.init();
   });
 
   // ---------------------------------------------------------------------------
@@ -681,39 +680,37 @@ describe('QueryCache', () => {
   // Hardening tests
   // ---------------------------------------------------------------------------
   describe('hardening', () => {
-    it('subscribe() returns no-op unsubscribe on destroyed cache', () => {
+    it('subscribe() works after destroy (StrictMode compatibility)', () => {
       cache = new QueryCache();
       cache.destroy();
 
-      const unsub = cache.subscribe(['market', '1'], vi.fn());
-      // Should return a function that does nothing (no-op)
+      // After destroy, subscribe still works -- StrictMode needs this
+      const cb = vi.fn();
+      const unsub = cache.subscribe(['market', '1'], cb);
       expect(typeof unsub).toBe('function');
-      expect(() => unsub()).not.toThrow();
-      // No entry should have been created
+      // Entry is created (cache is functional after destroy)
       expect(cache.getSnapshot(['market', '1']).status).toBe('idle');
+      expect(() => unsub()).not.toThrow();
     });
 
-    it('registerQueryFn() no-ops on destroyed cache', async () => {
+    it('registerQueryFn() works after destroy (StrictMode compatibility)', async () => {
       cache = new QueryCache();
       const key: CacheKey = ['market', '1'];
       const queryFn = createQueryFn('data');
 
-      // Subscribe and set up before destroying
       cache.subscribe(key, () => {});
       cache.destroy();
 
-      // registerQueryFn after destroy should be a no-op
+      // registerQueryFn after destroy works -- StrictMode child effects
+      // re-fire before parent calls init()
       cache.registerQueryFn(key, queryFn);
-
-      // queryFn should never have been stored, so ensureFetching is also a no-op
-      // (ensureFetching already has a destroyed guard)
       cache.ensureFetching(key);
       await flushMicrotasks();
 
-      expect(queryFn).not.toHaveBeenCalled();
+      expect(queryFn).toHaveBeenCalledTimes(1);
     });
 
-    it('setPollInterval() no-ops on destroyed cache', async () => {
+    it('destroy() clears poll timers so they do not fire', async () => {
       cache = new QueryCache();
       const key: CacheKey = ['market', '1'];
       const queryFn = createQueryFn('data');
@@ -725,12 +722,11 @@ describe('QueryCache', () => {
 
       expect(queryFn).toHaveBeenCalledTimes(1);
 
+      // Start polling then destroy
+      cache.setPollInterval(key, 1000);
       cache.destroy();
 
-      // setPollInterval after destroy should be a no-op
-      cache.setPollInterval(key, 1000);
-
-      // No poll should fire
+      // Poll timer was cleared by destroy -- no additional fetches
       vi.advanceTimersByTime(5000);
       await flushMicrotasks();
 

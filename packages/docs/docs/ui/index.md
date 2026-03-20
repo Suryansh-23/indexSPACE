@@ -6,7 +6,7 @@ description: "Overview of @functionspace/ui components, the TradeInputBaseProps 
 
 # UI
 
-`@functionspace/ui` — Ready-to-use React components. Requires `@functionspace/react` and `@functionspace/core` as peer dependencies.
+`@functionspace/ui`  -- Ready-to-use React components. Requires `@functionspace/react` and `@functionspace/core` as peer dependencies.
 
 All UI components must be rendered inside a `FunctionSpaceProvider`. They handle their own loading and error states, communicate through context (not props), and inherit theming automatically.
 

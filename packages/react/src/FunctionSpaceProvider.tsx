@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { FSClient, loginUser, signupUser, fetchCurrentUser, passwordlessLoginUser, silentReAuth, PASSWORD_REQUIRED } from '@functionspace/core';
 import type { PayoutCurve, Position, UserProfile, SignupOptions, PasswordlessLoginResult } from '@functionspace/core';
 import { FunctionSpaceContext } from './context.js';
+import { QueryCache } from './cache/index.js';
+import type { CacheConfig } from './cache/index.js';
+import { QueryCacheContext } from './QueryCacheContext.js';
 import {
   FS_DARK, FS_LIGHT, NATIVE_DARK, NATIVE_LIGHT,
   resolveChartColors, getPresetChartColors,
@@ -66,7 +69,7 @@ export function resolveTheme(input?: FSThemeInput): ResolvedFSTheme {
     return applyDefaults({ ...base, ...overrides });
   }
 
-  // No preset — apply defaults to derive optional tokens from core 9
+  // No preset  -- apply defaults to derive optional tokens from core 9
   return applyDefaults(overrides as FSTheme);
 }
 
@@ -80,11 +83,12 @@ export interface FunctionSpaceProviderProps {
     autoAuthenticate?: boolean;
   };
   theme?: FSThemeInput;
+  cache?: CacheConfig;
   storedUsername?: string | null;
   children: React.ReactNode;
 }
 
-export function FunctionSpaceProvider({ config, theme, storedUsername, children }: FunctionSpaceProviderProps) {
+export function FunctionSpaceProvider({ config, theme, cache, storedUsername, children }: FunctionSpaceProviderProps) {
   const clientRef = useRef<FSClient | null>(null);
   const [providerReady, setProviderReady] = useState(false);
   const [authError, setAuthError] = useState<Error | null>(null);
@@ -92,7 +96,6 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
   const [user, setUser] = useState<UserProfile | null>(null);
   const [previewBelief, setPreviewBelief] = useState<number[] | null>(null);
   const [previewPayout, setPreviewPayout] = useState<PayoutCurve | null>(null);
-  const [invalidationCount, setInvalidationCount] = useState(0);
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [pendingAdminUsername, setPendingAdminUsername] = useState<string | null>(null);
@@ -104,12 +107,25 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
 
   const client = clientRef.current;
 
+  // Create cache once
+  const cacheRef = useRef<QueryCache | null>(null);
+  if (!cacheRef.current) {
+    cacheRef.current = new QueryCache(cache);
+  }
+  const queryCache = cacheRef.current;
+
+  // Cache lifecycle: init on mount (handles StrictMode remount), destroy on unmount
+  useEffect(() => {
+    queryCache.init();
+    return () => { cacheRef.current?.destroy(); };
+  }, [queryCache]);
+
   // Dual-mode auth on mount
   useEffect(() => {
     const shouldAutoAuth = config.autoAuthenticate !== false && !!config.username && !!config.password;
 
     if (shouldAutoAuth) {
-      // Auto-auth via loginUser — single request returns token + user profile
+      // Auto-auth via loginUser  -- single request returns token + user profile
       setAuthLoading(true);
       loginUser(client, config.username!, config.password!)
         .then((result) => {
@@ -148,7 +164,7 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
   // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount-only effect; config/storedUsername are read once
   }, []);
 
-  // Login callback (interactive auth) — returns UserProfile for caller convenience
+  // Login callback (interactive auth)  -- returns UserProfile for caller convenience
   const login = useCallback(async (username: string, password: string) => {
     setAuthLoading(true);
     setAuthError(null);
@@ -159,7 +175,7 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
       setUser(result.user);
       setShowAdminLogin(false);
       setPendingAdminUsername(null);
-      setInvalidationCount((c) => c + 1);
+      queryCache.invalidateAll();
       return result.user;
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -168,19 +184,19 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
     } finally {
       setAuthLoading(false);
     }
-  }, [client]);
+  }, [client, queryCache]);
 
-  // Signup callback (signup → auto-login) — returns UserProfile for caller convenience
+  // Signup callback (signup → auto-login)  -- returns UserProfile for caller convenience
   const signup = useCallback(async (username: string, password: string, options?: SignupOptions) => {
     setAuthLoading(true);
     setAuthError(null);
     try {
       await signupUser(client, username, password, options);
-      // Signup returns no token — login to get session
+      // Signup returns no token  -- login to get session
       const result = await loginUser(client, username, password);
       client.setToken(result.token);
       setUser(result.user);
-      setInvalidationCount((c) => c + 1);
+      queryCache.invalidateAll();
       return result.user;
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -189,7 +205,7 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
     } finally {
       setAuthLoading(false);
     }
-  }, [client]);
+  }, [client, queryCache]);
 
   // Logout callback
   const logout = useCallback(() => {
@@ -202,8 +218,8 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
     setSelectedPosition(null);
     setPreviewBelief(null);
     setPreviewPayout(null);
-    setInvalidationCount((c) => c + 1);
-  }, [client]);
+    queryCache.invalidateAll();
+  }, [client, queryCache]);
 
   // Refresh user profile (wallet balance update after trades)
   const refreshUser = useCallback(async () => {
@@ -212,7 +228,7 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
       const profile = await fetchCurrentUser(client);
       setUser(profile);
     } catch {
-      // silently fail — wallet refresh is best-effort
+      // silently fail  -- wallet refresh is best-effort
     }
   }, [client]);
 
@@ -227,7 +243,7 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
       setUser(result.user);
       setShowAdminLogin(false);
       setPendingAdminUsername(null);
-      setInvalidationCount((c) => c + 1);
+      queryCache.invalidateAll();
       return result;
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -236,7 +252,7 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
     } finally {
       setAuthLoading(false);
     }
-  }, [client]);
+  }, [client, queryCache]);
 
   // Clear admin login state
   const clearAdminLogin = useCallback(() => {
@@ -244,13 +260,18 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
     setPendingAdminUsername(null);
   }, []);
 
-  // Invalidate: increment counter + refresh user wallet when authenticated
-  const invalidate = useCallback((_marketId: string | number) => {
-    setInvalidationCount((c) => c + 1);
+  // Invalidate: bust cache for a specific market + refresh user wallet when authenticated
+  const invalidate = useCallback((marketId: string | number) => {
+    queryCache.invalidate(String(marketId));
     if (client.isAuthenticated) {
       fetchCurrentUser(client).then(setUser).catch(() => {});
     }
-  }, [client]);
+  }, [client, queryCache]);
+
+  // Invalidate all cache entries
+  const invalidateAll = useCallback(() => {
+    queryCache.invalidateAll();
+  }, [queryCache]);
 
   // Resolve theme from preset + overrides
   const resolvedTheme = useMemo(() => resolveTheme(theme), [theme]);
@@ -307,7 +328,7 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
     previewPayout,
     setPreviewPayout,
     invalidate,
-    invalidationCount,
+    invalidateAll,
     selectedPosition,
     setSelectedPosition,
     user,
@@ -324,7 +345,7 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
     clearAdminLogin,
     chartColors: resolvedChartColors,
   }), [
-    previewBelief, previewPayout, invalidate, invalidationCount,
+    previewBelief, previewPayout, invalidate, invalidateAll,
     selectedPosition, user, isAuthenticated, authLoading, authError,
     login, signup, logout, refreshUser, passwordlessLogin,
     showAdminLogin, pendingAdminUsername, clearAdminLogin,
@@ -336,10 +357,12 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
   }
 
   return (
-    <FunctionSpaceContext.Provider value={contextValue}>
-      <div style={style}>
-        {children}
-      </div>
-    </FunctionSpaceContext.Provider>
+    <QueryCacheContext.Provider value={queryCache}>
+      <FunctionSpaceContext.Provider value={contextValue}>
+        <div style={style}>
+          {children}
+        </div>
+      </FunctionSpaceContext.Provider>
+    </QueryCacheContext.Provider>
   );
 }

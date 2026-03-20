@@ -1,6 +1,6 @@
 ---
 title: "useCustomShape"
-sidebar_position: 1
+sidebar_position: 6
 description: "Manages control point values, locks, drag state, and derived belief vectors for the shape editor."
 ---
 
@@ -75,7 +75,7 @@ function ShapeEditor({ marketId }: { marketId: number }) {
   const shape = useCustomShape(market);
 
   return (
-    
+    <div>
       {shape.controlValues.map((val, i) => (
         <input
           key={i}
@@ -89,7 +89,7 @@ function ShapeEditor({ marketId }: { marketId: number }) {
       ))}
       <p>Prediction: {shape.prediction?.toFixed(2)}</p>
       <button onClick={shape.resetToDefault}>Reset</button>
-    
+    </div>
   );
 }
 ```

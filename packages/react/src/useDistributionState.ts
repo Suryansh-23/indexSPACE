@@ -18,7 +18,7 @@ export interface DistributionState {
   market: MarketState | null;
   loading: boolean;
   error: Error | null;
-  refetch: () => void;
+  refetch: () => Promise<void>;
 
   // Bucket configuration (shared, settable)
   bucketCount: number;
@@ -56,9 +56,8 @@ export function useDistributionState(
   const loading = marketLoading || consensusLoading;
   const error = marketError || consensusError;
 
-  const refetch = useCallback(() => {
-    marketRefetch();
-    consensusRefetch();
+  const refetch = useCallback(async () => {
+    await Promise.all([marketRefetch(), consensusRefetch()]);
   }, [marketRefetch, consensusRefetch]);
 
   // Full-range buckets [L, H]
@@ -72,14 +71,14 @@ export function useDistributionState(
       bucketCount,
       market.decimals,
     );
-  }, [consensus, market, bucketCount, ctx.invalidationCount]);
+  }, [consensus, market, bucketCount]);
 
   // Percentiles from coefficient vector
   const percentiles = useMemo<PercentileSet | null>(() => {
     if (!market || !market.consensus) return null;
     const { L, H } = market.config;
     return computePercentiles(market.consensus, L, H);
-  }, [market, ctx.invalidationCount]);
+  }, [market]);
 
   // Helper: compute buckets over a custom sub-range
   const getBucketsForRange = useCallback((min: number, max: number): BucketData[] => {
@@ -91,7 +90,7 @@ export function useDistributionState(
       bucketCount,
       market.decimals,
     );
-  }, [consensus, market, bucketCount, ctx.invalidationCount]);
+  }, [consensus, market, bucketCount]);
 
   return {
     market,

@@ -8,7 +8,7 @@ description: "Provider setup, context fields, theme resolution, and data hook pa
 
 `@functionspace/react` provides React hooks, a Provider component, and a theme system that wraps `@functionspace/core` into an idiomatic React API. Requires `@functionspace/core` as a peer dependency.
 
-All hooks must be called within a `FunctionSpaceProvider`. Every data-fetching hook shares a common return shape (`loading`, `error`, `refetch`) and automatically re-fetches when `ctx.invalidate(marketId)` is called after trades.
+All hooks must be called within a `FunctionSpaceProvider`. Primary data-fetching hooks share a common return shape (`loading`, `isFetching`, `error`, `refetch`). Composite hooks (`useBucketDistribution`, `useDistributionState`) omit `isFetching` since they delegate to inner hooks. All data-fetching hooks automatically re-fetch when `ctx.invalidate(marketId)` is called after trades. Data is served from a query cache -- `loading` is true only on the first fetch (no cached data), while `isFetching` indicates background refetches.
 
 #### Provider & Context
 
@@ -27,6 +27,7 @@ All hooks in `@functionspace/react` require a `FunctionSpaceProvider` ancestor. 
     autoAuthenticate?: boolean;
   }}
   theme?: FSThemeInput
+  cache?: CacheConfig
 >
   {children}
 </FunctionSpaceProvider>
@@ -41,12 +42,13 @@ All hooks in `@functionspace/react` require a `FunctionSpaceProvider` ancestor. 
 | `config.password`         | `string?`       | Password for auto-authentication on mount                                                                                                                                                                |
 | `config.autoAuthenticate` | `boolean?`      | Controls auto-login behavior. Auto-auth fires when this is not explicitly `false` AND both `username` and `password` are truthy. Set to `false` to suppress auto-auth even when credentials are present. |
 | `theme`                   | `FSThemeInput?` | Preset name (`"fs-dark"`, `"fs-light"`, `"native-dark"`, `"native-light"`), partial theme object with optional `preset` base, or full `FSTheme`. Defaults to `"fs-dark"`. See Theme System.              |
+| `cache`                   | `CacheConfig?`  | Cache configuration. Accepts `staleTime` (ms before data is considered stale), `gcTime` (ms before unused entries are garbage collected), `defaultPollInterval` (ms), `revalidateOnFocus` (default: true), `revalidateOnReconnect` (default: true). |
 | `storedUsername`          | `string \| null?` | Previously authenticated username. When provided, the Provider attempts silent re-auth on mount via `silentReAuth`. If the account requires a password, sets `showAdminLogin: true` on context. |
 | `children`                | `ReactNode`     | Child component tree                                                                                                                                                                                     |
 
 **Auth modes:**
 
-1. **Auto-auth mode** (`username` + `password` provided, `autoAuthenticate` not `false`): Calls `loginUser(client, username, password)` on mount. Renders an "Authenticating..." placeholder until the request completes. On success, sets the token on the client and stores the `UserProfile`. On failure, stores the error on `authError` but still renders children, allowing guest-mode browsing. Does not increment `invalidationCount`.
+1. **Auto-auth mode** (`username` + `password` provided, `autoAuthenticate` not `false`): Calls `loginUser(client, username, password)` on mount. Renders an "Authenticating..." placeholder until the request completes. On success, sets the token on the client and stores the `UserProfile`. On failure, stores the error on `authError` but still renders children, allowing guest-mode browsing.
 2. **Stored username mode** (`storedUsername` provided, no auto-auth credentials): Renders children immediately, then attempts `silentReAuth(client, storedUsername)` in the background. On success, sets the token and user. If the account requires a password (`PASSWORD_REQUIRED`), sets `showAdminLogin: true` and `pendingAdminUsername` on context so UI widgets can prompt the user. On other failures, clears the stored username.
 3. **Interactive mode** (no credentials, or `autoAuthenticate: false`): Renders children immediately in guest mode (read-only market browsing). The application authenticates later by calling `login()`, `signup()`, or `passwordlessLogin()` from `useAuth()`.
 4. **Guest mode** (no credentials, no intent to authenticate): Identical to interactive mode at the Provider level. All data hooks work (market data, consensus, distributions), but mutation operations require authentication.
@@ -65,11 +67,11 @@ _Auth:_
 | `isAuthenticated` | `boolean` | `true` when `user` is not `null` |
 | `authLoading` | `boolean` | `true` during in-progress `login` or `signup` calls |
 | `authError` | `Error \| null` | Most recent auth error. Cleared at the start of each `login()`, `signup()`, or `logout()` call. |
-| `login` | `(username: string, password: string) => Promise` | Authenticates, sets token on client, stores user, increments `invalidationCount`. Throws on failure. |
-| `signup` | `(username: string, password: string, options?: SignupOptions) => Promise` | Registers via `signupUser`, then calls `loginUser` (signup returns no token). Stores user, increments `invalidationCount`. Throws on failure. |
-| `logout` | `() => void` | Clears token, user, `authError`, all preview state, and `selectedPosition`. Increments `invalidationCount`. |
+| `login` | `(username: string, password: string) => Promise` | Authenticates, sets token on client, stores user, invalidates all cache entries. Throws on failure. |
+| `signup` | `(username: string, password: string, options?: SignupOptions) => Promise` | Registers via `signupUser`, then calls `loginUser` (signup returns no token). Stores user, invalidates all cache entries. Throws on failure. |
+| `logout` | `() => void` | Clears token, user, `authError`, all preview state, and `selectedPosition`. Invalidates all cache entries. |
 | `refreshUser` | `() => Promise` | Re-fetches the current user profile (e.g., wallet balance after trades). No-ops silently if `client.isAuthenticated` is `false`. |
-| `passwordlessLogin` | `(username: string) => Promise<PasswordlessLoginResult>` | Passwordless login or auto-signup. Sets token, stores user, increments `invalidationCount`. Throws with `code: PASSWORD_REQUIRED` for password-protected accounts. |
+| `passwordlessLogin` | `(username: string) => Promise<PasswordlessLoginResult>` | Passwordless login or auto-signup. Sets token, stores user, invalidates all cache entries. Throws with `code: PASSWORD_REQUIRED` for password-protected accounts. |
 | `showAdminLogin` | `boolean` | `true` when silent re-auth detected a password-protected stored username. Used by `PasswordlessAuthWidget` to auto-open an admin login prompt. |
 | `pendingAdminUsername` | `string \| null` | The username that triggered `showAdminLogin`. Pre-fills the username field in admin login forms. |
 | `clearAdminLogin` | `() => void` | Resets `showAdminLogin` and `pendingAdminUsername`. Called after successful admin login or dismissal. |
@@ -93,8 +95,8 @@ _Invalidation:_
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `invalidate` | `(marketId: string \| number) => void` | Increments `invalidationCount` (triggering all data hooks to re-fetch) and, if authenticated, refreshes the user profile via `fetchCurrentUser` (best-effort, errors swallowed). The `marketId` parameter is accepted for future per-market invalidation but currently unused. |
-| `invalidationCount` | `number` | Counter watched by all data hooks. Increments on calls to `invalidate()`, `login()`, `signup()`, and `logout()`. Does not increment on auto-auth at mount. |
+| `invalidate` | `(marketId: string \| number) => void` | Marks cache entries for the given market as stale, triggering subscribed hooks to refetch. Also refreshes the user profile via `fetchCurrentUser` when authenticated (best-effort, errors swallowed). |
+| `invalidateAll` | `() => void` | Marks all cache entries as stale, triggering all mounted data hooks to refetch. Called automatically by `login()`, `signup()`, and `logout()`. |
 
 
 _Theme:_
@@ -107,7 +109,7 @@ _Theme:_
 
 **Invalidation mechanism:**
 
-After a trade, call `ctx.invalidate(marketId)`. This increments the internal `invalidationCount`, which every data hook includes in its `useEffect` dependency array. All hooks re-fetch in parallel on the next render. If the user is authenticated, `invalidate` also fires a background `fetchCurrentUser` call to refresh the wallet balance (failure is silently ignored). The `login()`, `signup()`, and `logout()` callbacks also increment `invalidationCount`, so all data hooks automatically refresh after auth state changes.
+After a trade, call `ctx.invalidate(marketId)`. This marks the cache entries keyed to that market as stale, causing all hooks subscribed to those entries to refetch. If the user is authenticated, `invalidate` also fires a background `fetchCurrentUser` call to refresh the wallet balance (failure is silently ignored). The `login()`, `signup()`, and `logout()` callbacks call `invalidateAll()`, which marks all cache entries as stale, so all data hooks automatically refresh after auth state changes.
 
 **Examples:**
 
@@ -168,8 +170,9 @@ Pure function that normalizes an `FSThemeInput` into a `ResolvedFSTheme` with al
 All data-fetching hooks share a common pattern:
 
 * Accept `marketId` as the first argument
-* Return `{ data, loading, error, refetch }` (where `data` is the hook-specific field name like `market`, `consensus`, etc.)
-* Start with `loading: true`, set to `false` after the first fetch completes
-* Automatically re-fetch when `ctx.invalidationCount` changes (triggered by `invalidate()`, `login()`, `signup()`, or `logout()`)
+* Return `{ data, loading, isFetching, error, refetch }` (where `data` is the hook-specific field name like `market`, `consensus`, etc.)
+* `loading` is `true` only on the first fetch (no cached data). On background refetches, `loading` stays `false` and `isFetching` is `true`.
+* Primary data-fetching hooks accept optional `QueryOptions` (`pollInterval`, `enabled`). Composite hooks do not accept `QueryOptions` directly -- they inherit polling behavior from their inner hooks.
+* Automatically re-fetch when `ctx.invalidate(marketId)` is called or when the cache entry is otherwise invalidated
 * Throw if called outside a `FunctionSpaceProvider`
-* `refetch()` can be called imperatively to force a re-fetch at any time
+* `refetch()` returns `Promise<void>` and triggers a background refetch

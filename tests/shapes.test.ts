@@ -178,7 +178,7 @@ describe('Dip shape', () => {
   it('trough is near center', () => {
     const belief = generateDip(CENTER, SPREAD, K, L, H);
     const expectedIdx = Math.round(((CENTER - L) / (H - L)) * K);
-    // Allow ±3 index tolerance — the 1.5x spread widening + normalization can shift the minimum slightly
+    // Allow ±3 index tolerance  -- the 1.5x spread widening + normalization can shift the minimum slightly
     expect(Math.abs(troughIndex(belief) - expectedIdx)).toBeLessThanOrEqual(3);
   });
 

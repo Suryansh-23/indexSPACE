@@ -37,7 +37,7 @@ Check `resolveChartColors()` in `packages/react/src/themes.ts`:
 
 ### 5. Verify component chart color usage
 Scan chart components in `packages/ui/src/charts/`:
-- Charts access colors via `useContext(FunctionSpaceContext).chartColors` — NOT via CSS variables
+- Charts access colors via `useContext(FunctionSpaceContext).chartColors`  -- NOT via CSS variables
 - No hardcoded hex colors in Recharts `stroke`, `fill`, or `color` props
 - All `chartColors.*` field references match fields defined in `ChartColors` interface
 

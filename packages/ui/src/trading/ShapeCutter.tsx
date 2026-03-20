@@ -6,20 +6,16 @@ import {
   generateDip,
   generateLeftSkew,
   generateRightSkew,
-  previewPayoutCurve,
-  buy,
   SHAPE_DEFINITIONS,
 } from '@functionspace/core';
-import type { BuyResult, ShapeId } from '@functionspace/core';
-import { FunctionSpaceContext, useMarket } from '@functionspace/react';
+import type { ShapeId } from '@functionspace/core';
+import { FunctionSpaceContext, useMarket, useBuy, usePreviewPayout } from '@functionspace/react';
+import type { TradeInputBaseProps } from './types.js';
 import { Slider } from '../components/Slider.js';
 import { RangeSlider } from '../components/RangeSlider.js';
 import '../styles/base.css';
 
-export interface ShapeCutterProps {
-  marketId: string | number;
-  onBuy?: (result: BuyResult) => void;
-  onError?: (error: Error) => void;
+export interface ShapeCutterProps extends TradeInputBaseProps {
   /** Which shapes to offer. Defaults to all 8. */
   shapes?: ShapeId[];
   /** Initial shape selection. Defaults to 'gaussian'. */
@@ -37,6 +33,8 @@ export function ShapeCutter({
   if (!ctx) throw new Error('ShapeCutter must be used within FunctionSpaceProvider');
 
   const { market } = useMarket(marketId);
+  const { execute: submitBuy, loading: isSubmitting, error: buyError } = useBuy(marketId);
+  const { execute: previewPayout } = usePreviewPayout(marketId);
 
   const [selectedShape, setSelectedShape] = useState<ShapeId>(defaultShape);
   const [amount, setAmount] = useState('100');
@@ -45,12 +43,9 @@ export function ShapeCutter({
   const [rangeValues, setRangeValues] = useState<[number, number] | null>(null);
   const [peakBias, setPeakBias] = useState(50); // 0-100, displayed as percentage
   const [skewAmount, setSkewAmount] = useState(50); // 0-100, mapped to 0-1 for generators
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [potentialPayout, setPotentialPayout] = useState<number | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
 
   // Filter shape definitions
@@ -77,9 +72,6 @@ export function ShapeCutter({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
       ctx.setPreviewBelief(null);
       ctx.setPreviewPayout(null);
     };
@@ -158,12 +150,6 @@ export function ShapeCutter({
 
   // Debounced payout preview
   useEffect(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     const belief = generateCurrentBelief();
@@ -175,7 +161,7 @@ export function ShapeCutter({
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral, market.config.K, undefined, { signal: controller.signal });
+        const result = await previewPayout(belief, collateral);
         if (!mountedRef.current) return;
         setPotentialPayout(result.maxPayout);
         ctx.setPreviewPayout(result);
@@ -188,31 +174,9 @@ export function ShapeCutter({
     }, 500);
 
     return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [generateCurrentBelief, amount, market, marketId]);
-
-  // Prediction value for trade submission
-  const getPrediction = (): number => {
-    const { L, H } = market!.config;
-    switch (selectedShape) {
-      case 'gaussian':
-      case 'spike':
-      case 'dip':
-      case 'leftskew':
-      case 'rightskew':
-        return targetOutcome!;
-      case 'range':
-        return (rangeValues![0] + rangeValues![1]) / 2;
-      case 'bimodal':
-        return (peakBias / 100) <= 0.5 ? rangeValues![0] : rangeValues![1];
-      case 'uniform':
-        return (L + H) / 2;
-    }
-  };
 
   const resetToDefaults = () => {
     if (market) {
@@ -234,25 +198,16 @@ export function ShapeCutter({
     const collateral = parseFloat(amount);
     if (!belief || isNaN(collateral) || collateral < 1) return;
 
-    setIsSubmitting(true);
-    setError(null);
-
     try {
-      const result = await buy(ctx.client, marketId, belief, collateral, market.config.K, {
-        prediction: getPrediction(),
-      });
+      const result = await submitBuy(belief, collateral);
 
       resetToDefaults();
       ctx.setPreviewBelief(null);
       ctx.setPreviewPayout(null);
 
       onBuy?.(result);
-      ctx.invalidate(marketId);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to submit trade');
-      onError?.(err);
-    } finally {
-      setIsSubmitting(false);
+    } catch (err) {
+      onError?.(err instanceof Error ? err : new Error(String(err)));
     }
   };
 
@@ -298,19 +253,19 @@ export function ShapeCutter({
                 <div className="fs-sc-stat">
                   <span className="fs-sc-stat-label">Prediction</span>
                   <span className="fs-sc-stat-value fs-sc-stat-primary">
-                    {displayPrediction !== null ? displayPrediction.toFixed(2) : '\u2014'}
+                    {displayPrediction !== null ? displayPrediction.toFixed(2) : '--'}
                   </span>
                 </div>
                 <div className="fs-sc-stat">
                   <span className="fs-sc-stat-label">Payout Potential</span>
                   <span className={`fs-sc-stat-value ${potentialPayout !== null ? 'has-value' : ''}`}>
-                    {potentialPayout !== null ? `$${potentialPayout.toFixed(2)}` : '\u2014'}
+                    {potentialPayout !== null ? `$${potentialPayout.toFixed(2)}` : '--'}
                   </span>
                 </div>
                 <div className="fs-sc-stat">
                   <span className="fs-sc-stat-label">Max Loss</span>
                   <span className="fs-sc-stat-value fs-sc-stat-negative">
-                    {!isNaN(collateral) && collateral >= 1 ? `$${collateral.toFixed(2)}` : '\u2014'}
+                    {!isNaN(collateral) && collateral >= 1 ? `$${collateral.toFixed(2)}` : '--'}
                   </span>
                 </div>
               </div>
@@ -466,7 +421,7 @@ export function ShapeCutter({
           </div>
         </div>
 
-        {error && <div className="fs-error-box">{error}</div>}
+        {buyError && <div className="fs-error-box">{buyError.message}</div>}
 
         {/* Footer: Amount input + Submit side by side */}
         <div className="fs-sc-footer">

@@ -119,7 +119,7 @@ export function ConsensusChartContent({
       }
     }
     // Preview/overlays can stretch the axis up to 4x consensus height
-    // Beyond that, peaks get clipped — keeps consensus visible
+    // Beyond that, peaks get clipped  -- keeps consensus visible
     const cappedOverlay = Math.min(overlayMax, consensusMax * 4);
     const max = Math.max(consensusMax, cappedOverlay);
     return [0, max * 1.15];
@@ -289,7 +289,7 @@ export function ConsensusChartContent({
             }}
           />
 
-          {/* Consensus area — blue */}
+          {/* Consensus area  -- blue */}
           <Area
             yAxisId="left"
             type="monotone"
@@ -302,7 +302,7 @@ export function ConsensusChartContent({
             isAnimationActive={false}
           />
 
-          {/* Preview area — yellow dashed, linear interpolation for sharp edges */}
+          {/* Preview area  -- yellow dashed, linear interpolation for sharp edges */}
           {hasPreview && (
             <Area
               yAxisId="left"
@@ -318,7 +318,7 @@ export function ConsensusChartContent({
             />
           )}
 
-          {/* Selected position — green (from context, automatic coordination) */}
+          {/* Selected position  -- green (from context, automatic coordination) */}
           {hasSelected && (
             <Area
               yAxisId="left"
@@ -333,7 +333,7 @@ export function ConsensusChartContent({
             />
           )}
 
-          {/* Payout — tooltip-only, invisible line for data access */}
+          {/* Payout  -- tooltip-only, invisible line for data access */}
           {hasPayout && (
             <Area
               yAxisId="right"
@@ -348,7 +348,7 @@ export function ConsensusChartContent({
             />
           )}
 
-          {/* Overlay curves — from props */}
+          {/* Overlay curves  -- from props */}
           {overlayCurves?.map((overlay) => (
             <Area
               key={overlay.id}

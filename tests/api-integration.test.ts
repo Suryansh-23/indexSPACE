@@ -18,7 +18,7 @@ const USERNAME = process.env.FS_TEST_USERNAME || '';
 const PASSWORD = process.env.FS_TEST_PASSWORD || '';
 const MARKET_ID = process.env.FS_TEST_MARKET_ID || '15';
 
-// Use K=60, L and H from actual market — but for pure math tests use representative values
+// Use K=60, L and H from actual market  -- but for pure math tests use representative values
 const K = 60;
 const L = 0;
 const H = 100;

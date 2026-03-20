@@ -12,7 +12,7 @@ The fastest way to get trading widgets running. The demo app separates config fr
 
 > **Environment variables:** The demo app reads `VITE_FS_BASE_URL`, `VITE_FS_USERNAME`, `VITE_FS_PASSWORD`, `VITE_FS_MARKET_ID`, and `VITE_FS_AUTO_AUTH` from a `.env` file. Replace the hardcoded values below with your own or use environment variables.
 
-**Standalone example** — Config + layout in one file. Drop this into any React app to get started.
+**Standalone example**  -- Config + layout in one file. Drop this into any React app to get started.
 
 ```tsx
 import { FunctionSpaceProvider } from '@functionspace/react';
@@ -21,8 +21,8 @@ import { ConsensusChart, TradePanel, PositionTable, MarketStats, AuthWidget } fr
 
 const config = {
   baseUrl: 'https://your-api-url.com',
-  username: 'your-username',          // optional — omit for manual auth via AuthWidget
-  password: 'your-password',          // optional — omit for manual auth via AuthWidget
+  username: 'your-username',          // optional  -- omit for manual auth via AuthWidget
+  password: 'your-password',          // optional  -- omit for manual auth via AuthWidget
   autoAuthenticate: true,             // auto-login on mount when username/password provided
 };
 
@@ -52,7 +52,7 @@ export default function App() {
 }
 ```
 
-**`main.tsx`** — Standard React entry point. No SDK-specific code.
+**`main.tsx`**  -- Standard React entry point. No SDK-specific code.
 
 ```tsx
 import React from 'react';

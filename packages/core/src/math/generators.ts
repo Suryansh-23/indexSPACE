@@ -153,7 +153,7 @@ function splineKernel(
   // Step 3: Fritsch-Carlson monotonicity correction
   for (let i = 0; i < n - 1; i++) {
     if (Math.abs(delta[i]) < 1e-10) {
-      // Flat segment — zero tangents at both endpoints
+      // Flat segment  -- zero tangents at both endpoints
       m[i] = 0;
       m[i + 1] = 0;
     } else {
@@ -180,7 +180,7 @@ function splineKernel(
   for (let k = 0; k <= K; k++) {
     const x = L + (k / K) * (H - L);
 
-    // Clamp to control range — flat extension outside
+    // Clamp to control range  -- flat extension outside
     if (x <= controlX[0]) {
       raw[k] = Math.max(0, controlY[0]);
       continue;
@@ -271,7 +271,7 @@ export interface RangeInput {
 /**
  * L2: Range belief generator. Supports single or multiple outcome ranges.
  * Each range becomes a RangeRegion with configurable sharpness (0 = smooth taper, 1 = hard cliff).
- * Multiple ranges are composed into one belief vector — e.g., three non-contiguous
+ * Multiple ranges are composed into one belief vector  -- e.g., three non-contiguous
  * bucket selections become three range regions in a single normalized vector.
  * Resolves through generateBelief with RangeRegion[].
  */

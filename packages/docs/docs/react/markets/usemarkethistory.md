@@ -13,10 +13,11 @@ Fetches time-series history of consensus snapshots, used for fan chart rendering
 ```typescript
 function useMarketHistory(
   marketId: string | number,
-  options?: { limit?: number },
+  options?: { limit?: number; pollInterval?: number; enabled?: boolean },
 ): {
   history: MarketHistory | null;
   loading: boolean;
+  isFetching: boolean;
   error: Error | null;
   refetch: () => Promise<void>;
 }
@@ -26,11 +27,14 @@ function useMarketHistory(
 | --------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `marketId`      | `string \| number` | Market identifier                                                                                                                         |
 | `options.limit` | `number?`          | Maximum number of historical snapshots to fetch. Passed through to `queryMarketHistory`; when omitted the server applies its own default. |
+| `options.pollInterval` | `number?` | Polling interval in milliseconds. Default: `0` (no polling). |
+| `options.enabled` | `boolean?` | When `false`, suppresses fetching. Default: `true`. |
 
 **Behavior:**
 
 * Returns a `MarketHistory` object containing `marketId`, `totalSnapshots`, and a `snapshots` array of `MarketSnapshot` records ordered by timestamp.
-* Re-fetches automatically when `marketId`, `options.limit`, or the provider's `invalidationCount` changes.
+* Re-fetches automatically when `marketId` or `options.limit` changes, or when the market's cache entry is invalidated.
+* `loading` is `true` only on the first fetch. Background refetches set `isFetching` to `true`.
 * Throws if rendered outside `FunctionSpaceProvider`.
 
 **Delegates to:** `queryMarketHistory(client, marketId, limit)` from core.
@@ -57,7 +61,7 @@ function MarketTimeline({ marketId }: { marketId: number }) {
       <p>{history.totalSnapshots} total snapshots, showing {fanData.length} points</p>
       {fanData.map(pt => (
         <p key={pt.tradeId}>
-          {new Date(pt.timestamp).toLocaleDateString()} — mean: {pt.mean.toFixed(2)}
+          {new Date(pt.timestamp).toLocaleDateString()}  -- mean: {pt.mean.toFixed(2)}
         </p>
       ))}
     

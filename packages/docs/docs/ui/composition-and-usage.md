@@ -6,7 +6,7 @@ description: "How UI components communicate through context and compose together
 
 # Composition and Usage
 
-The SDK is designed around **composition through context**. Any combination of UI components works together automatically when placed inside the same `FunctionSpaceProvider` — no prop-passing, no manual wiring, no event bus.
+The SDK is designed around **composition through context**. Any combination of UI components works together automatically when placed inside the same `FunctionSpaceProvider`  -- no prop-passing, no manual wiring, no event bus.
 
 #### How Components Communicate
 
@@ -27,9 +27,9 @@ FunctionSpaceProvider
 1. **Any chart + any trade panel = working preview.** Place a `ConsensusChart` and a `TradePanel` in the same provider tree. Moving sliders on the trade panel instantly shows a dashed preview curve on the chart.
 2. **Any chart + `PositionTable` = position visualization.** Clicking a position row highlights that position's belief on the chart.
 3. **Any trade panel can stand alone.** Each trading widget handles its own loading, error states, and submission. You can use a `ShapeCutter` without any chart.
-4. **Charts can stand alone.** A `ConsensusChart` without a trade panel simply shows the market consensus — no preview overlay.
+4. **Charts can stand alone.** A `ConsensusChart` without a trade panel simply shows the market consensus  -- no preview overlay.
 5. **`DistributionState` syncs chart and selector.** Pass the same `useDistributionState()` result to both `MarketCharts` (or `DistributionChart`) and `BucketRangeSelector`. Changing the bucket count in one updates the other.
-6. **Mix and match freely — with one constraint.** Want a `TimelineChart` above a `BinaryPanel`? A `ConsensusChart` next to a `CustomShapeEditor`? A `MarketStats` bar above a `BucketTradePanel`? All valid. All automatic. **However, only one trading component should be mounted at a time.** Mounting multiple trading components simultaneously causes conflicting `previewBelief` and `previewPayout` writes to context, resulting in flickering previews.
+6. **Mix and match freely  -- with one constraint.** Want a `TimelineChart` above a `BinaryPanel`? A `ConsensusChart` next to a `CustomShapeEditor`? A `MarketStats` bar above a `BucketTradePanel`? All valid. All automatic. **However, only one trading component should be mounted at a time.** Mounting multiple trading components simultaneously causes conflicting `previewBelief` and `previewPayout` writes to context, resulting in flickering previews.
 
 #### Composition Examples
 

@@ -81,7 +81,7 @@ async function run() {
     const posRes = await fetch(`${BASE_URL}/api/market/positions?market_id=${MARKET_ID}`, { headers: headers() });
     const posData = await posRes.json();
     const openPos = posData.positions?.find((p: any) => p.status === 'open');
-    if (!openPos) return 'SKIPPED — no open positions to simulate';
+    if (!openPos) return 'SKIPPED  -- no open positions to simulate';
     const res = await fetch(`${BASE_URL}/api/sell/simulate/${openPos.position_id}?market_id=${MARKET_ID}`, { headers: headers() });
     const data = await res.json();
     if (!('current_value_t_star' in data)) throw new Error(`Missing current_value_t_star. Got: ${Object.keys(data).join(', ')}`);

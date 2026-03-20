@@ -1,5 +1,5 @@
 /**
- * render_ui_pngs.ts — Automated UI screenshot capture for SDK documentation
+ * render_ui_pngs.ts  -- Automated UI screenshot capture for SDK documentation
  *
  * Uses Playwright to capture pixel-perfect, retina-quality PNGs of every SDK
  * UI component and starter kit layout. Output goes to internal_sdk_docs/ui_images/.
@@ -10,11 +10,11 @@
  *
  * This script works with two companion React apps in demo-app/src/:
  *
- *   App_AllComponents.tsx        — Renders every UI component on one page.
+ *   App_AllComponents.tsx         -- Renders every UI component on one page.
  *                                  Each component is wrapped in a <div data-capture="ComponentName">
  *                                  so this script can target and screenshot them individually.
  *
- *   App_StarterKitCapture.tsx    — Hash-routed app that renders each starter kit layout.
+ *   App_StarterKitCapture.tsx     -- Hash-routed app that renders each starter kit layout.
  *                                  Navigate to #basic, #binary, #custom-shape, etc.
  *                                  Each layout is wrapped in <div data-capture="StarterKit_Name">.
  *                                  Uses noAuthConfig so AuthWidget renders logged-out.
@@ -26,10 +26,10 @@
  * MODES
  * ═══════════════════════════════════════════════════════════════════════════════
  *
- *   components — Captures individual UI components (14 components + 2 AuthWidget states).
+ *   components  -- Captures individual UI components (14 components + 2 AuthWidget states).
  *                Requires: `import App from './App_AllComponents'` in main.tsx.
  *
- *   kits       — Captures full starter kit layouts (6 layouts, logged-out state).
+ *   kits        -- Captures full starter kit layouts (6 layouts, logged-out state).
  *                Requires: `import App from './App_StarterKitCapture'` in main.tsx.
  *
  * ═══════════════════════════════════════════════════════════════════════════════
@@ -68,11 +68,11 @@
  * ENVIRONMENT VARIABLES
  * ═══════════════════════════════════════════════════════════════════════════════
  *
- *   DEV_URL  — Demo app URL (default: http://localhost:5173)
- *   SCALE    — Device scale factor for retina (default: 2, use 1 for standard)
+ *   DEV_URL   -- Demo app URL (default: http://localhost:5173)
+ *   SCALE     -- Device scale factor for retina (default: 2, use 1 for standard)
  *
  * ═══════════════════════════════════════════════════════════════════════════════
- * OUTPUT FILES — internal_sdk_docs/ui_images/
+ * OUTPUT FILES  -- internal_sdk_docs/ui_images/
  * ═══════════════════════════════════════════════════════════════════════════════
  *
  *   "components" mode produces:
@@ -109,7 +109,7 @@ const OUTPUT_DIR = path.resolve(__dirname, 'ui_images');
 // Each entry maps to a <div data-capture="Name"> in App_AllComponents.tsx.
 // - name:    Output filename (without .png extension)
 // - selector: CSS selector targeting the wrapper div
-// - waitFor:  Optional inner selector to wait for before capturing — ensures
+// - waitFor:  Optional inner selector to wait for before capturing  -- ensures
 //             the component has finished loading/rendering (e.g., Recharts SVG
 //             elements appear only after data fetches complete)
 
@@ -141,7 +141,7 @@ const COMPONENTS: {
 // Each entry maps to a hash route in App_StarterKitCapture.tsx.
 // The app uses a simple hash router: navigating to /#basic renders the
 // BasicTradingLayout, which wraps its content in <div data-capture="StarterKit_BasicTrading">.
-// - name: Output filename (without .png) — must match the data-capture attribute
+// - name: Output filename (without .png)  -- must match the data-capture attribute
 // - hash: URL hash fragment to navigate to
 
 const STARTER_KITS: {
@@ -214,7 +214,7 @@ async function captureComponents(page: Page) {
     const userBar = await page.$(`${authSelector} .fs-auth-user-bar`);
 
     if (userBar) {
-      // Already logged in — rename initial capture and sign out for logged-out capture
+      // Already logged in  -- rename initial capture and sign out for logged-out capture
       const loggedInPath = path.join(OUTPUT_DIR, 'AuthWidget_LoggedIn.png');
       const originalPath = path.join(OUTPUT_DIR, 'AuthWidget.png');
       if (fs.existsSync(originalPath)) {
@@ -232,7 +232,7 @@ async function captureComponents(page: Page) {
         }
       }
     } else {
-      // Not logged in — rename initial capture and sign in for logged-in capture
+      // Not logged in  -- rename initial capture and sign in for logged-in capture
       const loggedOutPath = path.join(OUTPUT_DIR, 'AuthWidget_LoggedOut.png');
       const originalPath = path.join(OUTPUT_DIR, 'AuthWidget.png');
       if (fs.existsSync(originalPath)) {

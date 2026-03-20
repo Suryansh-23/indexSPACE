@@ -8,6 +8,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { validateBeliefVector } from '../packages/core/src/validation.js';
+import { validateUsername } from '../packages/core/src/index.js';
 
 describe('validateBeliefVector', () => {
   it('accepts a valid belief vector', () => {
@@ -63,5 +64,59 @@ describe('validateBeliefVector', () => {
     expect(() => validateBeliefVector([Infinity, 0, 0], 2)).toThrow(
       'non-finite',
     );
+  });
+});
+
+describe('validateUsername', () => {
+  it('accepts a valid username', () => {
+    expect(validateUsername('alice_123')).toEqual({ valid: true });
+  });
+
+  it('accepts username with dots and dashes', () => {
+    expect(validateUsername('user.name-test')).toEqual({ valid: true });
+  });
+
+  it('rejects empty string', () => {
+    const result = validateUsername('');
+    expect(result.valid).toBe(false);
+    expect(result.error).toMatch(/at least 3/);
+  });
+
+  it('rejects too short (1-2 chars)', () => {
+    expect(validateUsername('ab').valid).toBe(false);
+  });
+
+  it('accepts exactly 3 characters', () => {
+    expect(validateUsername('abc').valid).toBe(true);
+  });
+
+  it('accepts exactly 32 characters', () => {
+    expect(validateUsername('a'.repeat(32)).valid).toBe(true);
+  });
+
+  it('rejects 33+ characters', () => {
+    const result = validateUsername('a'.repeat(33));
+    expect(result.valid).toBe(false);
+    expect(result.error).toMatch(/at most 32/);
+  });
+
+  it('rejects spaces', () => {
+    const result = validateUsername('user name');
+    expect(result.valid).toBe(false);
+    expect(result.error).toMatch(/Only letters/);
+  });
+
+  it('rejects special characters', () => {
+    const result = validateUsername('user@name!');
+    expect(result.valid).toBe(false);
+  });
+
+  it('trims whitespace before validating', () => {
+    // '  abc  ' trims to 'abc' which is valid
+    expect(validateUsername('  abc  ').valid).toBe(true);
+  });
+
+  it('whitespace-only string fails (trims to empty)', () => {
+    expect(validateUsername('   ').valid).toBe(false);
   });
 });

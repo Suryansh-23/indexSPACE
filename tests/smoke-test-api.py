@@ -89,7 +89,7 @@ def run():
         positions = pos_data.get('positions', [])
         open_pos = next((p for p in positions if p.get('status') == 'open'), None)
         if not open_pos:
-            return 'SKIPPED — no open positions to simulate'
+            return 'SKIPPED  -- no open positions to simulate'
         res = requests.get(f"{BASE_URL}/api/sell/simulate/{open_pos['position_id']}?market_id={MARKET_ID}", headers=headers())
         data = res.json()
         if 'current_value_t_star' not in data:

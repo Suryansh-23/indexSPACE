@@ -1,5 +1,5 @@
 // Chart zoom/pan pure math functions (L0 Pure Math)
-// Protocol-agnostic — no awareness of markets, positions, or charting libraries.
+// Protocol-agnostic  -- no awareness of markets, positions, or charting libraries.
 
 export interface ZoomParams {
   currentDomain: [number, number];
@@ -62,7 +62,7 @@ export function computeZoomedDomain(params: ZoomParams): [number, number] | null
   const minSpan = fullRange / maxZoomFactor;
   const clampedRange = Math.max(minSpan, Math.min(fullRange, newRange));
 
-  // 99% reset threshold — avoids near-full-range jitter
+  // 99% reset threshold  -- avoids near-full-range jitter
   if (clampedRange >= fullRange * 0.99) return null;
 
   // Preserve cursor position proportionally
@@ -86,7 +86,7 @@ export function computeZoomedDomain(params: ZoomParams): [number, number] | null
 /**
  * Compute a new X domain after a drag-to-pan operation.
  * Negative pixelDelta (drag right) shifts the domain left, positive shifts right.
- * Range is preserved — only the position changes.
+ * Range is preserved  -- only the position changes.
  */
 export function computePannedDomain(params: PanParams): [number, number] {
   const { startDomain, fullDomain, pixelDelta, plotAreaWidth } = params;

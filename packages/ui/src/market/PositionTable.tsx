@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
-import { previewSell, sell } from '@functionspace/core';
 import type { Position, SellResult } from '@functionspace/core';
-import { FunctionSpaceContext, usePositions } from '@functionspace/react';
+import { FunctionSpaceContext, usePositions, useSell, usePreviewSell } from '@functionspace/react';
 import '../styles/base.css';
 
 export type PositionTabId = 'open-orders' | 'trade-history' | 'market-positions';
@@ -9,6 +8,7 @@ export type PositionTabId = 'open-orders' | 'trade-history' | 'market-positions'
 export interface PositionTableProps {
   marketId: string | number;
   onSell?: (result: SellResult) => void;
+  onError?: (error: Error) => void;
   pageSize?: number;
   selectedPositionId?: number | null;
   onSelectPosition?: (id: number | null) => void;
@@ -22,7 +22,7 @@ const TAB_LABELS: Record<PositionTabId, string> = {
 };
 
 const formatCurrency = (value: number | null | undefined): string => {
-  if (value === null || value === undefined) return '—';
+  if (value === null || value === undefined) return '--';
   return `$${Math.abs(value).toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -30,7 +30,7 @@ const formatCurrency = (value: number | null | undefined): string => {
 };
 
 const formatTimestamp = (iso: string | null): string => {
-  if (!iso) return '—';
+  if (!iso) return '--';
   return iso.replace('T', ' ').slice(0, 19);
 };
 
@@ -51,6 +51,7 @@ const sortByIdDesc = (positions: Position[]): Position[] => {
 export function PositionTable({
   marketId,
   onSell,
+  onError,
   pageSize = 20,
   selectedPositionId,
   onSelectPosition,
@@ -59,6 +60,9 @@ export function PositionTable({
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('PositionTable must be used within FunctionSpaceProvider');
 
+  const { execute: executeSell } = useSell(marketId);
+  const { execute: executePreviewSell } = usePreviewSell(marketId);
+
   const effectiveUsername = ctx.user?.username;
 
   // Tab management (follows MarketCharts pattern)
@@ -66,7 +70,7 @@ export function PositionTable({
   const showTabs = effectiveTabs.length > 1;
   const [activeTab, setActiveTab] = useState<PositionTabId>(effectiveTabs[0]);
 
-  // Data fetching — single API call
+  // Data fetching -- single API call
   const hasMarketTab = effectiveTabs.includes('market-positions');
   const { positions: rawPositions, loading, error, refetch } = usePositions(
     marketId,
@@ -129,7 +133,7 @@ export function PositionTable({
 
     const results = await Promise.allSettled(
       openPositions.map((p) =>
-        previewSell(ctx.client, p.positionId as number, marketId).then((r) => ({
+        executePreviewSell(p.positionId as number).then((r) => ({
           positionId: p.positionId,
           value: r.collateralReturned,
         }))
@@ -147,9 +151,9 @@ export function PositionTable({
     });
 
     setMarketValues((prev) => ({ ...prev, ...newValues }));
-  }, [ctx.client, marketId]);
+  }, [executePreviewSell]);
 
-  // Tab-aware market value refresh — never fetch for Trade History
+  // Tab-aware market value refresh -- never fetch for Trade History
   useEffect(() => {
     if (activeTab === 'trade-history') return;
     if (paginatedPositions.length > 0) {
@@ -162,12 +166,13 @@ export function PositionTable({
     setSellError(null);
 
     try {
-      const result = await sell(ctx.client, positionId as number, marketId);
+      const result = await executeSell(positionId as number);
       onSell?.(result);
-      ctx.invalidate(marketId);
       await refetch();
-    } catch (err: any) {
-      setSellError(err?.message || 'Failed to sell position');
+    } catch (err) {
+      const errObj = err instanceof Error ? err : new Error(String(err) || 'Failed to sell position');
+      setSellError(errObj.message);
+      onError?.(errObj);
     } finally {
       setSellInProgress((prev) => {
         const copy = new Set(prev);
@@ -241,7 +246,7 @@ export function PositionTable({
         </span>
       </td>
     );
-    const predictionCell = <td>{p.prediction?.toFixed(2) ?? '—'}</td>;
+    const predictionCell = <td>{p.prediction?.toFixed(2) ?? '--'}</td>;
     const costCell = <td>{formatCurrency(p.collateral)}</td>;
     const plCell = (
       <td>
@@ -249,14 +254,14 @@ export function PositionTable({
           <span className={`fs-pl ${profitLoss >= 0 ? 'profit' : 'loss'}`}>
             {profitLoss >= 0 ? '+' : ''}{formatCurrency(profitLoss)}
           </span>
-        ) : '—'}
+        ) : '--'}
       </td>
     );
     const plPctCell = (
       <td>
         {pnlPct !== null ? (
           <span className={`fs-pl ${profitLoss! >= 0 ? 'profit' : 'loss'}`}>{pnlPct}</span>
-        ) : '—'}
+        ) : '--'}
       </td>
     );
 
@@ -265,7 +270,7 @@ export function PositionTable({
         return (
           <>
             {idCell}{timestampCell}{statusCell}{predictionCell}{costCell}
-            <td>{marketValue !== null ? formatCurrency(marketValue) : '—'}</td>
+            <td>{marketValue !== null ? formatCurrency(marketValue) : '--'}</td>
             {plCell}{plPctCell}
             <td>
               {isOpen && !isSelling && (
@@ -274,7 +279,7 @@ export function PositionTable({
                 </button>
               )}
               {isOpen && isSelling && <span className="fs-selling">Selling...</span>}
-              {!isOpen && <span className="fs-no-action">—</span>}
+              {!isOpen && <span className="fs-no-action">--</span>}
             </td>
           </>
         );
@@ -301,7 +306,7 @@ export function PositionTable({
             </td>
             {statusCell}{predictionCell}{costCell}
             <td>{formatCurrency(p.soldPrice)}</td>
-            <td>{marketValue !== null ? formatCurrency(marketValue) : '—'}</td>
+            <td>{marketValue !== null ? formatCurrency(marketValue) : '--'}</td>
             {plCell}
           </>
         );

@@ -46,7 +46,7 @@ Widget (UI) → Hook (React) → Query/Transaction (Core) → Backend API
 - **Server state** flows through hooks: `useMarket`, `useConsensus`, `usePositions`, etc.
 - **Preview state** flows through context: `previewBelief`, `previewPayout` (ephemeral, set by trade inputs)
 - **Coordination state** flows through context: `selectedPosition` (syncs chart overlays with table selection)
-- **Cache invalidation** uses `ctx.invalidate(marketId)` after mutations, which increments `invalidationCount` and triggers all hooks to refetch
+- **Cache invalidation** uses `ctx.invalidate(marketId)` after mutations, which marks that market's cache entries as stale and triggers subscribed hooks to refetch
 
 ---
 
@@ -100,7 +100,7 @@ import { FunctionSpaceProvider } from '@functionspace/react';
 </FunctionSpaceProvider>
 ```
 
-**Hooks** -- Each returns `{ <named>, loading, error, refetch }` and reacts to `invalidationCount` for automatic cache busting after mutations.
+**Hooks** -- Each returns `{ <named>, loading, isFetching, error, refetch }` and uses cache subscription for automatic refetch after mutations.
 
 | Hook | Returns | Use For |
 |------|---------|---------|

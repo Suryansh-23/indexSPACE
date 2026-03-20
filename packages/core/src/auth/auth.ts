@@ -17,7 +17,7 @@ function mapUserProfile(raw: any): UserProfile {
 
 /**
  * Authenticate a user and return token + profile.
- * Uses raw fetch() to bypass ensureAuth — auth endpoints are the one case
+ * Uses raw fetch() to bypass ensureAuth  -- auth endpoints are the one case
  * where we POST without a token.
  */
 export async function loginUser(
@@ -48,7 +48,7 @@ export async function loginUser(
 }
 
 /**
- * Register a new user. Returns the user profile but NO token —
+ * Register a new user. Returns the user profile but NO token  --
  * caller must call loginUser after to obtain a session token.
  */
 export async function signupUser(

@@ -23,8 +23,8 @@ Install (headless React -- hooks only, no pre-built components):
 - [4. Data Hooks Reference](#4-data-hooks-reference)
 - [5. State & Action Hooks](#5-state--action-hooks)
 - [6. Building Beliefs](#6-building-beliefs)
-- [7. Executing Trades (Headless)](#7-executing-trades-headless)
-- [8. Previews](#8-previews)
+- [7. Mutation Hooks (Trade Execution)](#7-mutation-hooks-trade-execution)
+- [8. Preview Hooks](#8-preview-hooks)
 - [9. Context API Quick Reference](#9-context-api-quick-reference)
 - [10. NEVER Rules (Headless)](#10-never-rules-headless)
 - [11. Type Reference](#11-type-reference)
@@ -51,7 +51,7 @@ Description: A TypeScript SDK for embedding prediction market trading widgets in
 
 ### 1.2 What This Package Does
 
-The `@functionspace/react` package provides the React integration layer for the FunctionSpace Trading SDK. It includes `FunctionSpaceProvider` (which manages auth, theming, and shared state), data-fetching hooks (`useMarket`, `useConsensus`, `usePositions`, etc.), state hooks (`useAuth`, `useCustomShape`, `useChartZoom`), and the context API for cross-component coordination.
+The `@functionspace/react` package provides the React integration layer for the FunctionSpace Trading SDK. It includes `FunctionSpaceProvider` (which manages auth, theming, and shared state), data-fetching hooks (`useMarket`, `useConsensus`, `usePositions`, etc.), mutation hooks (`useBuy`, `useSell`), preview hooks (`usePreviewPayout`, `usePreviewSell`), state hooks (`useAuth`, `useCustomShape`, `useChartZoom`), and the context API for cross-component coordination.
 
 ### 1.3 Package Dependency Chain
 
@@ -86,14 +86,9 @@ This document covers `@functionspace/core` + `@functionspace/react` (headless cu
 
 | # | Limitation | Impact | Workaround |
 |---|-----------|--------|------------|
-| 1 | **No query caching or request deduplication.** Each hook instance fires its own independent API request. Mounting `useMarket` and `useConsensus` for the same market produces two separate network calls to the same endpoint. No `staleTime` or `gcTime` behavior exists. | Redundant API traffic scales linearly with the number of mounted hooks. Pages with multiple widgets for one market generate multiple identical requests per invalidation cycle. | Accept the redundant requests. Do not attempt to add TanStack Query, SWR, or any external caching wrapper around the SDK hooks. The internal hook API is not designed to be wrapped by external cache layers, and doing so will break invalidation coordination. |
-| 2 | **No real-time transport (WebSocket/SSE).** The SDK has no push-based data delivery. All data freshness depends on explicit refetch calls or polling. Changes made by other users are not automatically visible. | Market state, consensus curves, and position data go stale between manual refetches. In multi-user scenarios, the local view drifts from server state until the next refetch. | Use `useTradeHistory` with the `pollInterval` option to create a live trade feed (e.g., `useTradeHistory(marketId, { pollInterval: 3000 })`). For other data types, call `ctx.invalidate(marketId)` after local trades to trigger a refetch of all hooks. There is no polling support for hooks other than `useTradeHistory`. |
-| 3 | **No mutation hooks.** `buy()` and `sell()` are imported directly from `@functionspace/core`, not from `@functionspace/react`. No `useBuy` or `useSell` hooks exist. Preview functions (`previewPayoutCurve`, `previewSell`) are also core imports. | Developers building custom trade UIs must import from two packages (`@functionspace/core` for mutations and `@functionspace/react` for data hooks), manage their own `submitting`/`error` state, and manually call `ctx.invalidate(marketId)` and `ctx.refreshUser()` after every trade. | Import `buy` and `sell` from `@functionspace/core`. After a successful trade, call `ctx.invalidate(marketId)` to refresh all data hooks, then call `ctx.refreshUser()` to update the wallet balance. |
+| 2 | **No real-time transport (WebSocket/SSE).** The SDK has no push-based data delivery. All data freshness depends on polling or explicit refetch calls. Changes made by other users are not automatically visible without polling. | Market state, consensus curves, and position data go stale between refetches. In multi-user scenarios, the local view drifts from server state until the next poll or refetch. | Use `pollInterval` on any data hook to poll for updates (e.g., `useConsensus(marketId, 200, { pollInterval: 3000 })`). Call `ctx.invalidate(marketId)` after local trades for immediate refetch. |
 | 4 | **No market search or filtering.** `discoverMarkets()` returns all available markets as a flat `MarketState[]` array. The function accepts no search, filter, sort, or pagination parameters. | Applications that need to display a subset of markets must fetch the entire market list on every call. There is no server-side filtering. | Call `discoverMarkets(client)` and filter the returned array client-side using standard `Array.filter()`, `Array.sort()`, or `Array.find()` methods. |
-| 5 | **Global invalidation only.** `ctx.invalidate(marketId)` accepts a `marketId` parameter, but the parameter is currently ignored. Calling `invalidate` increments a global counter that causes every mounted data-fetching hook to refetch, regardless of which market the hook watches. | In multi-market dashboards, a trade on one market triggers unnecessary refetches for all other markets. Network traffic and UI re-renders scale with the total number of mounted hooks across all markets, not just the affected market. | Accept the global refetch behavior. Do not attempt to build per-market invalidation logic on top of the SDK. The `marketId` parameter is accepted for forward-compatibility and will be respected in a future release. |
 | 7 | **Settlement not yet implemented.** The `Position` type includes `settlementPayout` and `MarketState` includes `resolvedOutcome` fields, but no settlement functions exist in the SDK. | Positions in resolved markets cannot be settled through the SDK. The `settlementPayout` field is always `null` in current responses. | Monitor the `resolutionState` field on `MarketState` for `'resolved'` or `'voided'` status. Settlement processing must be handled outside the SDK until settlement functions are added. |
-| 8 | **Race conditions in data hooks on rapid marketId changes.** Data-fetching hooks (useMarket, useConsensus, usePositions, useMarketHistory, useDistributionState, useBucketDistribution) do not use AbortController or generation counters. If `marketId` changes rapidly, an earlier response can resolve after a later one and overwrite it with stale data. | When switching markets quickly (e.g., clicking through a market list), displayed data may briefly show results from a previously selected market. | Avoid rapid programmatic `marketId` switching. If building a market list with click-to-select, the data will self-correct once all in-flight requests settle. |
-| 9 | **Missing mounted guards in data hooks.** The same data-fetching hooks listed above do not check component mount status before calling `setState`. Fast unmount/remount cycles can trigger React warnings about state updates on unmounted components. | Console warnings during fast navigation. No data corruption, but noisy logs. | These warnings are benign and do not affect functionality. They will be resolved in a future release. |
 
 ---
 
@@ -142,6 +137,15 @@ The `config` object accepts these fields:
 | `username` | `string` | No | Username for auto-authentication |
 | `password` | `string` | No | Password for auto-authentication |
 | `autoAuthenticate` | `boolean` | No | When `true` (the default if `username` and `password` are provided), the provider logs in automatically on mount |
+
+The `FunctionSpaceProvider` component also accepts these optional props:
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `config` | `FSConfig` | Yes | Configuration object (see table above) |
+| `theme` | `FSThemeInput` | No | Theme preset string or custom theme object |
+| `cache` | `CacheConfig` | No | Cache configuration: `{ staleTime?, gcTime?, defaultPollInterval?, revalidateOnFocus?, revalidateOnReconnect? }` |
+| `storedUsername` | `string \| null` | No | Previously stored username for silent re-authentication on mount |
 
 ### Import Map
 
@@ -241,18 +245,24 @@ const config = {
 
 ## 4. Data Hooks Reference
 
-All data-fetching hooks follow a consistent contract. Each returns an object with a named data property, plus `loading`, `error`, and `refetch`. All data hooks react to `ctx.invalidationCount` -- when any component calls `ctx.invalidate(marketId)`, every mounted data hook refetches automatically.
+All data-fetching hooks follow a consistent contract. Each returns an object with a named data property, plus `loading`, `isFetching`, `error`, and `refetch`. All data hooks subscribe to the query cache and automatically refetch when `ctx.invalidate(marketId)` is called. All data hooks accept optional `QueryOptions` (`pollInterval`, `enabled`) for cache-based polling and conditional fetching.
 
-### `useMarket(marketId)`
+**`loading` vs `isFetching`:** `loading` is `true` only on the first fetch (no cached data). On background refetches (polling, invalidation), `loading` stays `false` and `isFetching` is `true`. This prevents UI flicker during polling and background refetches.
+
+### `useMarket(marketId, options?)`
 
 Fetches the complete market state including configuration, consensus, and metadata.
 
 ```typescript
-function useMarket(marketId: string | number): {
+function useMarket(
+  marketId: string | number,
+  options?: QueryOptions,
+): {
   market: MarketState | null;
   loading: boolean;
+  isFetching: boolean;
   error: Error | null;
-  refetch: () => void;
+  refetch: () => Promise<void>;
 }
 ```
 
@@ -261,15 +271,18 @@ function useMarket(marketId: string | number): {
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `marketId` | `string \| number` | The market identifier |
+| `options.pollInterval` | `number?` | Polling interval in ms. Default: `0` (no polling). |
+| `options.enabled` | `boolean?` | When `false`, suppresses fetching. Default: `true`. |
 
 **Return shape:**
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `market` | `MarketState \| null` | Complete market state, or `null` while loading |
-| `loading` | `boolean` | `true` during the initial fetch |
+| `loading` | `boolean` | `true` only on the first fetch (no cached data) |
+| `isFetching` | `boolean` | `true` whenever a request is in flight (first fetch or background refetch) |
 | `error` | `Error \| null` | Fetch error, if any |
-| `refetch` | `() => void` | Manually trigger a refetch |
+| `refetch` | `() => Promise<void>` | Trigger a background refetch |
 
 The `MarketState` object contains the market configuration (`market.config` with `K`, `L`, `H`, and other protocol parameters), the current consensus vector (`market.consensus`), pool statistics (`market.totalMass`, `market.poolBalance`, `market.totalVolume`), metadata (`market.title`, `market.xAxisUnits`, `market.decimals`), and resolution state (`market.resolutionState`).
 
@@ -297,7 +310,7 @@ function MarketHeader({ marketId }: { marketId: string }) {
 }
 ```
 
-### `useConsensus(marketId, numPoints?)`
+### `useConsensus(marketId, numPoints?, options?)`
 
 Fetches the consensus probability density as a renderable curve (array of `{x, y}` points).
 
@@ -305,11 +318,13 @@ Fetches the consensus probability density as a renderable curve (array of `{x, y
 function useConsensus(
   marketId: string | number,
   numPoints?: number,
+  options?: QueryOptions,
 ): {
   consensus: ConsensusCurve | null;
   loading: boolean;
+  isFetching: boolean;
   error: Error | null;
-  refetch: () => void;
+  refetch: () => Promise<void>;
 }
 ```
 
@@ -318,16 +333,19 @@ function useConsensus(
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `marketId` | `string \| number` | -- | The market identifier |
-| `numPoints` | `number` | Server default | Number of sample points for the density curve |
+| `numPoints` | `number` | `200` | Number of sample points for the density curve |
+| `options.pollInterval` | `number?` | `0` | Polling interval in ms. |
+| `options.enabled` | `boolean?` | `true` | When `false`, suppresses fetching. |
 
 **Return shape:**
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `consensus` | `ConsensusCurve \| null` | Object containing `points: Array<{x: number; y: number}>` and `config: MarketConfig` |
-| `loading` | `boolean` | `true` during the initial fetch |
+| `loading` | `boolean` | `true` only on the first fetch (no cached data) |
+| `isFetching` | `boolean` | `true` whenever a request is in flight |
 | `error` | `Error \| null` | Fetch error, if any |
-| `refetch` | `() => void` | Manually trigger a refetch |
+| `refetch` | `() => Promise<void>` | Trigger a background refetch |
 
 **Example:**
 
@@ -356,19 +374,21 @@ function ConsensusPeakDisplay({ marketId }: { marketId: string }) {
 }
 ```
 
-### `usePositions(marketId, username?)`
+### `usePositions(marketId, username?, options?)`
 
-Fetches all positions for a market, with an optional filter by username.
+Fetches all positions for a market, with an optional filter by username. Filtering is client-side after the cache -- one API call per market regardless of username.
 
 ```typescript
 function usePositions(
   marketId: string | number,
   username?: string,
+  options?: QueryOptions,
 ): {
   positions: Position[] | null;
   loading: boolean;
+  isFetching: boolean;
   error: Error | null;
-  refetch: () => void;
+  refetch: () => Promise<void>;
 }
 ```
 
@@ -378,6 +398,8 @@ function usePositions(
 |-----------|------|---------|-------------|
 | `marketId` | `string \| number` | -- | The market identifier |
 | `username` | `string` | `undefined` | When provided, filters positions to this user only. When omitted, returns all market positions. |
+| `options.pollInterval` | `number?` | `0` | Polling interval in ms. |
+| `options.enabled` | `boolean?` | `true` | When `false`, suppresses fetching. |
 
 **Example:**
 
@@ -415,17 +437,18 @@ function MyPositions({ marketId }: { marketId: string }) {
 
 ### `useTradeHistory(marketId, options?)`
 
-Fetches trade history entries. This is the only data hook that supports `pollInterval` for automatic periodic refetching.
+Fetches trade history entries with optional cache-based polling.
 
 ```typescript
 function useTradeHistory(
   marketId: string | number,
-  options?: { limit?: number; pollInterval?: number },
+  options?: { limit?: number; pollInterval?: number; enabled?: boolean },
 ): {
   trades: TradeEntry[] | null;
   loading: boolean;
+  isFetching: boolean;
   error: Error | null;
-  refetch: () => void;
+  refetch: () => Promise<void>;
 }
 ```
 
@@ -435,7 +458,8 @@ function useTradeHistory(
 |-----------|------|---------|-------------|
 | `marketId` | `string \| number` | -- | The market identifier |
 | `options.limit` | `number` | `100` | Maximum number of trade entries to return |
-| `options.pollInterval` | `number` | `undefined` | Polling interval in milliseconds. When set, the hook refetches at this interval automatically. |
+| `options.pollInterval` | `number` | `0` | Polling interval in milliseconds. Visibility-aware and deduplicated. |
+| `options.enabled` | `boolean?` | `true` | When `false`, suppresses fetching. |
 
 **Example:**
 
@@ -474,12 +498,13 @@ Fetches historical market snapshots (alpha vector changes over time). Used to bu
 ```typescript
 function useMarketHistory(
   marketId: string | number,
-  options?: { limit?: number },
+  options?: { limit?: number; pollInterval?: number; enabled?: boolean },
 ): {
   history: MarketHistory | null;
   loading: boolean;
+  isFetching: boolean;
   error: Error | null;
-  refetch: () => void;
+  refetch: () => Promise<void>;
 }
 ```
 
@@ -523,7 +548,7 @@ function useBucketDistribution(
   buckets: BucketData[] | null;
   loading: boolean;
   error: Error | null;
-  refetch: () => void;
+  refetch: () => Promise<void>;
 }
 ```
 
@@ -727,7 +752,7 @@ function useDistributionState(
 | `market` | `MarketState \| null` | The market state |
 | `loading` | `boolean` | Loading state |
 | `error` | `Error \| null` | Error state |
-| `refetch` | `() => void` | Refetch data |
+| `refetch` | `() => Promise<void>` | Refetch data |
 | `bucketCount` | `number` | Current bucket count |
 | `setBucketCount` | `(n: number) => void` | Update bucket count |
 | `buckets` | `BucketData[] \| null` | Computed bucket distribution |
@@ -840,11 +865,53 @@ const belief = generateRange(70, 85, K, L, H, 0.5);
 
 ---
 
-## 7. Executing Trades (Headless)
+## 7. Mutation Hooks (Trade Execution)
 
-The SDK's pre-built trading widgets implement a three-phase pattern for trade execution. When building custom UI, you must replicate this pattern yourself.
+Mutation hooks wrap core trade functions with managed state and automatic cache invalidation. They return `{ execute, loading, error, reset }` -- distinct from data-fetching hooks which return `{ <named>, loading, isFetching, error, refetch }`.
+
+### `useBuy(marketId)`
+
+Opens a new position. Auto-invalidates the market's cache on success.
+
+```typescript
+import { useBuy } from '@functionspace/react';
+
+const { execute, loading, error, reset } = useBuy(marketId);
+const result = await execute(belief, collateral);
+// Cache invalidation happens automatically -- no need to call ctx.invalidate()
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `marketId` | `string \| number` | Market to trade on |
+
+**`execute(belief, collateral)`** -- Submits the trade. Returns `Promise<BuyResult>`. Throws on failure.
+**`loading`** -- `true` while the request is in flight.
+**`error`** -- Most recent error, or `null`.
+**`reset()`** -- Clears `error` to `null`.
+
+The hook reads `numBuckets` from the market cache automatically. If market data is not yet loaded, it throws.
+
+### `useSell(marketId)`
+
+Closes an open position. Auto-invalidates the market's cache on success.
+
+```typescript
+import { useSell } from '@functionspace/react';
+
+const { execute, loading, error, reset } = useSell(marketId);
+const result = await execute(positionId);
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `marketId` | `string \| number` | Market the position belongs to |
+
+**`execute(positionId)`** -- Closes the position. Returns `Promise<SellResult>`. Throws on failure.
 
 ### The Three-Phase Pattern
+
+The SDK's pre-built trading widgets implement a three-phase pattern. When building custom UI, replicate this pattern using mutation hooks.
 
 **Phase 1: Build belief and set preview (instant, every input change).**
 
@@ -856,61 +923,30 @@ ctx.setPreviewBelief(belief);
 **Phase 2: Preview payout (debounced, 500ms after last input change).**
 
 ```typescript
-const payout = await previewPayoutCurve(ctx.client, marketId, belief, collateral, K);
-ctx.setPreviewPayout(payout);
+const { execute: preview } = usePreviewPayout(marketId);
+
+// Inside a debounced effect:
+const curve = await preview(belief, collateral);
+ctx.setPreviewPayout(curve);
 ```
 
 **Phase 3: Submit trade (on user confirmation).**
 
 ```typescript
-const result = await buy(ctx.client, marketId, belief, collateral, K, { prediction });
+const { execute: executeBuy } = useBuy(marketId);
+
+const result = await executeBuy(belief, collateral);
 ctx.setPreviewBelief(null);
 ctx.setPreviewPayout(null);
-ctx.invalidate(marketId);
-await ctx.refreshUser();
-```
-
-### `buy(client, marketId, belief, collateral, numBuckets, options?)`
-
-Opens a new position. Imported from `@functionspace/core`.
-
-```typescript
-import { buy } from '@functionspace/core';
-
-async function buy(
-  client: FSClient,
-  marketId: string | number,
-  belief: BeliefVector,
-  collateral: number,
-  numBuckets: number,
-  options?: { prediction?: number },
-): Promise<BuyResult>
-```
-
-### `sell(client, positionId, marketId)`
-
-Closes an open position and returns collateral. Imported from `@functionspace/core`.
-
-```typescript
-import { sell } from '@functionspace/core';
-
-async function sell(
-  client: FSClient,
-  positionId: string | number,
-  marketId: string | number,
-): Promise<SellResult>
+// No need to call ctx.invalidate() -- useBuy does it automatically
 ```
 
 ### Complete Working Example: Custom Trade Form
 
 ```tsx
 import React, { useState, useContext, useEffect, useRef, useCallback } from 'react';
-import { FunctionSpaceContext, useMarket } from '@functionspace/react';
-import {
-  generateGaussian,
-  buy,
-  previewPayoutCurve,
-} from '@functionspace/core';
+import { FunctionSpaceContext, useMarket, useBuy, usePreviewPayout } from '@functionspace/react';
+import { generateGaussian } from '@functionspace/core';
 import type { PayoutCurve } from '@functionspace/core';
 
 function CustomTradeForm({ marketId }: { marketId: string }) {
@@ -918,16 +954,16 @@ function CustomTradeForm({ marketId }: { marketId: string }) {
   if (!ctx) throw new Error('Must be within FunctionSpaceProvider');
 
   const { market, loading: marketLoading } = useMarket(marketId);
+  const { execute: executeBuy, loading: buyLoading, error: buyError } = useBuy(marketId);
+  const { execute: previewPayout } = usePreviewPayout(marketId);
 
   // User inputs
   const [center, setCenter] = useState(75);
   const [spread, setSpread] = useState(5);
   const [collateral, setCollateral] = useState(10);
 
-  // Trade state
+  // Local state
   const [payout, setPayout] = useState<PayoutCurve | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
 
   // Debounce timer ref
@@ -947,10 +983,11 @@ function CustomTradeForm({ marketId }: { marketId: string }) {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       try {
-        const curve = await previewPayoutCurve(ctx.client, marketId, belief, collateral, K);
+        const curve = await previewPayout(belief, collateral);
         setPayout(curve);
         ctx.setPreviewPayout(curve);
       } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
         setPayout(null);
         ctx.setPreviewPayout(null);
       }
@@ -972,30 +1009,23 @@ function CustomTradeForm({ marketId }: { marketId: string }) {
   // Phase 3: Submit trade
   const handleBuy = useCallback(async () => {
     if (!market) return;
-    setError(null);
-    setSubmitting(true);
 
     try {
       const { K, L, H } = market.config;
       const belief = generateGaussian(center, spread, K, L, H);
 
-      const result = await buy(ctx.client, marketId, belief, collateral, K, {
-        prediction: center,
-      });
+      const result = await executeBuy(belief, collateral);
+      // Cache invalidation and wallet refresh happen automatically
 
       ctx.setPreviewBelief(null);
       ctx.setPreviewPayout(null);
       setPayout(null);
-      ctx.invalidate(marketId);
-      await ctx.refreshUser();
 
       setLastResult(
         `Position #${result.positionId} opened: ${result.claims.toFixed(4)} claims for $${result.collateral}`,
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Trade failed');
-    } finally {
-      setSubmitting(false);
+      // error is also available via buyError
     }
   }, [market, center, spread, collateral, marketId]);
 
@@ -1026,11 +1056,11 @@ function CustomTradeForm({ marketId }: { marketId: string }) {
       {payout && (
         <p>Max payout: ${payout.maxPayout.toFixed(2)} at outcome {payout.maxPayoutOutcome.toFixed(1)}</p>
       )}
-      <button onClick={handleBuy} disabled={submitting || !ctx.isAuthenticated}>
-        {submitting ? 'Submitting...' : `Buy for $${collateral}`}
+      <button onClick={handleBuy} disabled={buyLoading || !ctx.isAuthenticated}>
+        {buyLoading ? 'Submitting...' : `Buy for $${collateral}`}
       </button>
       {!ctx.isAuthenticated && <p>Log in to trade</p>}
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {buyError && <p style={{ color: 'red' }}>{buyError.message}</p>}
       {lastResult && <p style={{ color: 'green' }}>{lastResult}</p>}
     </div>
   );
@@ -1041,22 +1071,29 @@ export default CustomTradeForm;
 
 ---
 
-## 8. Previews
+## 8. Preview Hooks
 
-Previews are read-only API calls that preview what would happen without executing a trade.
+Preview hooks wrap read-only core preview functions with managed state and automatic request cancellation. They return the same `{ execute, loading, error, reset }` shape as mutation hooks but do not auto-invalidate the cache.
 
-### `previewPayoutCurve(client, marketId, belief, collateral, numBuckets, numOutcomes?, options?)`
+### `usePreviewPayout(marketId)`
 
-Previews what the settlement payout would be for every possible outcome given a hypothetical belief and collateral amount.
+Previews payout curve for a hypothetical trade. Manages its own `AbortController` -- each call to `execute` cancels any previous in-flight request.
 
 ```typescript
-import { previewPayoutCurve } from '@functionspace/core';
+import { usePreviewPayout } from '@functionspace/react';
 
-const curve = await previewPayoutCurve(ctx.client, marketId, belief, collateral, K);
+const { execute: preview, loading, error } = usePreviewPayout(marketId);
+const curve = await preview(belief, collateral);
 ctx.setPreviewPayout(curve);
 ```
 
-**Returns `PayoutCurve`:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `marketId` | `string \| number` | Market to preview |
+
+**`execute(belief, collateral)`** -- Returns `Promise<PayoutCurve>`. Automatically reads `numBuckets` from the market cache. Aborts any previous in-flight request.
+
+**`PayoutCurve` fields:**
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -1065,15 +1102,35 @@ ctx.setPreviewPayout(curve);
 | `maxPayoutOutcome` | `number` | The outcome value that produces the best payout |
 | `inputCollateral` | `number` | Echo of the collateral you passed in |
 
-### `previewSell(client, positionId, marketId, options?)`
+Debouncing is the caller's responsibility (typically 500ms). The hook handles only the request and cancellation.
 
-Previews how much collateral would be returned if a position were sold at the current market state.
+### `usePreviewSell(marketId)`
+
+Previews how much collateral would be returned if a position were sold. Callers can optionally pass an `AbortSignal` for cancellation.
 
 ```typescript
-import { previewSell } from '@functionspace/core';
+import { usePreviewSell } from '@functionspace/react';
 
-const preview = await previewSell(ctx.client, positionId, marketId);
-// preview = { collateralReturned: number, positionId: string | number }
+const { execute: previewSellFn, loading, error } = usePreviewSell(marketId);
+const result = await previewSellFn(positionId, { signal: controller.signal });
+// result = { collateralReturned: number, positionId: string | number }
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `marketId` | `string \| number` | Market the position belongs to |
+
+**`execute(positionId, options?)`** -- Returns `Promise<PreviewSellResult>`. Pass `{ signal }` to enable caller-controlled cancellation.
+
+### Direct Core Imports (Alternative)
+
+The core package also exports `previewPayoutCurve` and `previewSell` for use outside React or when you need full parameter control:
+
+```typescript
+import { previewPayoutCurve, previewSell } from '@functionspace/core';
+
+const curve = await previewPayoutCurve(ctx.client, marketId, belief, collateral, K);
+const sellPreview = await previewSell(ctx.client, positionId, marketId);
 ```
 
 ---
@@ -1098,7 +1155,6 @@ if (!ctx) throw new Error('Must be within FunctionSpaceProvider');
 | `client` | `FSClient` | The HTTP client instance (authenticated if provider has credentials) |
 | `previewBelief` | `number[] \| null` | Active belief vector preview (set by trade inputs, read by charts) |
 | `previewPayout` | `PayoutCurve \| null` | Active payout curve preview |
-| `invalidationCount` | `number` | Internal counter -- hooks watch this to trigger refetches |
 | `selectedPosition` | `Position \| null` | Currently selected position for chart/table sync |
 | `user` | `UserProfile \| null` | Current authenticated user, `null` in guest mode |
 | `isAuthenticated` | `boolean` | Whether a user is currently logged in |
@@ -1113,13 +1169,14 @@ if (!ctx) throw new Error('Must be within FunctionSpaceProvider');
 | `setPreviewBelief` | `(belief: number[] \| null) => void` | Set/clear the preview belief overlay |
 | `setPreviewPayout` | `(payout: PayoutCurve \| null) => void` | Set/clear the payout curve overlay |
 | `setSelectedPosition` | `(pos: Position \| null) => void` | Set the selected position |
-| `invalidate` | `(marketId: string \| number) => void` | Trigger data refetch across all mounted hooks |
-| `login` | `(username: string, password: string) => Promise<UserProfile>` | Interactive login |
-| `signup` | `(username: string, password: string, options?: SignupOptions) => Promise<UserProfile>` | Interactive signup (auto-logs-in after) |
-| `logout` | `() => void` | Clear auth state, previews, and trigger invalidation |
+| `invalidate` | `(marketId: string \| number) => void` | Targeted cache invalidation -- marks cache entries for the given market as stale |
+| `invalidateAll` | `() => void` | Global cache invalidation -- marks all cache entries as stale. Called automatically by login, signup, and logout. |
+| `login` | `(username: string, password: string) => Promise<UserProfile>` | Interactive login (auto-invalidates all cache entries) |
+| `signup` | `(username: string, password: string, options?: SignupOptions) => Promise<UserProfile>` | Interactive signup (auto-logs-in after, auto-invalidates all cache entries) |
+| `logout` | `() => void` | Clear auth state, previews, and invalidate all cache entries |
 | `refreshUser` | `() => Promise<void>` | Refresh user profile (wallet balance update after trades) |
 
-Total: 18 fields (10 read, 8 write).
+Total: 18 fields (9 read, 9 write). Additional passwordless auth fields (`passwordlessLogin`, `showAdminLogin`, `pendingAdminUsername`, `clearAdminLogin`) are accessible via `useAuth()`.
 
 ---
 
@@ -1127,15 +1184,13 @@ Total: 18 fields (10 read, 8 write).
 
 These rules prevent the most common integration mistakes. Each maps to a silent failure or hard-to-debug behavior.
 
-- **NEVER call `buy()` or `sell()` without `ctx.invalidate(marketId)` after success.** Without invalidation, all mounted data hooks (positions, consensus, trade history) continue showing stale data. Charts and tables will not reflect the trade.
+- **NEVER call `buy()` or `sell()` from core directly in React components.** Use `useBuy` and `useSell` mutation hooks instead. They manage loading/error state and auto-invalidate the cache on success. If you must use the core functions directly (e.g., outside React), always call `ctx.invalidate(marketId)` after success.
 
-- **NEVER assume hooks other than `useTradeHistory` support `pollInterval`.** Only `useTradeHistory` accepts a `pollInterval` option. All other data hooks refetch on invalidation only (via `ctx.invalidationCount`). Do not pass `pollInterval` to `useMarket`, `useConsensus`, `usePositions`, `useMarketHistory`, or `useBucketDistribution` -- it will be silently ignored.
+- **NEVER assume `loading` means a request is in flight (on data-fetching hooks).** `loading` is `true` only on the first fetch (no cached data). For subsequent refetches (polling, invalidation), use `isFetching` to detect in-flight requests. This prevents UI flicker during background refetches. Note: mutation hooks (`useBuy`, `useSell`, etc.) use `loading` differently -- it is `true` for every in-flight request.
 
 - **NEVER create `FSClient` manually inside a React tree.** The provider creates and manages the client instance. Access it via `useContext(FunctionSpaceContext).client`. Creating a second client bypasses auth state, token management, and invalidation coordination.
 
-- **NEVER skip the debounced payout preview step.** The three-phase pattern exists for a reason. Without Phase 2, any chart rendering payout information in its tooltip will show stale or null data. Debounce at 500ms to avoid flooding the API with preview requests during rapid slider changes.
-
-- **NEVER import `buy` or `sell` from `@functionspace/react`.** Transaction functions live in `@functionspace/core`. The React package exports hooks and the provider -- not transaction functions. The correct import is `import { buy, sell } from '@functionspace/core'`.
+- **NEVER skip the debounced payout preview step.** The three-phase pattern exists for a reason. Without Phase 2, any chart rendering payout information in its tooltip will show stale or null data. Use `usePreviewPayout` with a 500ms debounce to avoid flooding the API.
 
 - **NEVER use `useFunctionSpace()`.** This hook does not exist. The correct pattern is `useContext(FunctionSpaceContext)` from React, with `FunctionSpaceContext` imported from `@functionspace/react`.
 
@@ -1159,8 +1214,10 @@ See the complete core type reference in `core.txt`. Key types used in headless m
 
 ### React Types (from `@functionspace/react`)
 
-- **`FSContext`** -- The shape of the React context object. 18 fields (10 read, 8 write). Accessed via `useContext(FunctionSpaceContext)`.
+- **`FSContext`** -- The shape of the React context object. 19 fields (9 read, 10 write). Accessed via `useContext(FunctionSpaceContext)`.
 - **`FSThemeInput`** -- Accepted by the `theme` prop on `FunctionSpaceProvider`. Can be a preset string (`"fs-dark"`, `"fs-light"`, `"native-dark"`, `"native-light"`) or an object with overrides.
+- **`CacheConfig`** -- Accepted by the `cache` prop on `FunctionSpaceProvider`. Configures `staleTime`, `gcTime`, `defaultPollInterval`, `revalidateOnFocus`, `revalidateOnReconnect`.
+- **`QueryOptions`** -- Accepted by all data-fetching hooks. Configures `pollInterval`, `enabled`.
 - **`ChartColors`** -- Concrete hex values for Recharts SVG. Accessible via `ctx.chartColors`. Includes `grid`, `axisText`, `consensus`, `previewLine`, `payout`, `positions`, `fanBands`.
 
 ### Theme Presets
