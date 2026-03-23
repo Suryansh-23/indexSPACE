@@ -95,6 +95,7 @@ vi.mock('@functionspace/core', () => ({
   evaluateDensityCurve: vi.fn().mockReturnValue(
     Array(100).fill(null).map((_, i) => ({ x: i, y: 0.01 })),
   ),
+  evaluateDensityPiecewise: vi.fn().mockReturnValue(0.01),
   transformHistoryToFanChart: vi.fn().mockReturnValue([]),
   SHAPE_DEFINITIONS: [
     { id: 'gaussian', name: 'Gaussian', description: 'Bell curve', svgPath: 'M10,50 Q50,5 90,50', parameters: ['targetOutcome', 'confidence'] },
@@ -169,7 +170,7 @@ function setup(jsx: React.ReactElement) {
 const mockMarketData = {
   id: '1',
   title: 'Test Market',
-  config: { K: 10, L: 0, H: 100 },
+  config: { numBuckets: 10, lowerBound: 0, upperBound: 100, K: 10, L: 0, H: 100 },
   alpha_vector: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
   consensus: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
   current_pool: 1000,

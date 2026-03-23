@@ -23,8 +23,8 @@ vi.mock('@functionspace/core', () => ({
   mapPosition: vi.fn((p) => p),
   calculateBucketDistribution: vi.fn(),
   computePercentiles: vi.fn(),
-  generateCustomShape: vi.fn().mockImplementation((controlValues: number[], K: number) => {
-    const len = K + 1;
+  generateCustomShape: vi.fn().mockImplementation((controlValues: number[], numBuckets: number) => {
+    const len = numBuckets + 1;
     return new Array(len).fill(1 / len);
   }),
   generateBellShape: vi.fn().mockImplementation((n: number) => new Array(n).fill(0.5)),
@@ -204,7 +204,7 @@ describe('useMarket hook', () => {
 
   it('returns data after successful fetch', async () => {
     const mockMarket = {
-      config: { K: 60, L: 0, H: 100 },
+      config: { numBuckets: 60, lowerBound: 0, upperBound: 100, K: 60, L: 0, H: 100 },
       title: 'Test Market',
       consensusBelief: [0.5, 0.5],
     };
@@ -244,8 +244,8 @@ describe('useMarket hook', () => {
     let callCount = 0;
     vi.mocked(queryMarketState).mockImplementation(() => {
       callCount++;
-      if (callCount === 1) return Promise.resolve({ config: { K: 60 }, title: 'First' });
-      return new Promise((resolve) => setTimeout(() => resolve({ config: { K: 80 }, title: 'Second' }), 50));
+      if (callCount === 1) return Promise.resolve({ config: { numBuckets: 60, K: 60 }, title: 'First' });
+      return new Promise((resolve) => setTimeout(() => resolve({ config: { numBuckets: 80, K: 80 }, title: 'Second' }), 50));
     });
 
     const { wrapper } = createCacheWrapper();
@@ -301,7 +301,7 @@ describe('useMarket hook', () => {
     expect(result.current.error?.message).toBe('Network error');
 
     // Switch to success for the refetch
-    vi.mocked(queryMarketState).mockResolvedValue({ config: { K: 60 }, title: 'Recovered' });
+    vi.mocked(queryMarketState).mockResolvedValue({ config: { numBuckets: 60, K: 60 }, title: 'Recovered' });
 
     // Refetch successfully
     await act(async () => {
@@ -309,11 +309,11 @@ describe('useMarket hook', () => {
     });
 
     expect(result.current.error).toBe(null);
-    expect(result.current.market).toEqual({ config: { K: 60 }, title: 'Recovered' });
+    expect(result.current.market).toEqual({ config: { numBuckets: 60, K: 60 }, title: 'Recovered' });
   });
 
   it('refetch returns Promise', async () => {
-    vi.mocked(queryMarketState).mockResolvedValue({ config: { K: 60 }, title: 'First' });
+    vi.mocked(queryMarketState).mockResolvedValue({ config: { numBuckets: 60, K: 60 }, title: 'First' });
 
     const { wrapper } = createCacheWrapper();
     const { result } = renderHook(() => useMarket('1'), { wrapper });
@@ -323,7 +323,7 @@ describe('useMarket hook', () => {
     });
 
     // Switch mock for the refetch
-    vi.mocked(queryMarketState).mockResolvedValue({ config: { K: 80 }, title: 'Updated' });
+    vi.mocked(queryMarketState).mockResolvedValue({ config: { numBuckets: 80, K: 80 }, title: 'Updated' });
 
     await act(async () => {
       await result.current.refetch();
@@ -349,7 +349,7 @@ describe('useMarket hook', () => {
     // Resolve initial fetch(es) -- StrictMode may cause more than one
     await waitFor(() => expect(resolvers.length).toBeGreaterThanOrEqual(1));
     const initialCount = resolvers.length;
-    act(() => { resolvers.forEach(r => r({ config: { K: 60 }, title: 'First' })); });
+    act(() => { resolvers.forEach(r => r({ config: { numBuckets: 60, K: 60 }, title: 'First' })); });
 
     // The poll timer is now set. We need to wait for it to fire.
     // Use real timers but a short pollInterval so it fires quickly.
@@ -1127,7 +1127,7 @@ describe('Cache system behavior', () => {
     let callCount = 0;
     vi.mocked(queryMarketState).mockImplementation(async () => {
       callCount++;
-      return { config: { K: 60 }, title: `Call ${callCount}` };
+      return { config: { numBuckets: 60, K: 60 }, title: `Call ${callCount}` };
     });
 
     const { wrapper, ctx } = createCacheWrapper();
@@ -1155,10 +1155,10 @@ describe('Cache system behavior', () => {
     vi.mocked(queryMarketState).mockImplementation(async (_client: any, marketId: any) => {
       if (String(marketId) === '42') {
         market42Calls++;
-        return { config: { K: 60 }, title: `Market 42 call ${market42Calls}` };
+        return { config: { numBuckets: 60, K: 60 }, title: `Market 42 call ${market42Calls}` };
       }
       market43Calls++;
-      return { config: { K: 60 }, title: `Market 43 call ${market43Calls}` };
+      return { config: { numBuckets: 60, K: 60 }, title: `Market 43 call ${market43Calls}` };
     });
 
     const { wrapper, ctx } = createCacheWrapper();
@@ -1192,7 +1192,7 @@ describe('Cache system behavior', () => {
     let callCount = 0;
     vi.mocked(queryMarketState).mockImplementation(async () => {
       callCount++;
-      return { config: { K: 60 }, title: 'Shared' };
+      return { config: { numBuckets: 60, K: 60 }, title: 'Shared' };
     });
 
     const { wrapper } = createCacheWrapper();
@@ -1217,7 +1217,7 @@ describe('Cache system behavior', () => {
   });
 
   it('enabled: false suppresses fetch', async () => {
-    vi.mocked(queryMarketState).mockResolvedValue({ config: { K: 60 }, title: 'Should Not Fetch' });
+    vi.mocked(queryMarketState).mockResolvedValue({ config: { numBuckets: 60, K: 60 }, title: 'Should Not Fetch' });
 
     const { wrapper } = createCacheWrapper();
     const { result } = renderHook(() => useMarket('1', { enabled: false }), { wrapper });
@@ -1298,12 +1298,12 @@ function createMutationWrapper() {
   return { wrapper: MutationWrapper, cache, ctx: ctxValue, invalidateSpy };
 }
 
-// Helper to pre-populate the cache with market data containing config.K
-async function populateMarketCache(cache: QueryCache, marketId: string, K: number) {
+// Helper to pre-populate the cache with market data containing config.numBuckets
+async function populateMarketCache(cache: QueryCache, marketId: string, numBuckets: number) {
   cache.registerQueryFn(['marketState', marketId], async () => ({
-    config: { K, L: 0, H: 100 },
+    config: { numBuckets, lowerBound: 0, upperBound: 100, K: numBuckets, L: 0, H: 100 },
     title: 'Test Market',
-    consensusBelief: new Array(K + 1).fill(1 / (K + 1)),
+    consensusBelief: new Array(numBuckets + 1).fill(1 / (numBuckets + 1)),
   }));
   cache.ensureFetching(['marketState', marketId]);
   // Wait for the async fetch to complete
@@ -2139,10 +2139,10 @@ describe('useBucketDistribution hook', () => {
   it('returns computed bucket data from underlying hooks', async () => {
     const mockConsensus = {
       points: [{ x: 0, y: 0.1 }, { x: 50, y: 0.5 }, { x: 100, y: 0.1 }],
-      config: { K: 60, L: 0, H: 100 },
+      config: { numBuckets: 60, lowerBound: 0, upperBound: 100, K: 60, L: 0, H: 100 },
     };
     const mockMarket = {
-      config: { K: 60, L: 0, H: 100 },
+      config: { numBuckets: 60, lowerBound: 0, upperBound: 100, K: 60, L: 0, H: 100 },
       title: 'Test',
       decimals: 0,
     };
@@ -2167,7 +2167,7 @@ describe('useBucketDistribution hook', () => {
   });
 
   it('returns { buckets, loading, error, refetch }', async () => {
-    vi.mocked(queryMarketState).mockResolvedValue({ config: { L: 0, H: 100 }, decimals: 0 } as any);
+    vi.mocked(queryMarketState).mockResolvedValue({ config: { numBuckets: 60, lowerBound: 0, upperBound: 100, K: 60, L: 0, H: 100 }, decimals: 0 } as any);
     vi.mocked(getConsensusCurve).mockResolvedValue({ points: [] } as any);
     vi.mocked(calculateBucketDistribution).mockReturnValue([]);
 
@@ -2190,7 +2190,7 @@ describe('useBucketDistribution hook', () => {
 
 describe('useDistributionState hook', () => {
   const mockMarket = {
-    config: { K: 60, L: 0, H: 100, P0: 1, mu: 1, epsAlpha: 0.01, tau: 1, gamma: 1, lambdaS: 0, lambdaD: 0 },
+    config: { numBuckets: 60, lowerBound: 0, upperBound: 100, K: 60, L: 0, H: 100, P0: 1, mu: 1, epsAlpha: 0.01, tau: 1, gamma: 1, lambdaS: 0, lambdaD: 0 },
     consensus: [0.5, 0.5],
     title: 'Test Market',
     decimals: 0,
@@ -2256,8 +2256,8 @@ describe('useDistributionState hook', () => {
     expect(result.current.error).toBe(null);
     expect(calculateBucketDistribution).toHaveBeenCalledWith(
       mockConsensus.points,
-      0,    // L
-      100,  // H
+      0,    // lowerBound
+      100,  // upperBound
       12,   // default bucketCount
       0,    // decimals
     );
@@ -2315,8 +2315,8 @@ describe('useDistributionState hook', () => {
     expect(result.current.percentiles).toEqual(mockPercentiles);
     expect(computePercentiles).toHaveBeenCalledWith(
       mockMarket.consensus,
-      0,    // L
-      100,  // H
+      0,    // lowerBound
+      100,  // upperBound
     );
   });
 
@@ -2634,7 +2634,7 @@ describe('useAuth hook', () => {
 // ============================================================================
 
 const mockCustomShapeMarket = {
-  config: { K: 50, L: 50, H: 150 },
+  config: { numBuckets: 50, lowerBound: 50, upperBound: 150, K: 50, L: 50, H: 150 },
   consensus: new Array(51).fill(1 / 51),
   alpha: new Array(51).fill(1),
 } as any;

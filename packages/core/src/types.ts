@@ -1,8 +1,14 @@
 // ── Market Types ──
 
 export interface MarketConfig {
+  numBuckets: number;
+  lowerBound: number;
+  upperBound: number;
+  /** @deprecated Use numBuckets. Will be removed in next major. */
   K: number;
+  /** @deprecated Use lowerBound. Will be removed in next major. */
   L: number;
+  /** @deprecated Use upperBound. Will be removed in next major. */
   H: number;
   P0: number;
   mu: number;

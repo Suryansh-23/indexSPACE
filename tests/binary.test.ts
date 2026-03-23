@@ -1,46 +1,46 @@
 import { describe, it, expect } from 'vitest';
 import { generateRange } from '@functionspace/core';
 
-const K = 20;
-const L = 80;
-const H = 100;
+const numBuckets = 20;
+const lowerBound = 80;
+const upperBound = 100;
 
 describe('Binary Option (generateRange for binary use case)', () => {
-  describe('Yes side (threshold → H)', () => {
-    it('produces K+1 elements summing to ~1.0', () => {
+  describe('Yes side (threshold → upperBound)', () => {
+    it('produces numBuckets+1 elements summing to ~1.0', () => {
       const threshold = 90;
-      const belief = generateRange(threshold, H, K, L, H, 1);
-      expect(belief).toHaveLength(K + 1);
+      const belief = generateRange(threshold, upperBound, numBuckets, lowerBound, upperBound, 1);
+      expect(belief).toHaveLength(numBuckets + 1);
       const sum = belief.reduce((a, b) => a + b, 0);
       expect(sum).toBeCloseTo(1.0, 5);
     });
 
     it('concentrates mass in upper coefficients', () => {
       const threshold = 90;
-      const belief = generateRange(threshold, H, K, L, H, 1);
+      const belief = generateRange(threshold, upperBound, numBuckets, lowerBound, upperBound, 1);
 
       // Normalized threshold position: (90-80)/(100-80) = 0.5
-      const thresholdIdx = Math.round(((threshold - L) / (H - L)) * K);
+      const thresholdIdx = Math.round(((threshold - lowerBound) / (upperBound - lowerBound)) * numBuckets);
       const upperMass = belief.slice(thresholdIdx).reduce((a, b) => a + b, 0);
       const lowerMass = belief.slice(0, thresholdIdx).reduce((a, b) => a + b, 0);
       expect(upperMass).toBeGreaterThan(lowerMass);
     });
   });
 
-  describe('No side (L → threshold)', () => {
-    it('produces K+1 elements summing to ~1.0', () => {
+  describe('No side (lowerBound → threshold)', () => {
+    it('produces numBuckets+1 elements summing to ~1.0', () => {
       const threshold = 90;
-      const belief = generateRange(L, threshold, K, L, H, 1);
-      expect(belief).toHaveLength(K + 1);
+      const belief = generateRange(lowerBound, threshold, numBuckets, lowerBound, upperBound, 1);
+      expect(belief).toHaveLength(numBuckets + 1);
       const sum = belief.reduce((a, b) => a + b, 0);
       expect(sum).toBeCloseTo(1.0, 5);
     });
 
     it('concentrates mass in lower coefficients', () => {
       const threshold = 90;
-      const belief = generateRange(L, threshold, K, L, H, 1);
+      const belief = generateRange(lowerBound, threshold, numBuckets, lowerBound, upperBound, 1);
 
-      const thresholdIdx = Math.round(((threshold - L) / (H - L)) * K);
+      const thresholdIdx = Math.round(((threshold - lowerBound) / (upperBound - lowerBound)) * numBuckets);
       const upperMass = belief.slice(thresholdIdx).reduce((a, b) => a + b, 0);
       const lowerMass = belief.slice(0, thresholdIdx).reduce((a, b) => a + b, 0);
       expect(lowerMass).toBeGreaterThan(upperMass);
@@ -49,34 +49,34 @@ describe('Binary Option (generateRange for binary use case)', () => {
 
   describe('Midpoint threshold symmetry', () => {
     it('yes and no at midpoint are approximate mirrors', () => {
-      const mid = (L + H) / 2;
-      const yes = generateRange(mid, H, K, L, H, 1);
-      const no = generateRange(L, mid, K, L, H, 1);
+      const mid = (lowerBound + upperBound) / 2;
+      const yes = generateRange(mid, upperBound, numBuckets, lowerBound, upperBound, 1);
+      const no = generateRange(lowerBound, mid, numBuckets, lowerBound, upperBound, 1);
 
-      // Mirror: yes[k] should approximately equal no[K-k]
-      for (let k = 0; k <= K; k++) {
-        expect(yes[k]).toBeCloseTo(no[K - k], 3);
+      // Mirror: yes[k] should approximately equal no[numBuckets-k]
+      for (let k = 0; k <= numBuckets; k++) {
+        expect(yes[k]).toBeCloseTo(no[numBuckets - k], 3);
       }
     });
   });
 
   describe('Edge cases', () => {
-    it('threshold at L: yes covers entire range', () => {
-      const belief = generateRange(L, H, K, L, H, 1);
-      expect(belief).toHaveLength(K + 1);
+    it('threshold at lowerBound: yes covers entire range', () => {
+      const belief = generateRange(lowerBound, upperBound, numBuckets, lowerBound, upperBound, 1);
+      expect(belief).toHaveLength(numBuckets + 1);
       const sum = belief.reduce((a, b) => a + b, 0);
       expect(sum).toBeCloseTo(1.0, 5);
       // All coefficients should be roughly equal (uniform)
-      const avg = 1 / (K + 1);
-      for (let k = 0; k <= K; k++) {
+      const avg = 1 / (numBuckets + 1);
+      for (let k = 0; k <= numBuckets; k++) {
         expect(belief[k]).toBeCloseTo(avg, 1);
       }
     });
 
-    it('threshold near H: yes side narrows to top of range', () => {
-      const nearH = H - 1; // 99
-      const belief = generateRange(nearH, H, K, L, H, 1);
-      expect(belief).toHaveLength(K + 1);
+    it('threshold near upperBound: yes side narrows to top of range', () => {
+      const nearUpper = upperBound - 1; // 99
+      const belief = generateRange(nearUpper, upperBound, numBuckets, lowerBound, upperBound, 1);
+      expect(belief).toHaveLength(numBuckets + 1);
       const sum = belief.reduce((a, b) => a + b, 0);
       expect(sum).toBeCloseTo(1.0, 5);
       // Narrow yes range near top: mass concentrates in final coefficients
@@ -86,12 +86,12 @@ describe('Binary Option (generateRange for binary use case)', () => {
 
     it('sharpness=1 produces hard cliff edges', () => {
       const threshold = 90;
-      const belief = generateRange(threshold, H, K, L, H, 1);
+      const belief = generateRange(threshold, upperBound, numBuckets, lowerBound, upperBound, 1);
 
       // Coefficients well inside the range should be much larger
       // than coefficients well outside
-      const thresholdIdx = Math.round(((threshold - L) / (H - L)) * K);
-      const insideCoeff = belief[Math.min(thresholdIdx + 2, K)];
+      const thresholdIdx = Math.round(((threshold - lowerBound) / (upperBound - lowerBound)) * numBuckets);
+      const insideCoeff = belief[Math.min(thresholdIdx + 2, numBuckets)];
       const outsideCoeff = belief[Math.max(thresholdIdx - 2, 0)];
       expect(insideCoeff).toBeGreaterThan(outsideCoeff * 5);
     });

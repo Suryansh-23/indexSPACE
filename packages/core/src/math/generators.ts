@@ -18,12 +18,12 @@ export interface RangeRegion {
   low: number;
   high: number;
   weight?: number;
-  sharpness?: number;  // 0 = smooth cosine taper (default), 1 = hard cliff edges
+  sharpness?: number;  // Edge sharpness: 0 = smooth cosine taper, 1 = hard cliff edges (default for single-range generateRange)
 }
 
 export interface SplineRegion {
   type: 'spline';
-  controlX: number[];  // X positions in outcome space [L..H], must be sorted ascending
+  controlX: number[];  // X positions in outcome space [lowerBound..upperBound], must be sorted ascending
   controlY: number[];  // Y values (unnormalized, e.g. [0, 25])
   weight?: number;
 }
@@ -41,16 +41,16 @@ function normalize(raw: number[]): BeliefVector {
 
 function pointKernel(
   region: PointRegion,
-  K: number,
-  L: number,
-  H: number,
+  numBuckets: number,
+  lowerBound: number,
+  upperBound: number,
 ): number[] {
-  const uCenter = (region.center - L) / (H - L);
-  const uSpread = region.spread / (H - L);
-  const raw = new Array<number>(K + 1);
+  const uCenter = (region.center - lowerBound) / (upperBound - lowerBound);
+  const uSpread = region.spread / (upperBound - lowerBound);
+  const raw = new Array<number>(numBuckets + 1);
 
-  for (let k = 0; k <= K; k++) {
-    const u = k / K;
+  for (let k = 0; k <= numBuckets; k++) {
+    const u = k / numBuckets;
 
     // Skew: use different effective spread on each side of center
     // |skew| controls intensity (0=symmetric, 1=full asymmetry)
@@ -83,22 +83,22 @@ function pointKernel(
 
 function rangeKernel(
   region: RangeRegion,
-  K: number,
-  L: number,
-  H: number,
+  numBuckets: number,
+  lowerBound: number,
+  upperBound: number,
 ): number[] {
-  const uLow = (region.low - L) / (H - L);
-  const uHigh = (region.high - L) / (H - L);
+  const uLow = (region.low - lowerBound) / (upperBound - lowerBound);
+  const uHigh = (region.high - lowerBound) / (upperBound - lowerBound);
   const sharpness = region.sharpness ?? 0;
 
   // Interpolate EPS: 0.001 (smooth) → 0.0001 (sharp)
   const EPS = 0.001 - sharpness * 0.0009;
-  // Interpolate taper width: 2/K (smooth) → 0 (sharp)
-  const taperWidth = (2 / K) * (1 - sharpness);
+  // Interpolate taper width: 2/numBuckets (smooth) → 0 (sharp)
+  const taperWidth = (2 / numBuckets) * (1 - sharpness);
 
-  const raw = new Array<number>(K + 1);
-  for (let k = 0; k <= K; k++) {
-    const u = k / K;
+  const raw = new Array<number>(numBuckets + 1);
+  for (let k = 0; k <= numBuckets; k++) {
+    const u = k / numBuckets;
     if (u >= uLow && u <= uHigh) {
       raw[k] = 1.0;
     } else if (taperWidth > 0 && u < uLow && u >= uLow - taperWidth) {
@@ -115,102 +115,72 @@ function rangeKernel(
 }
 
 /**
- * Fritsch-Carlson monotonic piecewise cubic Hermite spline interpolation.
- * Produces a smooth, overshoot-free curve through the control points.
- * Negative output values are clamped to 0.
+ * Quadratic B-spline evaluation matching the fs_core backend.
+ * This is an approximating spline -- the curve does NOT pass through control
+ * points. Control Y values are treated as B-spline control point weights.
+ * Negative output values are clamped to 0 as a safety measure.
  */
 function splineKernel(
   region: SplineRegion,
-  K: number,
-  L: number,
-  H: number,
+  numBuckets: number,
+  lowerBound: number,
+  upperBound: number,
 ): number[] {
   const { controlX, controlY } = region;
   const n = controlX.length;
 
-  // Degenerate: single point → flat
+  // Degenerate: single point or empty -- flat
   if (n <= 1) {
     const val = n === 1 ? Math.max(0, controlY[0]) : 0;
-    return new Array<number>(K + 1).fill(val);
+    return new Array<number>(numBuckets + 1).fill(val);
   }
 
-  // Step 1: Compute interval widths (h) and slopes (delta)
-  const h = new Array<number>(n - 1);
-  const delta = new Array<number>(n - 1);
-  for (let i = 0; i < n - 1; i++) {
-    h[i] = controlX[i + 1] - controlX[i];
-    delta[i] = h[i] > 0 ? (controlY[i + 1] - controlY[i]) / h[i] : 0;
-  }
+  // Normalize control X positions to [0, 1]
+  const range = upperBound - lowerBound;
+  const xMin = controlX[0];
+  const xMax = controlX[n - 1];
+  const normalizedXMin = (xMin - lowerBound) / range;
+  const normalizedXMax = (xMax - lowerBound) / range;
 
-  // Step 2: Compute initial tangents
-  const m = new Array<number>(n);
-  m[0] = delta[0];
-  m[n - 1] = delta[n - 2];
-  for (let i = 1; i < n - 1; i++) {
-    m[i] = (delta[i - 1] + delta[i]) / 2;
-  }
+  // B-spline parameters: N cells between n control points
+  const N = n - 1; // number of cells in control point space
+  const h = 1 / N; // uniform knot spacing in control point space
 
-  // Step 3: Fritsch-Carlson monotonicity correction
-  for (let i = 0; i < n - 1; i++) {
-    if (Math.abs(delta[i]) < 1e-10) {
-      // Flat segment  -- zero tangents at both endpoints
-      m[i] = 0;
-      m[i + 1] = 0;
-    } else {
-      const alpha = m[i] / delta[i];
-      const beta = m[i + 1] / delta[i];
-      const tau = alpha * alpha + beta * beta;
-      if (tau > 9) {
-        const tauScale = 3 / Math.sqrt(tau);
-        m[i] = tauScale * alpha * delta[i];
-        m[i + 1] = tauScale * beta * delta[i];
-      }
-    }
-  }
+  // Evaluate at numBuckets+1 uniformly spaced output points
+  const raw = new Array<number>(numBuckets + 1);
+  for (let i = 0; i <= numBuckets; i++) {
+    const u = i / numBuckets; // output position in [0, 1]
 
-  // Step 4: Zero tangents at local extrema
-  for (let i = 1; i < n - 1; i++) {
-    if (delta[i - 1] * delta[i] <= 0) {
-      m[i] = 0;
-    }
-  }
-
-  // Step 5: Evaluate at K+1 uniformly spaced output points
-  const raw = new Array<number>(K + 1);
-  for (let k = 0; k <= K; k++) {
-    const x = L + (k / K) * (H - L);
-
-    // Clamp to control range  -- flat extension outside
-    if (x <= controlX[0]) {
-      raw[k] = Math.max(0, controlY[0]);
+    // Flat extension outside control point range
+    // At boundaries, B-spline evaluates to c * 0.5 for the edge control point
+    if (u <= normalizedXMin) {
+      raw[i] = Math.max(0, controlY[0] * 0.5);
       continue;
     }
-    if (x >= controlX[n - 1]) {
-      raw[k] = Math.max(0, controlY[n - 1]);
+    if (u >= normalizedXMax) {
+      raw[i] = Math.max(0, controlY[N] * 0.5);
       continue;
     }
 
-    // Find interval: controlX[seg] <= x < controlX[seg+1]
-    let seg = 0;
-    for (let i = n - 2; i >= 0; i--) {
-      if (x >= controlX[i]) { seg = i; break; }
-    }
+    // Map u from [normalizedXMin, normalizedXMax] to control point space [0, 1]
+    const x = (u - normalizedXMin) / (normalizedXMax - normalizedXMin);
 
-    // Hermite basis interpolation
-    const t = (x - controlX[seg]) / h[seg];
-    const t2 = t * t;
-    const t3 = t2 * t;
-    const h00 = 2 * t3 - 3 * t2 + 1;
-    const h10 = t3 - 2 * t2 + t;
-    const h01 = -2 * t3 + 3 * t2;
-    const h11 = t3 - t2;
+    // Find which control point cell x falls in
+    const k = Math.min(Math.floor(x / h), N - 1);
+    const tau = x - k * h;
 
-    const value = h00 * controlY[seg]
-      + h10 * h[seg] * m[seg]
-      + h01 * controlY[seg + 1]
-      + h11 * h[seg] * m[seg + 1];
+    // Look up three control point Y values with boundary handling
+    const cPrev = k > 0 ? controlY[k - 1] : 0;
+    const cCurr = controlY[k];
+    const cNext = k + 1 < controlY.length ? controlY[k + 1] : 0;
 
-    raw[k] = Math.max(0, value);
+    // Quadratic B-spline evaluation
+    const value =
+      cPrev * (h - tau) * (h - tau) / (2 * h * h) +
+      cCurr * (0.5 + tau / h - (tau * tau) / (h * h)) +
+      cNext * (tau * tau) / (2 * h * h);
+
+    raw[i] = Math.max(0, value);
   }
 
   return raw;
@@ -224,20 +194,20 @@ function splineKernel(
  */
 export function generateBelief(
   regions: Region[],
-  K: number,
-  L: number,
-  H: number,
+  numBuckets: number,
+  lowerBound: number,
+  upperBound: number,
 ): BeliefVector {
-  const combined = new Array<number>(K + 1).fill(0);
+  const combined = new Array<number>(numBuckets + 1).fill(0);
 
   for (const region of regions) {
     const weight = region.weight ?? 1;
     let raw: number[];
-    if (region.type === 'point') raw = pointKernel(region, K, L, H);
-    else if (region.type === 'range') raw = rangeKernel(region, K, L, H);
-    else raw = splineKernel(region, K, L, H);
+    if (region.type === 'point') raw = pointKernel(region, numBuckets, lowerBound, upperBound);
+    else if (region.type === 'range') raw = rangeKernel(region, numBuckets, lowerBound, upperBound);
+    else raw = splineKernel(region, numBuckets, lowerBound, upperBound);
 
-    for (let k = 0; k <= K; k++) {
+    for (let k = 0; k <= numBuckets; k++) {
       combined[k] += raw[k] * weight;
     }
   }
@@ -252,11 +222,11 @@ export function generateBelief(
 export function generateGaussian(
   center: number,
   spread: number,
-  K: number,
-  L: number,
-  H: number,
+  numBuckets: number,
+  lowerBound: number,
+  upperBound: number,
 ): BeliefVector {
-  return generateBelief([{ type: 'point', center, spread }], K, L, H);
+  return generateBelief([{ type: 'point', center, spread }], numBuckets, lowerBound, upperBound);
 }
 
 // ── Range input type (for multi-range L2 convenience) ──
@@ -275,14 +245,14 @@ export interface RangeInput {
  * bucket selections become three range regions in a single normalized vector.
  * Resolves through generateBelief with RangeRegion[].
  */
-export function generateRange(low: number, high: number, K: number, L: number, H: number, sharpness?: number): BeliefVector;
-export function generateRange(ranges: RangeInput[], K: number, L: number, H: number): BeliefVector;
+export function generateRange(low: number, high: number, numBuckets: number, lowerBound: number, upperBound: number, sharpness?: number): BeliefVector;
+export function generateRange(ranges: RangeInput[], numBuckets: number, lowerBound: number, upperBound: number): BeliefVector;
 export function generateRange(
   lowOrRanges: number | RangeInput[],
-  highOrK: number,
-  KOrL: number,
-  LOrH: number,
-  HOrUndefined?: number,
+  highOrNumBuckets: number,
+  numBucketsOrLowerBound: number,
+  lowerBoundOrUpperBound: number,
+  upperBoundOrUndefined?: number,
   sharpness?: number,
 ): BeliefVector {
   if (Array.isArray(lowOrRanges)) {
@@ -293,11 +263,11 @@ export function generateRange(
       weight: r.weight,
       sharpness: r.sharpness,
     }));
-    return generateBelief(regions, highOrK, KOrL, LOrH);
+    return generateBelief(regions, highOrNumBuckets, numBucketsOrLowerBound, lowerBoundOrUpperBound);
   }
   return generateBelief(
-    [{ type: 'range', low: lowOrRanges, high: highOrK, sharpness: sharpness ?? 0.5 }],
-    KOrL, LOrH, HOrUndefined!,
+    [{ type: 'range', low: lowOrRanges, high: highOrNumBuckets, sharpness: sharpness ?? 1 }],
+    numBucketsOrLowerBound, lowerBoundOrUpperBound, upperBoundOrUndefined!,
   );
 }
 
@@ -310,11 +280,11 @@ export function generateRange(
 export function generateDip(
   center: number,
   spread: number,
-  K: number,
-  L: number,
-  H: number,
+  numBuckets: number,
+  lowerBound: number,
+  upperBound: number,
 ): BeliefVector {
-  return generateBelief([{ type: 'point', center, spread: spread * 1.5, inverted: true }], K, L, H);
+  return generateBelief([{ type: 'point', center, spread: spread * 1.5, inverted: true }], numBuckets, lowerBound, upperBound);
 }
 
 /**
@@ -325,12 +295,12 @@ export function generateDip(
 export function generateLeftSkew(
   center: number,
   spread: number,
-  K: number,
-  L: number,
-  H: number,
+  numBuckets: number,
+  lowerBound: number,
+  upperBound: number,
   skewAmount: number = 1,
 ): BeliefVector {
-  return generateBelief([{ type: 'point', center, spread, skew: -skewAmount }], K, L, H);
+  return generateBelief([{ type: 'point', center, spread, skew: -skewAmount }], numBuckets, lowerBound, upperBound);
 }
 
 /**
@@ -341,33 +311,34 @@ export function generateLeftSkew(
 export function generateRightSkew(
   center: number,
   spread: number,
-  K: number,
-  L: number,
-  H: number,
+  numBuckets: number,
+  lowerBound: number,
+  upperBound: number,
   skewAmount: number = 1,
 ): BeliefVector {
-  return generateBelief([{ type: 'point', center, spread, skew: skewAmount }], K, L, H);
+  return generateBelief([{ type: 'point', center, spread, skew: skewAmount }], numBuckets, lowerBound, upperBound);
 }
 
 /**
- * L2: Custom shape generator using cubic spline interpolation.
- * Converts N control point values into a belief vector via Fritsch-Carlson spline.
- * Control points are uniformly spaced from L to H.
+ * L2: Custom shape generator using quadratic B-spline evaluation.
+ * Converts N control point values into a belief vector via quadratic B-spline,
+ * matching the fs_core backend implementation.
+ * Control points are uniformly spaced from lowerBound to upperBound.
  * Resolves through generateBelief with a single SplineRegion.
  */
 export function generateCustomShape(
   controlValues: number[],
-  K: number,
-  L: number,
-  H: number,
+  numBuckets: number,
+  lowerBound: number,
+  upperBound: number,
 ): BeliefVector {
   const N = controlValues.length;
   const controlX = controlValues.map((_, i) =>
-    N === 1 ? (L + H) / 2 : L + (i / (N - 1)) * (H - L),
+    N === 1 ? (lowerBound + upperBound) / 2 : lowerBound + (i / (N - 1)) * (upperBound - lowerBound),
   );
   return generateBelief(
     [{ type: 'spline', controlX, controlY: controlValues }],
-    K, L, H,
+    numBuckets, lowerBound, upperBound,
   );
 }
 

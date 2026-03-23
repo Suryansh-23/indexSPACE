@@ -39,15 +39,15 @@ export function DistributionChartContent({
 
   // Smart decimals for bucket labels: use 0 if bucket width >= 1, otherwise use market.decimals
   const bucketDecimals = useMemo(() => {
-    const bucketWidth = (market.config.H - market.config.L) / bucketCount;
+    const bucketWidth = (market.config.upperBound - market.config.lowerBound) / bucketCount;
     return bucketWidth >= 1 ? 0 : (market.decimals ?? 0);
   }, [market, bucketCount]);
 
   const bucketData = useMemo<BucketData[]>(() => {
     return calculateBucketDistribution(
       consensus.points,
-      market.config.L,
-      market.config.H,
+      market.config.lowerBound,
+      market.config.upperBound,
       bucketCount,
       bucketDecimals,
     );

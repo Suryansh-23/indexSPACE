@@ -40,7 +40,7 @@ export function useBuy(marketId: string | number): UseBuyReturn {
     clearErrorTimer();
     try {
       const marketSnapshot = cache.getSnapshot<MarketState>(['marketState', String(marketId)]);
-      const numBuckets = marketSnapshot.data?.config?.K;
+      const numBuckets = marketSnapshot.data?.config?.numBuckets;
       if (!numBuckets) throw new Error('Market data not loaded. Cannot determine numBuckets for validation.');
 
       const result = await buy(client, marketId, belief, collateral, numBuckets);

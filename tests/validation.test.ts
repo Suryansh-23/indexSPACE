@@ -17,7 +17,7 @@ describe('validateBeliefVector', () => {
 
   it('throws on wrong length', () => {
     expect(() => validateBeliefVector([0.5, 0.5], 5)).toThrow('length 2');
-    expect(() => validateBeliefVector([0.5, 0.5], 5)).toThrow('K+1 = 6');
+    expect(() => validateBeliefVector([0.5, 0.5], 5)).toThrow('numBuckets+1 = 6');
   });
 
   it('throws when vector does not sum to 1.0', () => {
@@ -32,7 +32,7 @@ describe('validateBeliefVector', () => {
     );
   });
 
-  it('edge case: K=0 with single-element vector passes', () => {
+  it('edge case: numBuckets=0 with single-element vector passes', () => {
     expect(() => validateBeliefVector([1.0], 0)).not.toThrow();
   });
 
@@ -49,9 +49,9 @@ describe('validateBeliefVector', () => {
     );
   });
 
-  it('edge case: empty vector with K=0 throws (expects length 1, not 0)', () => {
+  it('edge case: empty vector with numBuckets=0 throws (expects length 1, not 0)', () => {
     expect(() => validateBeliefVector([], 0)).toThrow('length 0');
-    expect(() => validateBeliefVector([], 0)).toThrow('K+1 = 1');
+    expect(() => validateBeliefVector([], 0)).toThrow('numBuckets+1 = 1');
   });
 
   it('throws on NaN values', () => {

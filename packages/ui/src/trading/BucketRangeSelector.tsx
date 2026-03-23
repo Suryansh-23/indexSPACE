@@ -104,8 +104,8 @@ export function BucketRangeSelector({
     const max = parseFloat(customMax);
     if (!market || isNaN(min) || isNaN(max) || min >= max) return;
 
-    const effectiveL = autoMode && percentiles ? percentiles.p2_5 : market.config.L;
-    const effectiveH = autoMode && percentiles ? percentiles.p97_5 : market.config.H;
+    const effectiveL = autoMode && percentiles ? percentiles.p2_5 : market.config.lowerBound;
+    const effectiveH = autoMode && percentiles ? percentiles.p97_5 : market.config.upperBound;
 
     if (min < effectiveL || max > effectiveH) return;
 
@@ -139,8 +139,8 @@ export function BucketRangeSelector({
 
     if (ranges.length === 0) return null;
 
-    const { K, L, H } = market.config;
-    return generateRange(ranges, K, L, H);
+    const { numBuckets, lowerBound, upperBound } = market.config;
+    return generateRange(ranges, numBuckets, lowerBound, upperBound);
   }, [market, activeBuckets, selectedBuckets, customSelection]);
 
   // Phase 1: Instant preview
@@ -302,7 +302,7 @@ export function BucketRangeSelector({
                 type="number"
                 value={customMin}
                 onChange={(e) => setCustomMin(e.target.value)}
-                placeholder={String(market.config.L)}
+                placeholder={String(market.config.lowerBound)}
                 step="any"
               />
             </div>
@@ -312,7 +312,7 @@ export function BucketRangeSelector({
                 type="number"
                 value={customMax}
                 onChange={(e) => setCustomMax(e.target.value)}
-                placeholder={String(market.config.H)}
+                placeholder={String(market.config.upperBound)}
                 step="any"
               />
             </div>

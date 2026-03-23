@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import {
   evaluateDensityCurve,
+  evaluateDensityPiecewise,
 } from '@functionspace/core';
 import { FunctionSpaceContext, useMarket, useConsensus, useCustomShape, useChartZoom, rechartsPlotArea, useBuy, usePreviewPayout } from '@functionspace/react';
 import type { TradeInputBaseProps } from './types.js';
@@ -128,8 +129,8 @@ export function CustomShapeEditor({
     }));
 
     if (shape.pVector) {
-      const { L, H } = market.config;
-      const beliefCurve = evaluateDensityCurve(shape.pVector, L, H, points.length);
+      const { lowerBound, upperBound } = market.config;
+      const beliefCurve = evaluateDensityCurve(shape.pVector, lowerBound, upperBound, points.length);
       for (let i = 0; i < points.length && i < beliefCurve.length; i++) {
         points[i].belief = beliefCurve[i].y;
       }
@@ -137,8 +138,8 @@ export function CustomShapeEditor({
 
     // Add selected position curve from context (automatic component coordination)
     if (ctx.selectedPosition?.belief && market) {
-      const { L, H } = market.config;
-      const selectedCurve = evaluateDensityCurve(ctx.selectedPosition.belief, L, H, points.length);
+      const { lowerBound, upperBound } = market.config;
+      const selectedCurve = evaluateDensityCurve(ctx.selectedPosition.belief, lowerBound, upperBound, points.length);
       for (let i = 0; i < points.length && i < selectedCurve.length; i++) {
         points[i].selected = selectedCurve[i].y;
       }
@@ -157,7 +158,7 @@ export function CustomShapeEditor({
             bestDist = dist;
           }
         }
-        const step = (market.config.H - market.config.L) / (market.config.K || 50);
+        const step = (market.config.upperBound - market.config.lowerBound) / (market.config.numBuckets || 50);
         if (bestDist < step * 2) {
           point.payout = best.payout;
         }
@@ -193,25 +194,14 @@ export function CustomShapeEditor({
   // Control point positions for chart scatter dots
   const controlDots = useMemo<ControlDot[]>(() => {
     if (!market || !shape.pVector) return [];
-    const { L, H, K } = market.config;
-    const step = (H - L) / K;
+    const { lowerBound, upperBound } = market.config;
     const N = shape.controlValues.length;
 
     return shape.controlValues.map((_, i) => {
-      const x = N === 1 ? (L + H) / 2 : L + (i / (N - 1)) * (H - L);
+      const x = N === 1 ? (lowerBound + upperBound) / 2 : lowerBound + (i / (N - 1)) * (upperBound - lowerBound);
 
-      // Interpolate Y from pVector density at this X
-      const exactIdx = (x - L) / step;
-      const loIdx = Math.floor(exactIdx);
-      const hiIdx = Math.min(Math.ceil(exactIdx), K);
-      let prob: number;
-      if (loIdx === hiIdx || loIdx >= K) {
-        prob = shape.pVector![Math.min(loIdx, K)];
-      } else {
-        const t = exactIdx - loIdx;
-        prob = shape.pVector![loIdx] * (1 - t) + shape.pVector![hiIdx] * t;
-      }
-      const density = prob / step;
+      // Evaluate density at this X via shared B-spline kernel (matches rendered curve)
+      const density = evaluateDensityPiecewise(shape.pVector!, x, lowerBound, upperBound);
 
       return {
         x: Math.round(x * 100) / 100,
@@ -526,7 +516,7 @@ export function CustomShapeEditor({
               {/* Consensus area */}
               <Area
                 yAxisId="left"
-                type="monotone"
+                type="linear"
                 dataKey="consensus"
                 stroke={ctx.chartColors.consensus}
                 strokeWidth={2}
@@ -556,7 +546,7 @@ export function CustomShapeEditor({
               {hasSelected && (
                 <Area
                   yAxisId="left"
-                  type="monotone"
+                  type="linear"
                   dataKey="selected"
                   stroke={ctx.chartColors.positions[0]}
                   strokeWidth={2}
@@ -571,7 +561,7 @@ export function CustomShapeEditor({
               {hasPayout && (
                 <Area
                   yAxisId="right"
-                  type="monotone"
+                  type="linear"
                   dataKey="payout"
                   stroke="transparent"
                   strokeWidth={0}

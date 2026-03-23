@@ -22,11 +22,11 @@ export function useBucketDistribution(
 
   const buckets = useMemo<BucketData[] | null>(() => {
     if (!consensus || !market) return null;
-    const { L, H } = market.config;
+    const { lowerBound, upperBound } = market.config;
     return calculateBucketDistribution(
       consensus.points,
-      L,
-      H,
+      lowerBound,
+      upperBound,
       numBuckets,
       market.decimals,
     );

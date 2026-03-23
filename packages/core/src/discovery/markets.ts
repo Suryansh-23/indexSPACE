@@ -21,12 +21,12 @@ export async function discoverMarkets(
     const mp = item.market_model_params;
     if (!mp) throw new Error('Missing market_model_params in market list item');
 
-    const K = item.num_buckets;
-    if (K == null) throw new Error('Missing num_buckets (K) in market list item');
-    const L = item.lower_bound;
-    if (L == null) throw new Error('Missing lower_bound (L) in market list item');
-    const H = item.upper_bound;
-    if (H == null) throw new Error('Missing upper_bound (H) in market list item');
+    const numBuckets = item.num_buckets;
+    if (numBuckets == null) throw new Error('Missing num_buckets in market list item');
+    const lowerBound = item.lower_bound;
+    if (lowerBound == null) throw new Error('Missing lower_bound in market list item');
+    const upperBound = item.upper_bound;
+    if (upperBound == null) throw new Error('Missing upper_bound in market list item');
 
     return {
       alpha: alphaVector,
@@ -37,9 +37,12 @@ export async function discoverMarkets(
       totalVolume: item.total_volume ?? 0,
       positionsOpen: item.open_positions,
       config: {
-        K,
-        L,
-        H,
+        numBuckets,
+        lowerBound,
+        upperBound,
+        K: numBuckets,      // deprecated alias
+        L: lowerBound,      // deprecated alias
+        H: upperBound,      // deprecated alias
         P0: mp.P0,
         mu: mp.mu,
         epsAlpha: mp.eps_alpha,

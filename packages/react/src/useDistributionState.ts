@@ -24,7 +24,7 @@ export interface DistributionState {
   bucketCount: number;
   setBucketCount: (n: number) => void;
 
-  // Pre-computed: full-range [L, H] buckets with consensus probabilities
+  // Pre-computed: full-range [lowerBound, upperBound] buckets with consensus probabilities
   buckets: BucketData[] | null;
 
   // Consensus percentiles (for auto mode, fan charts, etc.)
@@ -60,14 +60,14 @@ export function useDistributionState(
     await Promise.all([marketRefetch(), consensusRefetch()]);
   }, [marketRefetch, consensusRefetch]);
 
-  // Full-range buckets [L, H]
+  // Full-range buckets [lowerBound, upperBound]
   const buckets = useMemo<BucketData[] | null>(() => {
     if (!consensus || !market) return null;
-    const { L, H } = market.config;
+    const { lowerBound, upperBound } = market.config;
     return calculateBucketDistribution(
       consensus.points,
-      L,
-      H,
+      lowerBound,
+      upperBound,
       bucketCount,
       market.decimals,
     );
@@ -76,8 +76,8 @@ export function useDistributionState(
   // Percentiles from coefficient vector
   const percentiles = useMemo<PercentileSet | null>(() => {
     if (!market || !market.consensus) return null;
-    const { L, H } = market.config;
-    return computePercentiles(market.consensus, L, H);
+    const { lowerBound, upperBound } = market.config;
+    return computePercentiles(market.consensus, lowerBound, upperBound);
   }, [market]);
 
   // Helper: compute buckets over a custom sub-range

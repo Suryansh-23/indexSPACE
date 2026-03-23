@@ -34,13 +34,13 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy, onE
   // Initialize slider values from market config
   useEffect(() => {
     if (market) {
-      const { L, H } = market.config;
+      const { lowerBound, upperBound } = market.config;
       if (prediction === null) {
-        setPrediction((L + H) / 2);
+        setPrediction((lowerBound + upperBound) / 2);
       }
       if (rangeValues === null) {
-        const range = H - L;
-        setRangeValues([L + range * 0.25, L + range * 0.75]);
+        const range = upperBound - lowerBound;
+        setRangeValues([lowerBound + range * 0.25, lowerBound + range * 0.75]);
       }
     }
   }, [market, prediction, rangeValues]);
@@ -57,8 +57,8 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy, onE
   // Convert confidence (0-100) to stdDev
   const getStdDevFromConfidence = useCallback((conf: number): number => {
     if (!market) return 4.0;
-    const { L, H } = market.config;
-    const range = H - L;
+    const { lowerBound, upperBound } = market.config;
+    const range = upperBound - lowerBound;
     const minSigma = range * 0.01;  // 1% of range (high confidence)
     const maxSigma = range * 0.20;  // 20% of range (low confidence)
     return maxSigma - ((conf / 100) * (maxSigma - minSigma));
@@ -67,19 +67,19 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy, onE
   // Generate belief from current inputs
   const generateCurrentBelief = useCallback(() => {
     if (!market) return null;
-    const { K, L, H } = market.config;
+    const { numBuckets, lowerBound, upperBound } = market.config;
 
     if (activeMode === 'gaussian') {
       if (prediction === null) return null;
       const stdDev = getStdDevFromConfidence(confidence);
-      if (prediction < L || prediction > H) return null;
-      return generateGaussian(prediction, stdDev, K, L, H);
+      if (prediction < lowerBound || prediction > upperBound) return null;
+      return generateGaussian(prediction, stdDev, numBuckets, lowerBound, upperBound);
     } else {
       if (!rangeValues) return null;
       const [lo, hi] = rangeValues;
       if (lo >= hi) return null;
-      if (lo < L || hi > H) return null;
-      return generateRange(lo, hi, K, L, H, 1);
+      if (lo < lowerBound || hi > upperBound) return null;
+      return generateRange(lo, hi, numBuckets, lowerBound, upperBound, 1);
     }
   }, [market, activeMode, prediction, confidence, rangeValues, getStdDevFromConfidence]);
 
@@ -135,11 +135,11 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy, onE
 
       // Reset to defaults
       if (market) {
-        const { L, H } = market.config;
-        setPrediction((L + H) / 2);
+        const { lowerBound, upperBound } = market.config;
+        setPrediction((lowerBound + upperBound) / 2);
         setConfidence(50);
-        const range = H - L;
-        setRangeValues([L + range * 0.25, L + range * 0.75]);
+        const range = upperBound - lowerBound;
+        setRangeValues([lowerBound + range * 0.25, lowerBound + range * 0.75]);
       }
       setAmount('100');
       setPotentialPayout(null);
@@ -163,7 +163,7 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy, onE
   // Calculate step based on market range
   const getStep = () => {
     if (!market) return 1;
-    const range = market.config.H - market.config.L;
+    const range = market.config.upperBound - market.config.lowerBound;
     return range / 100;
   };
 
@@ -216,16 +216,16 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy, onE
               {market && prediction !== null && (
                 <>
                   <Slider
-                    min={market.config.L}
-                    max={market.config.H}
+                    min={market.config.lowerBound}
+                    max={market.config.upperBound}
                     value={prediction}
                     onChange={setPrediction}
                     step={getStep()}
                     disabled={isSubmitting}
                   />
                   <div className="fs-slider-bounds">
-                    <span>{market.config.L}</span>
-                    <span>{market.config.H}</span>
+                    <span>{market.config.lowerBound}</span>
+                    <span>{market.config.upperBound}</span>
                   </div>
                 </>
               )}
@@ -257,8 +257,8 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy, onE
             {market && rangeValues && (
               <>
                 <RangeSlider
-                  min={market.config.L}
-                  max={market.config.H}
+                  min={market.config.lowerBound}
+                  max={market.config.upperBound}
                   values={rangeValues}
                   onChange={setRangeValues}
                   step={getStep()}
@@ -270,8 +270,8 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy, onE
                   <span className="fs-range-value">{rangeValues[1].toFixed(1)}</span>
                 </div>
                 <div className="fs-slider-bounds">
-                  <span>{market.config.L}</span>
-                  <span>{market.config.H}</span>
+                  <span>{market.config.lowerBound}</span>
+                  <span>{market.config.upperBound}</span>
                 </div>
               </>
             )}

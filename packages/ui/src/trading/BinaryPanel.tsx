@@ -64,12 +64,12 @@ export function BinaryPanel({
   const consensusStats = useMemo(() => {
     if (!market) return null;
     if (xPoint.mode !== 'dynamic-mode' && xPoint.mode !== 'dynamic-mean') return null;
-    return computeStatistics(market.consensus, market.config.L, market.config.H);
+    return computeStatistics(market.consensus, market.config.lowerBound, market.config.upperBound);
   }, [market, xPoint.mode]);
 
   const resolvedX = useMemo(() => {
     if (!market) return null;
-    const { L, H } = market.config;
+    const { lowerBound, upperBound } = market.config;
     let raw: number | null = null;
 
     switch (xPoint.mode) {
@@ -77,17 +77,17 @@ export function BinaryPanel({
         raw = xPoint.value;
         break;
       case 'variable':
-        raw = userOverrideX ?? xPoint.initial ?? (L + H) / 2;
+        raw = userOverrideX ?? xPoint.initial ?? (lowerBound + upperBound) / 2;
         break;
       case 'dynamic-mode':
-        raw = userOverrideX ?? consensusStats?.mode ?? (L + H) / 2;
+        raw = userOverrideX ?? consensusStats?.mode ?? (lowerBound + upperBound) / 2;
         break;
       case 'dynamic-mean':
-        raw = userOverrideX ?? consensusStats?.mean ?? (L + H) / 2;
+        raw = userOverrideX ?? consensusStats?.mean ?? (lowerBound + upperBound) / 2;
         break;
     }
 
-    return raw !== null ? Math.max(L, Math.min(H, raw)) : null;
+    return raw !== null ? Math.max(lowerBound, Math.min(upperBound, raw)) : null;
   }, [market, xPoint, userOverrideX, consensusStats]);
 
   // Whether the X input is editable
@@ -113,11 +113,11 @@ export function BinaryPanel({
 
   const belief = useMemo(() => {
     if (!market || !side || resolvedX === null) return null;
-    const { K, L, H } = market.config;
+    const { numBuckets, lowerBound, upperBound } = market.config;
     if (side === 'yes') {
-      return generateRange(resolvedX, H, K, L, H, 1);
+      return generateRange(resolvedX, upperBound, numBuckets, lowerBound, upperBound, 1);
     } else {
-      return generateRange(L, resolvedX, K, L, H, 1);
+      return generateRange(lowerBound, resolvedX, numBuckets, lowerBound, upperBound, 1);
     }
   }, [market, side, resolvedX]);
 
@@ -183,8 +183,8 @@ export function BinaryPanel({
     setIsEditingX(false);
     const val = parseFloat(xInputValue);
     if (!isNaN(val) && market) {
-      const { L, H } = market.config;
-      setUserOverrideX(Math.max(L, Math.min(H, val)));
+      const { lowerBound, upperBound } = market.config;
+      setUserOverrideX(Math.max(lowerBound, Math.min(upperBound, val)));
     }
   };
 

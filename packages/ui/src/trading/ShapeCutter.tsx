@@ -56,13 +56,13 @@ export function ShapeCutter({
   // Initialize slider values from market config
   useEffect(() => {
     if (market) {
-      const { L, H } = market.config;
+      const { lowerBound, upperBound } = market.config;
       if (targetOutcome === null) {
-        setTargetOutcome((L + H) / 2);
+        setTargetOutcome((lowerBound + upperBound) / 2);
       }
       if (rangeValues === null) {
-        const range = H - L;
-        setRangeValues([L + range * 0.25, L + range * 0.75]);
+        const range = upperBound - lowerBound;
+        setRangeValues([lowerBound + range * 0.25, lowerBound + range * 0.75]);
       }
     }
   }, [market, targetOutcome, rangeValues]);
@@ -80,8 +80,8 @@ export function ShapeCutter({
   // Confidence → spread conversion (same formula as TradePanel)
   const getSpreadFromConfidence = useCallback((conf: number): number => {
     if (!market) return 4.0;
-    const { L, H } = market.config;
-    const range = H - L;
+    const { lowerBound, upperBound } = market.config;
+    const range = upperBound - lowerBound;
     const minSigma = range * 0.01;
     const maxSigma = range * 0.20;
     return maxSigma - ((conf / 100) * (maxSigma - minSigma));
@@ -90,47 +90,47 @@ export function ShapeCutter({
   // Generate belief from current shape + parameters
   const generateCurrentBelief = useCallback(() => {
     if (!market) return null;
-    const { K, L, H } = market.config;
+    const { numBuckets, lowerBound, upperBound } = market.config;
     const spread = getSpreadFromConfidence(confidence);
 
     switch (selectedShape) {
       case 'gaussian':
         if (targetOutcome === null) return null;
-        return generateGaussian(targetOutcome, spread, K, L, H);
+        return generateGaussian(targetOutcome, spread, numBuckets, lowerBound, upperBound);
 
       case 'spike': {
         if (targetOutcome === null) return null;
         // Dynamic multiplier: 0.4x at low confidence → 0.02x at high confidence
         // Gives the spike ~20x more dynamic range than gaussian across confidence levels
         const spikeMul = 0.4 - (confidence / 100) * 0.38;
-        return generateGaussian(targetOutcome, spread * spikeMul, K, L, H);
+        return generateGaussian(targetOutcome, spread * spikeMul, numBuckets, lowerBound, upperBound);
       }
 
       case 'range':
         if (!rangeValues) return null;
-        return generateRange(rangeValues[0], rangeValues[1], K, L, H, 1);
+        return generateRange(rangeValues[0], rangeValues[1], numBuckets, lowerBound, upperBound, 1);
 
       case 'bimodal':
         if (!rangeValues) return null;
         return generateBelief([
           { type: 'point', center: rangeValues[0], spread: spread * 0.8, weight: 1 - (peakBias / 100) },
           { type: 'point', center: rangeValues[1], spread: spread * 0.8, weight: peakBias / 100 },
-        ], K, L, H);
+        ], numBuckets, lowerBound, upperBound);
 
       case 'dip':
         if (targetOutcome === null) return null;
-        return generateDip(targetOutcome, spread, K, L, H);
+        return generateDip(targetOutcome, spread, numBuckets, lowerBound, upperBound);
 
       case 'leftskew':
         if (targetOutcome === null) return null;
-        return generateLeftSkew(targetOutcome, spread, K, L, H, skewAmount / 100);
+        return generateLeftSkew(targetOutcome, spread, numBuckets, lowerBound, upperBound, skewAmount / 100);
 
       case 'rightskew':
         if (targetOutcome === null) return null;
-        return generateRightSkew(targetOutcome, spread, K, L, H, skewAmount / 100);
+        return generateRightSkew(targetOutcome, spread, numBuckets, lowerBound, upperBound, skewAmount / 100);
 
       case 'uniform':
-        return generateRange(L, H, K, L, H, 1);
+        return generateRange(lowerBound, upperBound, numBuckets, lowerBound, upperBound, 1);
 
       default:
         return null;
@@ -180,11 +180,11 @@ export function ShapeCutter({
 
   const resetToDefaults = () => {
     if (market) {
-      const { L, H } = market.config;
-      setTargetOutcome((L + H) / 2);
+      const { lowerBound, upperBound } = market.config;
+      setTargetOutcome((lowerBound + upperBound) / 2);
       setConfidence(50);
-      const range = H - L;
-      setRangeValues([L + range * 0.25, L + range * 0.75]);
+      const range = upperBound - lowerBound;
+      setRangeValues([lowerBound + range * 0.25, lowerBound + range * 0.75]);
       setPeakBias(50);
       setSkewAmount(50);
     }
@@ -219,7 +219,7 @@ export function ShapeCutter({
 
   const getStep = () => {
     if (!market) return 1;
-    const range = market.config.H - market.config.L;
+    const range = market.config.upperBound - market.config.lowerBound;
     return range / 100;
   };
 
@@ -230,7 +230,7 @@ export function ShapeCutter({
   // Display values for trade summary
   const collateral = parseFloat(amount);
   const displayPrediction = (() => {
-    if (selectedShape === 'uniform' && market) return (market.config.L + market.config.H) / 2;
+    if (selectedShape === 'uniform' && market) return (market.config.lowerBound + market.config.upperBound) / 2;
     if (selectedShape === 'range' || selectedShape === 'bimodal') {
       if (!rangeValues) return null;
       return selectedShape === 'bimodal'
@@ -284,8 +284,8 @@ export function ShapeCutter({
                       <div className="fs-range-inline">
                         <span className="fs-range-value">{Math.round(rangeValues[0])}</span>
                         <RangeSlider
-                          min={market.config.L}
-                          max={market.config.H}
+                          min={market.config.lowerBound}
+                          max={market.config.upperBound}
                           values={rangeValues}
                           onChange={setRangeValues}
                           step={getStep()}
@@ -307,16 +307,16 @@ export function ShapeCutter({
                     {market && targetOutcome !== null && (
                       <>
                         <Slider
-                          min={market.config.L}
-                          max={market.config.H}
+                          min={market.config.lowerBound}
+                          max={market.config.upperBound}
                           value={targetOutcome}
                           onChange={setTargetOutcome}
                           step={getStep()}
                           disabled={isSubmitting || !needs('targetOutcome')}
                         />
                         <div className="fs-slider-bounds">
-                          <span>{market.config.L}</span>
-                          <span>{market.config.H}</span>
+                          <span>{market.config.lowerBound}</span>
+                          <span>{market.config.upperBound}</span>
                         </div>
                       </>
                     )}

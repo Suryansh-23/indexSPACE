@@ -89,6 +89,9 @@ const expectedMarketState = {
   totalVolume: 1500.0,
   positionsOpen: 5,
   config: {
+    numBuckets: 6,
+    lowerBound: 0,
+    upperBound: 100,
     K: 6,
     L: 0,
     H: 100,
@@ -437,7 +440,7 @@ const expectedDiscoverMarkets = [
     totalVolume: 1500.0,
     positionsOpen: 5,
     config: {
-      K: 6, L: 0, H: 100, P0: 100,
+      numBuckets: 6, lowerBound: 0, upperBound: 100, K: 6, L: 0, H: 100, P0: 100,
       mu: 0.01, epsAlpha: 0.001, tau: 1.0,
       gamma: 0.5, lambdaS: 0.1, lambdaD: 0.05,
     },
@@ -456,7 +459,7 @@ const expectedDiscoverMarkets = [
     totalVolume: 200.0,
     positionsOpen: 1,
     config: {
-      K: 2, L: 0, H: 1, P0: 50,
+      numBuckets: 2, lowerBound: 0, upperBound: 1, K: 2, L: 0, H: 1, P0: 50,
       mu: 0.01, epsAlpha: 0.001, tau: 1.0,
       gamma: 0.5, lambdaS: 0.1, lambdaD: 0.05,
     },
@@ -516,7 +519,7 @@ describe('queryMarketState', () => {
 
     const client = makeMockClient();
     await expect(queryMarketState(client, '123')).rejects.toThrow(
-      'Missing num_buckets (K) in market response',
+      'Missing num_buckets in market response',
     );
   });
 
@@ -533,7 +536,7 @@ describe('queryMarketState', () => {
 
     const client = makeMockClient();
     await expect(queryMarketState(client, '123')).rejects.toThrow(
-      'Missing lower_bound (L) in market response',
+      'Missing lower_bound in market response',
     );
   });
 
@@ -550,7 +553,7 @@ describe('queryMarketState', () => {
 
     const client = makeMockClient();
     await expect(queryMarketState(client, '123')).rejects.toThrow(
-      'Missing upper_bound (H) in market response',
+      'Missing upper_bound in market response',
     );
   });
 
@@ -567,7 +570,7 @@ describe('queryMarketState', () => {
 
     const client = makeMockClient();
     const result = await queryMarketState(client, '123');
-    expect(result.config.L).toBe(10);
+    expect(result.config.lowerBound).toBe(10);
   });
 
   it('ignores metadata lower_bound when root lower_bound is present', async () => {
@@ -583,7 +586,7 @@ describe('queryMarketState', () => {
 
     const client = makeMockClient();
     const result = await queryMarketState(client, '123');
-    expect(result.config.L).toBe(10);
+    expect(result.config.lowerBound).toBe(10);
   });
 
   it('ignores metadata upper_bound when root upper_bound is present', async () => {
@@ -599,7 +602,7 @@ describe('queryMarketState', () => {
 
     const client = makeMockClient();
     const result = await queryMarketState(client, '123');
-    expect(result.config.H).toBe(200);
+    expect(result.config.upperBound).toBe(200);
   });
 
   it('ignores metadata title when root title is present', async () => {
@@ -1614,7 +1617,7 @@ describe('discoverMarkets', () => {
 
     const client = makeMockClient();
     await expect(discoverMarkets(client)).rejects.toThrow(
-      'Missing lower_bound (L) in market list item',
+      'Missing lower_bound in market list item',
     );
   });
 
@@ -1632,7 +1635,7 @@ describe('discoverMarkets', () => {
 
     const client = makeMockClient();
     await expect(discoverMarkets(client)).rejects.toThrow(
-      'Missing upper_bound (H) in market list item',
+      'Missing upper_bound in market list item',
     );
   });
 
@@ -1650,7 +1653,7 @@ describe('discoverMarkets', () => {
 
     const client = makeMockClient();
     await expect(discoverMarkets(client)).rejects.toThrow(
-      'Missing num_buckets (K) in market list item',
+      'Missing num_buckets in market list item',
     );
   });
 
