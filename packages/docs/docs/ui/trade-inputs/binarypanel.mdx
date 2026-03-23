@@ -84,16 +84,16 @@ type XPointMode =
 | Mode           | Threshold Source                                          | Editable?                     | Fallback      |
 | -------------- | --------------------------------------------------------- | ----------------------------- | ------------- |
 | `static`       | `value` (fixed)                                           | Never                         | --            |
-| `variable`     | `initial` or market midpoint                              | Always                        | `(L + H) / 2` |
-| `dynamic-mode` | Consensus mode (peak probability) via `computeStatistics` | Only if `allowOverride: true` | `(L + H) / 2` |
-| `dynamic-mean` | Consensus mean via `computeStatistics`                    | Only if `allowOverride: true` | `(L + H) / 2` |
+| `variable`     | `initial` or market midpoint                              | Always                        | `(lowerBound + upperBound) / 2` |
+| `dynamic-mode` | Consensus mode (peak probability) via `computeStatistics` | Only if `allowOverride: true` | `(lowerBound + upperBound) / 2` |
+| `dynamic-mean` | Consensus mean via `computeStatistics`                    | Only if `allowOverride: true` | `(lowerBound + upperBound) / 2` |
 
-All resolved thresholds are clamped to `[L, H]`.
+All resolved thresholds are clamped to `[lowerBound, upperBound]`.
 
 **Behavior:**
 
-* **Yes:** Builds `generateRange(X, H, K, L, H, 1)` -- a hard-edged range from the threshold to the market high.
-* **No:** Builds `generateRange(L, X, K, L, H, 1)` -- a hard-edged range from the market low to the threshold.
+* **Yes:** Builds `generateRange(X, upperBound, numBuckets, lowerBound, upperBound, 1)` -- a hard-edged range from the threshold to the market high.
+* **No:** Builds `generateRange(lowerBound, X, numBuckets, lowerBound, upperBound, 1)` -- a hard-edged range from the market low to the threshold.
 * **Side toggle:** Clicking an already-selected side deselects it. The amount input and submit button only appear after a side is chosen.
 * **Default amount:** Hardcoded `'100'` USDC.
 * **Post-trade reset:** Side resets to `null` (no selection), amount resets to `'100'`. Threshold persists.
@@ -106,7 +106,7 @@ All resolved thresholds are clamped to `[L, H]`.
 * **Writes:** `ctx.setPreviewBelief(belief)` on side/threshold change, `ctx.setPreviewPayout(result)` after debounced preview, clears both on unmount
 * **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useMarket`, `generateRange`, `computeStatistics`, `previewPayoutCurve`, `buy`
+**Internal calls:** `useMarket`, `useBuy`, `usePreviewPayout`, `generateRange`, `computeStatistics`
 
 **Example:**
 

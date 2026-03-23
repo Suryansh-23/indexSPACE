@@ -344,11 +344,11 @@ export function MyChart({ data }: { data: any[] }) {
 
 | Hook | Returns | Use For |
 |------|---------|---------|
-| `useMarket(marketId, options?)` | `{ market, loading, isFetching, error, refetch }` | Market metadata, config, state. Accepts `QueryOptions` (`pollInterval`, `staleTime`, `enabled`). |
+| `useMarket(marketId, options?)` | `{ market, loading, isFetching, error, refetch }` | Market metadata, config, state. Accepts `QueryOptions` (`pollInterval`, `enabled`). |
 | `useConsensus(marketId, points?, options?)` | `{ consensus, loading, isFetching, error, refetch }` | Probability density curves. Accepts `QueryOptions`. |
 | `usePositions(marketId, username?, options?)` | `{ positions, loading, isFetching, error, refetch }` | Positions -- filtered by `username` when provided, all positions when omitted. Client-side filtering after cache. Accepts `QueryOptions`. |
-| `useMarketHistory(marketId, options?)` | `{ history, loading, isFetching, error, refetch }` | Alpha vector snapshots over time (timeline fan chart). Options include `limit`, `pollInterval`, `staleTime`, `enabled`. |
-| `useTradeHistory(marketId, options?)` | `{ trades, loading, isFetching, error, refetch }` | Trade history entries. Options include `limit`, `pollInterval`, `staleTime`, `enabled`. |
+| `useMarketHistory(marketId, options?)` | `{ history, loading, isFetching, error, refetch }` | Alpha vector snapshots over time (timeline fan chart). Options include `limit`, `pollInterval`, `enabled`. |
+| `useTradeHistory(marketId, options?)` | `{ trades, loading, isFetching, error, refetch }` | Trade history entries. Options include `limit`, `pollInterval`, `enabled`. |
 | `useBucketDistribution(marketId, numBuckets?, numPoints?)` | `{ buckets, loading, error, refetch }` | Probability distribution across equal-width outcome buckets (derived from market + consensus) |
 | `useDistributionState(marketId, config?)` | `{ market, loading, error, refetch, bucketCount, setBucketCount, buckets, percentiles, getBucketsForRange }` | Shared distribution state for bucket-based trading components -- state/composition hook |
 | `useAuth()` | `{ user, isAuthenticated, loading, error, login, signup, logout, refreshUser, passwordlessLogin, showAdminLogin, pendingAdminUsername, clearAdminLogin }` | Auth state and actions -- state/action hook (no cache subscription) |
@@ -439,11 +439,11 @@ Every market has a `config` object with three core parameters used throughout th
 
 | Parameter | Meaning | Example |
 |-----------|---------|---------|
-| `K` | Polynomial degree  -- determines belief vector resolution (K+1 elements) | 20 |
-| `L` | Lower bound of the market outcome range | 0 |
-| `H` | Upper bound of the market outcome range | 100 |
+| `numBuckets` | Polynomial degree  -- determines belief vector resolution (numBuckets+1 elements) | 20 |
+| `lowerBound` | Lower bound of the market outcome range | 0 |
+| `upperBound` | Upper bound of the market outcome range | 100 |
 
-These are accessed via `market.config.K`, `market.config.L`, `market.config.H` from the `useMarket` hook.
+These are accessed via `market.config.numBuckets`, `market.config.lowerBound`, `market.config.upperBound` from the `useMarket` hook. Deprecated aliases `K`, `L`, `H` still exist on the config object but should not be used in new code.
 
 ---
 
@@ -451,7 +451,7 @@ These are accessed via `market.config.K`, `market.config.L`, `market.config.H` f
 
 The belief construction system lives in `packages/core/src/math/generators.ts` and uses a strict two-layer architecture. Understanding this is essential before adding new shapes or modifying trade inputs.
 
-### L1  -- `generateBelief(regions, K, L, H)` → `BeliefVector`
+### L1  -- `generateBelief(regions, numBuckets, lowerBound, upperBound)` → `BeliefVector`
 
 The **universal constructor**. ALL belief vector creation MUST route through this function. It:
 1. Takes an array of `Region` objects
@@ -460,11 +460,11 @@ The **universal constructor**. ALL belief vector creation MUST route through thi
 4. Normalizes the result (private `normalize()` function  -- guarantees output sums to 1)
 
 ```
-generateBelief(regions, K, L, H)
+generateBelief(regions, numBuckets, lowerBound, upperBound)
   for each region:
-    if type === 'point' → pointKernel(region, K, L, H)  → raw K+1 array
-    if type === 'range' → rangeKernel(region, K, L, H)  → raw K+1 array
-    if type === 'spline' → splineKernel(region, K, L, H) → raw K+1 array
+    if type === 'point' → pointKernel(region, numBuckets, lowerBound, upperBound)  → raw numBuckets+1 array
+    if type === 'range' → rangeKernel(region, numBuckets, lowerBound, upperBound)  → raw numBuckets+1 array
+    if type === 'spline' → splineKernel(region, numBuckets, lowerBound, upperBound) → raw numBuckets+1 array
     combined[k] += raw[k] * weight
   return normalize(combined)
 ```
@@ -479,13 +479,13 @@ Thin wrappers that construct the correct `Region` array and delegate to `generat
 
 | L2 Function | What it passes to `generateBelief` |
 |-------------|--------------------------------|
-| `generateGaussian(center, spread, K, L, H)` | `[{ type: 'point', center, spread }]` |
-| `generateRange(low, high, K, L, H, sharpness?)` | `[{ type: 'range', low, high, sharpness: sharpness ?? 0.5 }]`  -- single range |
-| `generateRange(ranges[], K, L, H)` | Multiple `RangeRegion` entries with per-range sharpness/weight  -- multi-range composition |
-| `generateDip(center, spread, K, L, H)` | `[{ type: 'point', center, spread: spread*1.5, inverted: true }]` |
-| `generateLeftSkew(center, spread, K, L, H, skewAmount?)` | `[{ type: 'point', center, spread, skew: -skewAmount }]` |
-| `generateRightSkew(center, spread, K, L, H, skewAmount?)` | `[{ type: 'point', center, spread, skew: skewAmount }]` |
-| `generateCustomShape(controlValues, K, L, H)` | `[{ type: 'spline', controlX: evenly-spaced, controlY: controlValues }]`  -- spline interpolation of user control points |
+| `generateGaussian(center, spread, numBuckets, lowerBound, upperBound)` | `[{ type: 'point', center, spread }]` |
+| `generateRange(low, high, numBuckets, lowerBound, upperBound, sharpness?)` | `[{ type: 'range', low, high, sharpness: sharpness ?? 1 }]`  -- single range |
+| `generateRange(ranges[], numBuckets, lowerBound, upperBound)` | Multiple `RangeRegion` entries with per-range sharpness/weight  -- multi-range composition |
+| `generateDip(center, spread, numBuckets, lowerBound, upperBound)` | `[{ type: 'point', center, spread: spread*1.5, inverted: true }]` |
+| `generateLeftSkew(center, spread, numBuckets, lowerBound, upperBound, skewAmount?)` | `[{ type: 'point', center, spread, skew: -skewAmount }]` |
+| `generateRightSkew(center, spread, numBuckets, lowerBound, upperBound, skewAmount?)` | `[{ type: 'point', center, spread, skew: skewAmount }]` |
+| `generateCustomShape(controlValues, numBuckets, lowerBound, upperBound)` | `[{ type: 'spline', controlX: evenly-spaced, controlY: controlValues }]`  -- quadratic B-spline approximation of user control points |
 
 ### Region Types
 
@@ -511,7 +511,7 @@ interface RangeRegion {
 
 interface SplineRegion {
   type: 'spline';
-  controlX: number[];  // X positions in outcome space [L..H], must be sorted ascending
+  controlX: number[];  // X positions in outcome space [lowerBound..upperBound], must be sorted ascending
   controlY: number[];  // Y values (unnormalized, e.g. [0, 25])
   weight?: number;     // Relative weight (default 1)
 }
@@ -520,23 +520,23 @@ interface SplineRegion {
 **`skew` details:** `|skew|` controls intensity (0 = symmetric, 1 = full asymmetry). Sign controls direction. At the kernel level, two multipliers interpolate based on `|skew|`: the wider side scales `1 + 2.0 * intensity` (up to 3x), the narrower side scales `1 - 0.7 * intensity` (down to 0.3x). Each side of center uses a different effective spread.
 
 **`sharpness` details:** Interpolates two parameters in `rangeKernel`:
-- Taper width: `(2/K) * (1 - sharpness)`  -- at 0, cosine taper over 2 coefficient bins; at 1, no taper (hard step).
+- Taper width: `(2/numBuckets) * (1 - sharpness)`  -- at 0, cosine taper over 2 coefficient bins; at 1, no taper (hard step).
 - EPS (out-of-range floor): `0.001 - sharpness * 0.0009`  -- at 0, floor is 0.001; at 1, floor is 0.0001.
 
-When `sharpness = 1`, the coefficient vector has a hard step function at the range boundaries. The actual visual sharpness on the chart depends on the polynomial degree `K` and the density evaluation (piecewise-linear interpolation).
+When `sharpness = 1`, the coefficient vector has a hard step function at the range boundaries. The actual visual sharpness on the chart depends on the polynomial degree `numBuckets` and the density evaluation (quadratic B-spline evaluation).
 
 ### When to Create a New L2 vs Call L1 Directly
 
 | Scenario | What to do | Example |
 |----------|-----------|---------|
 | Simple shape with one region | Create L2 if it will be reused | `generateGaussian`, `generateDip` |
-| Shape that's just existing L2 with different params | Call existing L2 with modified params  -- **no new function** | Spike = `generateGaussian(center, spread * 0.2, K, L, H)` |
+| Shape that's just existing L2 with different params | Call existing L2 with modified params  -- **no new function** | Spike = `generateGaussian(center, spread * 0.2, numBuckets, lowerBound, upperBound)` |
 | Shape with multiple regions | Call `generateBelief` directly from the widget | Bimodal = two PointRegions with different centers/weights |
-| Shape that is a special case of existing L2 | Call existing L2 with boundary params | Uniform = `generateRange(L, H, K, L, H)` |
+| Shape that is a special case of existing L2 | Call existing L2 with boundary params | Uniform = `generateRange(lowerBound, upperBound, numBuckets, lowerBound, upperBound)` |
 
 **Rule of thumb:** Create a new L2 only when the shape has unique Region parameters that encode a distinct shape concept (like inversion or skew). If it's just "same generator, different numbers," let the widget pass different numbers.
 
-**Multi-range composition:** For non-contiguous range selections (e.g., `BucketRangeSelector`), use `generateRange(ranges[], K, L, H)` which accepts an array of `RangeInput` objects, each with its own `low`, `high`, `weight`, and `sharpness`. This composes multiple range regions into a single belief vector via `generateBelief`.
+**Multi-range composition:** For non-contiguous range selections (e.g., `BucketRangeSelector`), use `generateRange(ranges[], numBuckets, lowerBound, upperBound)` which accepts an array of `RangeInput` objects, each with its own `low`, `high`, `weight`, and `sharpness`. This composes multiple range regions into a single belief vector via `generateBelief`.
 
 ### End-to-End Belief Flow
 
@@ -545,44 +545,45 @@ Widget (e.g. TradePanel, ShapeCutter)
   → L2 generator or generateBelief directly
     → pointKernel / rangeKernel / splineKernel (private, internal)
       → normalize (private, internal)
-        → BeliefVector (number[], K+1 elements, sums to 1)
+        → BeliefVector (number[], numBuckets+1 elements, sums to 1)
 
 BeliefVector → ctx.setPreviewBelief(belief)     [instant, on every input change]
             → ConsensusChart / MarketCharts reads ctx.previewBelief
-              → evaluateDensityCurve(belief, L, H, numPoints)  [piecewise-linear interpolation]
+              → evaluateDensityCurve(belief, lowerBound, upperBound, numPoints)  [quadratic B-spline evaluation]
                 → rendered as dashed yellow area on chart (type="linear")
 
-BeliefVector + collateral → previewPayoutCurve(client, marketId, belief, collateral, K)  [debounced 500ms]
-                          → validateBeliefVector(belief, K) runs first [throws on invalid]
+BeliefVector + collateral → previewPayoutCurve(client, marketId, belief, collateral, numBuckets)  [debounced 500ms]
+                          → validateBeliefVector(belief, numBuckets) runs first [throws on invalid]
                           → ctx.setPreviewPayout(payoutCurve)
                             → ConsensusChart shows payout in tooltip
 
-BeliefVector + collateral → buy(client, marketId, belief, collateral, K)
-                          → validateBeliefVector(belief, K) runs first [throws on invalid]
+BeliefVector + collateral → buy(client, marketId, belief, collateral, numBuckets)
+                          → validateBeliefVector(belief, numBuckets) runs first [throws on invalid]
                           → ctx.invalidate(marketId)  [refreshes all hooks]
                           Note: core buy() accepts optional { prediction } but useBuy does not forward it.
 ```
 
 ### Density Evaluation
 
-All density rendering uses piecewise-linear interpolation via a single function:
+All density rendering uses quadratic B-spline evaluation via a single function:
 
-**`evaluateDensityCurve(coefficients, L, H, numPoints)`  -- Multi-point curve for charting**
+**`evaluateDensityCurve(coefficients, lowerBound, upperBound, numPoints)`  -- Multi-point curve for charting**
 
-- Maps each output point to a position in the coefficient array (`u * K`)
-- Linearly interpolates between the two nearest coefficients
-- Applies density scaling `(K+1)/(H-L)` for correct PDF normalization
-- Preserves sharp transitions faithfully (ranges have cliff edges, spikes have narrow peaks)
+- Maps each output point to a position in the coefficient array
+- Evaluates a quadratic B-spline basis over neighboring coefficients (smooth, C1-continuous curve)
+- Applies density scaling `(numBuckets+1)/(upperBound-lowerBound)` for correct PDF normalization
+- Boundary values are 0.5x interior values because the B-spline basis function support extends outside [0,1]
 - Used by `ConsensusChart` for previews, consensus, and selected position curves
 
-**`evaluateDensityPiecewise(coefficients, x, L, H)`  -- Single-point evaluation**
+**`evaluateDensityPiecewise(coefficients, x, lowerBound, upperBound)`  -- Single-point evaluation**
 
 Same math as `evaluateDensityCurve` but for one x value. Used internally by `computeStatistics` and `queryDensityAt`.
 
 **Invariants:**
 - Coefficients are non-negative (guaranteed by kernel functions)
 - Coefficients sum to 1 (guaranteed by `normalize` in `generateBelief`)
-- Density scaling is `(K+1)/(H-L)`
+- Density scaling is `(numBuckets+1)/(upperBound-lowerBound)`
+- Boundary values are 0.5x due to B-spline basis function support extending outside [0,1]
 - Preview and consensus use the same evaluation  -- what the user sees before submitting matches what they see after
 
 ---
@@ -603,25 +604,25 @@ Peaks beyond 4x are clipped visually but remain in the tooltip data. This ensure
 ## Core Functions (from @functionspace/core)
 
 ### Math/Position Generation (Positions category)
-- `generateBelief(regions, K, L, H)` → belief vector (L1  -- universal constructor, see above)
-- `generateGaussian(center, spread, K, L, H)` → belief vector (L2)
-- `generateRange(low, high, K, L, H, sharpness?)` → belief vector (L2, single range)
-- `generateRange(ranges[], K, L, H)` → belief vector (L2, multi-range composition)
-- `generateDip(center, spread, K, L, H)` → belief vector (L2)
-- `generateLeftSkew(center, spread, K, L, H, skewAmount?)` → belief vector (L2)
-- `generateRightSkew(center, spread, K, L, H, skewAmount?)` → belief vector (L2)
-- `generateCustomShape(controlValues, K, L, H)` → belief vector (L2  -- spline interpolation of user control points)
+- `generateBelief(regions, numBuckets, lowerBound, upperBound)` → belief vector (L1  -- universal constructor, see above)
+- `generateGaussian(center, spread, numBuckets, lowerBound, upperBound)` → belief vector (L2)
+- `generateRange(low, high, numBuckets, lowerBound, upperBound, sharpness?)` → belief vector (L2, single range)
+- `generateRange(ranges[], numBuckets, lowerBound, upperBound)` → belief vector (L2, multi-range composition)
+- `generateDip(center, spread, numBuckets, lowerBound, upperBound)` → belief vector (L2)
+- `generateLeftSkew(center, spread, numBuckets, lowerBound, upperBound, skewAmount?)` → belief vector (L2)
+- `generateRightSkew(center, spread, numBuckets, lowerBound, upperBound, skewAmount?)` → belief vector (L2)
+- `generateCustomShape(controlValues, numBuckets, lowerBound, upperBound)` → belief vector (L2  -- quadratic B-spline approximation of user control points)
 - `generateBellShape(numPoints, peakPosition?, spread?, zeroTailPercent?)` → `number[]` (utility  -- default bell-shaped control values for custom shape editor)
 
 ### Math/Density & Statistics (L0 pure math)
-- `evaluateDensityCurve(belief, L, H, numPoints)` → chart points (piecewise-linear interpolation)
-- `evaluateDensityPiecewise(coefficients, x, L, H)` → density at single point
-- `computeStatistics(coefficients, L, H)` → `{ mean, median, mode, variance, stdDev }`
-- `computePercentiles(coefficients, L, H)` → `PercentileSet` (9 percentiles via CDF integration)
-- `calculateBucketDistribution(points, L, H, numBuckets?, decimals?)` → `BucketData[]`
+- `evaluateDensityCurve(belief, lowerBound, upperBound, numPoints)` → chart points (quadratic B-spline evaluation)
+- `evaluateDensityPiecewise(coefficients, x, lowerBound, upperBound)` → density at single point
+- `computeStatistics(coefficients, lowerBound, upperBound)` → `{ mean, median, mode, variance, stdDev }`
+- `computePercentiles(coefficients, lowerBound, upperBound)` → `PercentileSet` (9 percentiles via CDF integration)
+- `calculateBucketDistribution(points, lowerBound, upperBound, numBuckets?, decimals?)` → `BucketData[]`
 
 ### Math/Fan Chart
-- `transformHistoryToFanChart(snapshots, L, H, maxPoints?)` → `FanChartPoint[]` (downsample + percentile extraction)
+- `transformHistoryToFanChart(snapshots, lowerBound, upperBound, maxPoints?)` → `FanChartPoint[]` (downsample + percentile extraction)
 
 ### Queries
 All query functions accept an optional trailing `options?: { signal?: AbortSignal }` parameter (backward-compatible). Signal is forwarded through composed call chains.
@@ -663,11 +664,11 @@ All query functions accept an optional trailing `options?: { signal?: AbortSigna
 - `previewSell(client, positionId, marketId, options?)` -- wraps `GET /api/views/preview/sell/{marketId}/{positionId}` → PreviewSellResult
 
 ### Validation (L0)
-- `validateBeliefVector(vector, K)` -- throws descriptive error if belief vector is invalid (length, finite, non-negative, sum-to-1)
+- `validateBeliefVector(vector, numBuckets)` -- throws descriptive error if belief vector is invalid (length, finite, non-negative, sum-to-1)
 
 ---
 
-**Metadata policy:** Mapping functions read fields from their primary source in the API response. L/H/title come from root level. xAxisUnits/decimals come from the metadata dict (their only source). Do not add metadata fallback chains (e.g., `data.metadata?.X ?? data.X`).
+**Metadata policy:** Mapping functions read fields from their primary source in the API response. lowerBound/upperBound/title come from root level. xAxisUnits/decimals come from the metadata dict (their only source). Do not add metadata fallback chains (e.g., `data.metadata?.X ?? data.X`).
 
 ## CSS Class Naming Convention
 
@@ -715,8 +716,8 @@ setState(result);
 
 ### After Mutations
 ```typescript
-const { K } = market.config;
-const result = await buy(ctx.client, marketId, belief, collateral, K);
+const { numBuckets } = market.config;
+const result = await buy(ctx.client, marketId, belief, collateral, numBuckets);
 ctx.invalidate(marketId);  // Triggers useMarket/usePositions refetch
 onSuccess?.(result);       // Notify parent
 ```
@@ -741,7 +742,7 @@ onSuccess?.(result);       // Notify parent
 | `BucketTradePanel` | Composed chart + range selector | Composes `DistributionChart` + `BucketRangeSelector` with shared `useDistributionState` (see shared state composition below) |
 | `PositionTable` | Data table | Tabbed views (Open Orders / Trade History / Market Positions), per-tab columns, pagination, row selection → chart overlay, sell actions |
 | `TimeSales` | Time & sales ticker | Uses `useTradeHistory` with `pollInterval` (default 5s), read-only market activity feed |
-| `CustomShapeEditor` | Custom shape trade input | Uses `useCustomShape` for control point state, draggable scatter dots + vertical sliders, spline interpolation via `generateCustomShape`, three-phase trade pattern |
+| `CustomShapeEditor` | Custom shape trade input | Uses `useCustomShape` for control point state, draggable scatter dots + vertical sliders, quadratic B-spline approximation via `generateCustomShape`, three-phase trade pattern |
 
 **TimelineChart data-fetching pattern:** Unlike Consensus/Distribution (which receive shared `market` + `consensus` data as props from `MarketCharts`), `TimelineChartContent` calls `useMarketHistory` internally. This avoids fetching history data when the timeline tab isn't active. The `timeFilter` state is lifted to `MarketCharts` so it persists across tab switches.
 
@@ -783,7 +784,7 @@ When adding a new tabbed widget, follow this exact pattern  -- do not invent a d
 - [ ] Uses `FunctionSpaceContext` for client access
 - [ ] Uses `useCacheSubscription` for data fetching (subscribes to cache via `useSyncExternalStore`)
 - [ ] Returns `{ <named>, loading, isFetching, error, refetch }` pattern (named property matches hook purpose)
-- [ ] Accepts optional `QueryOptions` (`pollInterval`, `staleTime`, `enabled`) for cache-based polling and conditional fetching
+- [ ] Accepts optional `QueryOptions` (`pollInterval`, `enabled`) for cache-based polling and conditional fetching.
 - [ ] `loading` is true only on first fetch (no cached data); `isFetching` is true whenever a request is in flight
 - [ ] Exported from `packages/react/src/index.ts`
 - [ ] **Add tests to `hooks.test.tsx` (context check, loading, success, error)**
@@ -817,7 +818,7 @@ Before creating anything, decide the correct approach (see "When to Create a New
 **If the shape needs a new L2 generator:**
 - [ ] Add L2 function to `generators.ts`  -- one line of logic constructing a Region array and passing to `generateBelief`
 - [ ] Export from `packages/core/src/index.ts`
-- [ ] Add tests to `tests/shapes.test.ts`  -- valid vector (K+1 elements, all >= 0, sums to ~1) + shape-specific assertions
+- [ ] Add tests to `tests/shapes.test.ts`  -- valid vector (numBuckets+1 elements, all >= 0, sums to ~1) + shape-specific assertions
 
 **If the shape is just existing generator with different params:**
 - [ ] No new function needed  -- widget passes different params to existing L2 or calls `generateBelief` directly
@@ -969,9 +970,9 @@ Generate the belief vector on every parameter change and write it to context imm
 ```typescript
 const generateCurrentBelief = useCallback(() => {
   if (!market) return null;
-  const { K, L, H } = market.config;
+  const { numBuckets, lowerBound, upperBound } = market.config;
   // Call appropriate generator based on current inputs
-  return generateGaussian(prediction, stdDev, K, L, H);
+  return generateGaussian(prediction, stdDev, numBuckets, lowerBound, upperBound);
 }, [market, prediction, stdDev, /* other deps */]);
 
 useEffect(() => {
@@ -1025,8 +1026,8 @@ Trade input widgets that offer a "confidence" slider (0-100%) convert it to a `s
 ```typescript
 const getSpreadFromConfidence = useCallback((conf: number): number => {
   if (!market) return 4.0;
-  const { L, H } = market.config;
-  const range = H - L;
+  const { lowerBound, upperBound } = market.config;
+  const range = upperBound - lowerBound;
   const minSigma = range * 0.01;   // 1% of range (high confidence = narrow)
   const maxSigma = range * 0.20;   // 20% of range (low confidence = wide)
   return maxSigma - ((conf / 100) * (maxSigma - minSigma));

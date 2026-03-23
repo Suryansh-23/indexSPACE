@@ -176,3 +176,41 @@ All data-fetching hooks share a common pattern:
 * Automatically re-fetch when `ctx.invalidate(marketId)` is called or when the cache entry is otherwise invalidated
 * Throw if called outside a `FunctionSpaceProvider`
 * `refetch()` returns `Promise<void>` and triggers a background refetch
+
+#### Hooks Overview
+
+All 14 hooks provided by `@functionspace/react`, grouped by category.
+
+**Data Hooks**
+
+| Hook | Description | Docs |
+|------|-------------|------|
+| `useMarket` | Market metadata, config, state | [Details](./markets/usemarket) |
+| `useConsensus` | Probability density curves | [Details](./markets/useconsensus) |
+| `usePositions` | User and market positions | [Details](./positions/usepositions) |
+| `useMarketHistory` | Alpha vector snapshots over time | [Details](./markets/usemarkethistory) |
+| `useTradeHistory` | Trade history entries | [Details](./markets/usetradehistory) |
+| `useBucketDistribution` | Bucket probability distribution | [Details](./markets/usebucketdistribution) |
+| `useDistributionState` | Shared distribution state for bucket trading | [Details](./markets/usedistributionstate) |
+
+**Mutation and Preview Hooks**
+
+| Hook | Description | Docs |
+|------|-------------|------|
+| `useBuy` | Execute buy with auto-invalidation | [Details](./trading/usebuy) |
+| `useSell` | Execute sell with auto-invalidation | [Details](./trading/usesell) |
+| `usePreviewPayout` | Preview payout curve | [Details](./trading/usepreviewpayout) |
+| `usePreviewSell` | Preview sell value | [Details](./trading/usepreviewsell) |
+
+**State and Action Hooks**
+
+| Hook | Description | Docs |
+|------|-------------|------|
+| `useAuth` | Auth state and actions | [Details](./auth/useauth) |
+| `useCustomShape` | Custom shape editing state | [Details](./trading/usecustomshape) |
+
+**Utility Hooks**
+
+| Hook | Description | Docs |
+|------|-------------|------|
+| `useChartZoom` | Chart zoom/pan state | [Details](./chart-utilities/usechartzoom) |

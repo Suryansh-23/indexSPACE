@@ -12,7 +12,7 @@ Adds a new data-fetching hook to `packages/react/src/` following the SDK's estab
 Every data-fetching hook MUST:
 
 1. Accept `marketId: string | number` as first parameter
-2. Accept optional `QueryOptions` as the last parameter (for `pollInterval`, `staleTime`, `enabled`)
+2. Accept optional `QueryOptions` as the last parameter (for `pollInterval`, `enabled`).
 3. Get context via `useContext(FunctionSpaceContext)` and throw if missing
 4. Get the cache via `useQueryCache()`
 5. Build a `CacheKey` tuple via `useMemo` (e.g., `['queryName', normalizedId]`)

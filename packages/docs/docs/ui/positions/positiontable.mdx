@@ -12,7 +12,7 @@ import { DEMO_MARKET_ID, DEMO_USERNAME } from '@site/src/constants';
 
 **`PositionTable`**
 
-Paginated data table for viewing and managing positions. Supports three tab views, real-time market value lookup via `previewSell`, inline sell actions, and row selection that coordinates with chart overlays.
+Paginated data table for viewing and managing positions. Supports three tab views, real-time market value lookup via `usePreviewSell`, inline sell actions, and row selection that coordinates with chart overlays.
 
 ```tsx
 import { PositionTable } from '@functionspace/ui';
@@ -53,9 +53,9 @@ import { PositionTable } from '@functionspace/ui';
   * **Uncontrolled** (no `onSelectPosition`): Clicking a row writes the position to `ctx.setSelectedPosition`, causing `ConsensusChart` to render the position's belief as a colored overlay. Clicking the selected row again deselects it.
   * **Controlled** (`onSelectPosition` provided): Clicking a row calls `onSelectPosition(id)`. Selection state is determined by the `selectedPositionId` prop, falling back to `ctx.selectedPosition?.positionId` when `selectedPositionId` is not provided.
 * **Per-tab pagination:** Each tab maintains its own page number independently. Pages auto-reset to 1 when tab data count changes.
-* **Market value lookup:** For visible open positions (current page only), `previewSell` is called via `Promise.allSettled` for resilient fetching. Values are cached and update when the page changes.
-* **Sell flow:** The "Sell" button (open-orders tab, open positions only) calls `sell()`, then `ctx.invalidate(marketId)` and `refetch()`. Shows "Selling..." during the operation. Sell errors display as a banner above the table.
-* **P/L calculation (priority order):** 1) Sold/closed positions with a non-null `soldPrice`: `soldPrice - collateral`. 2) Any remaining position with a non-null `settlementPayout`: `settlementPayout - collateral`. 3) Open positions: `marketValue - collateral` (from `previewSell`). Note: sold/closed positions with a `soldPrice` always use path 1, even if they also have a `settlementPayout`. P/L% = `(P/L / collateral) * 100`.
+* **Market value lookup:** For visible open positions (current page only), `usePreviewSell`'s `execute()` is called via `Promise.allSettled` for resilient fetching. Values are cached and update when the page changes.
+* **Sell flow:** The "Sell" button (open-orders tab, open positions only) calls `useSell`'s `execute()`, which automatically triggers `ctx.invalidate(marketId)`, then `refetch()`. Shows "Selling..." during the operation. Sell errors display as a banner above the table.
+* **P/L calculation (priority order):** 1) Sold/closed positions with a non-null `soldPrice`: `soldPrice - collateral`. 2) Any remaining position with a non-null `settlementPayout`: `settlementPayout - collateral`. 3) Open positions: `marketValue - collateral` (from `usePreviewSell`). Note: sold/closed positions with a `soldPrice` always use path 1, even if they also have a `settlementPayout`. P/L% = `(P/L / collateral) * 100`.
 * **Owner highlighting:** In the `market-positions` tab, the authenticated user's rows (matched via `ctx.user?.username`) show "(you)" next to the username. No `username` prop is needed -- the widget reads the authenticated user from context automatically.
 * **Sorting:** All tab data is sorted by position ID descending.
 * **Loading/error:** Renders a spinner with "Loading positions..." or an error message with a "Retry" button. Empty states show contextual messages per tab.
@@ -66,7 +66,7 @@ import { PositionTable } from '@functionspace/ui';
 * **Writes:** `ctx.setSelectedPosition(position | null)` (uncontrolled mode only)
 * **Triggers:** `ctx.invalidate(marketId)` after successful sell
 
-**Internal calls:** `usePositions`, `previewSell`, `sell`
+**Internal calls:** `usePositions`, `useSell`, `usePreviewSell`
 
 **Example:**
 
@@ -85,6 +85,6 @@ import { PositionTable } from '@functionspace/ui';
 />
 ```
 
-**Related:** `ConsensusChart` (reads `selectedPosition` for overlay) | `usePositions` (data hook) | `previewSell`, `sell` (core functions)
+**Related:** `ConsensusChart` (reads `selectedPosition` for overlay) | `usePositions` (data hook) | `useSell`, `usePreviewSell` (mutation hooks)
 
 ---

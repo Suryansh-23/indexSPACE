@@ -113,7 +113,7 @@ If hooks were added or modified:
 - Data-fetching hooks use `useCacheSubscription` (cache subscription via `useSyncExternalStore`), not local `useState`
 - State/action hooks (useAuth, useCustomShape) return context fields directly -- no refetch
 - All hooks check `if (!ctx) throw new Error(...)` at the top
-- Data-fetching hooks accept optional `QueryOptions` (`pollInterval`, `staleTime`, `enabled`)
+- Data-fetching hooks accept optional `QueryOptions` (`pollInterval`, `enabled`).
 
 ### 7. Consumer Experience
 

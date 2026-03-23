@@ -83,7 +83,7 @@ Handoff document: `Docs/order-depth-widget-handoff.md`
    - useCallback wrapping `queryOrderDepth` with AbortSignal: `(signal) => queryOrderDepth(ctx.client, marketId, { signal })`
    - useCacheSubscription for data subscription (uses useSyncExternalStore)
    - Return `{ orderDepth, loading, isFetching, error, refetch }`
-   - Accept optional QueryOptions (pollInterval, staleTime, enabled)
+   - Accept optional QueryOptions (pollInterval, enabled).
 2. Export from `packages/react/src/index.ts`
    - `export { useOrderDepth } from './useOrderDepth.js';`
 

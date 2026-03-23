@@ -19,7 +19,7 @@ The React layer currently passes data through. Its job is to become the **value 
 | Caching | QueryCache class with key-based storage, subscriber tracking, staleness, and garbage collection |
 | Request deduplication | Implemented -- same cache key from multiple hook instances produces one network request |
 | Polling | All data-fetching hooks accept `pollInterval` via `QueryOptions`; visibility-aware (pauses when tab hidden) |
-| Mutation hooks | Implemented -- `useBuy`, `useSell`, `usePreviewPayout`, `usePreviewSell` wrap core functions with managed state and auto-invalidation |
+| Mutation hooks | Implemented -- `useBuy`, `useSell` wrap core transaction functions with managed state and auto-invalidation; `usePreviewPayout`, `usePreviewSell` wrap core preview functions with managed state (no auto-invalidation) |
 | Invalidation | Targeted -- `ctx.invalidate(marketId)` marks only that market's cache entries as stale; `ctx.invalidateAll()` for global refresh |
 | Stale-while-revalidate | Implemented -- `loading` true only on first fetch; background refetches return cached data with `isFetching: true` |
 | Request cancellation | Implemented -- `AbortController` per in-flight request; aborts on re-fetch, parameter change, or cleanup |
@@ -199,7 +199,7 @@ On failure, the hook sets the error and does not invalidate.
 **Layer implications:**
 
 - **Core:** No changes.
-- **React:** Cache keys must include `marketId` as a prefix segment. `invalidate(marketId)` filters cache entries by key prefix. The global `invalidationCount` is removed or relegated to `invalidateAll()`.
+- **React:** Cache keys include `marketId` as a prefix segment. `invalidate(marketId)` filters cache entries by key prefix. The global `invalidationCount` was removed and replaced by QueryCache-based targeted invalidation via `invalidate(marketId)` and `invalidateAll()`.
 - **UI:** No changes. Components already pass `marketId` to `ctx.invalidate()`.
 
 **Checklist:**

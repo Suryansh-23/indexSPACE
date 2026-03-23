@@ -76,7 +76,7 @@ Every new function must be classifiable by both layer AND category. This keeps t
 | Widgets must check `FunctionSpaceContext` | Throws helpful error if provider missing |
 | Data-fetching hooks return `{ <named>, loading, isFetching, error, refetch }` | Named property matches hook purpose. `loading` is true only on first fetch (no cached data). `isFetching` is true whenever a request is in flight (first fetch or background refetch). State/action hooks (e.g. `useAuth`, `useCustomShape`) return context fields directly. |
 | Data-fetching hooks use `useCacheSubscription`, not local `useState` | Hooks subscribe to the query cache via `useSyncExternalStore`. No per-hook `useState` for data/loading/error. |
-| Data-fetching hooks accept optional `QueryOptions` (`pollInterval`, `enabled`). `staleTime` is provider-level via `CacheConfig`, not per-hook. | All data-fetching hooks support cache-based polling and conditional fetching. |
+| Data-fetching hooks accept optional `QueryOptions` (`pollInterval`, `enabled`). | All data-fetching hooks support cache-based polling and conditional fetching. |
 | Hooks must provide `getServerSnapshot` for SSR | `useCacheSubscription` provides a frozen idle snapshot for server-side rendering. |
 | Export types separately | `export type { Props }` for proper tree-shaking |
 | Chart content components can fetch their own data | TimelineChartContent calls `useMarketHistory` internally  -- avoids wasteful fetches when tab is hidden |
@@ -135,7 +135,7 @@ cd packages/docs && npx docusaurus build  # Docs site build verification (requir
 | `tests/mappings.test.ts` | Mocked-fetch mapping contract tests (raw API shape to SDK type, POST body assertions) | Changing any mapping function, API endpoint shapes, or POST request bodies |
 | `tests/validation.test.ts` | Belief vector and username validation (validateBeliefVector, validateUsername) | Changing validation logic or adding new validation functions |
 | `tests/components.test.tsx` | Widget smoke tests, interaction tests, and accessibility audit -- all UI components | Adding or modifying UI widgets -- see [Widget Component Testing Guide](../Docs/widget-component-testing-guide.md) |
-| `tests/density-stats.test.ts` | L0 math functions (evaluateDensityCurve, evaluateDensityPiecewise, computeStatistics) | Changing density curve evaluation, piecewise interpolation, or statistics computation |
+| `tests/density-stats.test.ts` | L0 math functions (evaluateDensityCurve, evaluateDensityPiecewise, computeStatistics) | Changing density curve evaluation, B-spline evaluation, or statistics computation |
 
 **When adding UI widgets:** Add 5 smoke tests to `components.test.tsx` (provider guard, loading state, error state, data rendering, unmount cleanup).
 
@@ -234,6 +234,10 @@ Multi-agent adversarial review of recent implementation work. Invoked manually w
 
 - ~~**Race conditions in data hooks.**~~ **Resolved.** Cache-based data hooks use `useSyncExternalStore` with `QueryCache` managing an `AbortController` per in-flight request. Parameter changes abort previous requests, preventing stale responses from overwriting current data. Mutation hooks (`useBuy`, `useSell`) use local `useState` with `useCallback`, eliminating race conditions for trade operations.
 - ~~**Missing mounted guards in data hooks.**~~ **Resolved.** Data-fetching hooks use `useSyncExternalStore`, which handles component lifecycle automatically -- no manual mounted guards needed. Mutation hooks use local `useState`, which React manages safely on unmount.
+
+## Deferred Work
+
+- **Prediction field cleanup.** `Position.prediction` and `TradeEntry.prediction` remain on the types. `buy()` still accepts `options.prediction` (deprecated, not sent to server). `useBuy` does not forward it. Removal was deferred -- when picked up, remove fields from both types, remove the option from `buy()`, remove Prediction columns from PositionTable/TimeSales, and update consumer docs.
 
 ## Commit Style
 

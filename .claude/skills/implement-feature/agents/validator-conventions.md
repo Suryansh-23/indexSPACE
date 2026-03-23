@@ -55,7 +55,7 @@ If the plan adds hooks, verify they follow the canonical pattern:
 - `useCallback` wrapping the core function with `(signal: AbortSignal) => coreFn(ctx.client, ...)`
 - `useCacheSubscription(cache, key, queryFn, options)` for data subscription (uses `useSyncExternalStore`)
 - Return shape: `{ <named>, loading, isFetching, error, refetch }`
-- Accepts optional `QueryOptions` (`pollInterval`, `staleTime`, `enabled`)
+- Accepts optional `QueryOptions` (`pollInterval`, `enabled`).
 
 If the plan describes a hook that deviates from this pattern, flag it unless the plan explicitly justifies the deviation (e.g., state/action hooks like useAuth).
 
