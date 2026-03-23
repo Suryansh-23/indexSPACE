@@ -6,15 +6,15 @@ description: "Integrate a density curve into equal-width histogram buckets."
 
 # calculateBucketDistribution
 
-**`calculateBucketDistribution(points, L, H, numBuckets?, decimals?)`**
+**`calculateBucketDistribution(points, lowerBound, upperBound, numBuckets?, decimals?)`**
 
 **Layer:** L0. Integrates a density curve into equal-width histogram buckets using trapezoidal integration with linear interpolation at bucket boundaries. This is how continuous PDF curves get turned into the discrete bar charts used by `DistributionChart` and `BucketRangeSelector`.
 
 ```typescript
 function calculateBucketDistribution(
   points: Array<{ x: number; y: number }>,  // from evaluateDensityCurve or ConsensusCurve.points
-  L: number,
-  H: number,
+  lowerBound: number,
+  upperBound: number,
   numBuckets?: number,   // default: 12, clamped to [1, 200]
   decimals?: number,     // default: 0 (for range label formatting)
 ): BucketData[]
@@ -37,8 +37,8 @@ interface BucketData {
 **Example:**
 
 ```typescript
-const curve = evaluateDensityCurve(market.consensus, L, H, 200);
-const buckets = calculateBucketDistribution(curve, L, H, 12);
+const curve = evaluateDensityCurve(market.consensus, lowerBound, upperBound, 200);
+const buckets = calculateBucketDistribution(curve, lowerBound, upperBound, 12);
 
 // buckets = [
 //   { range: "50-56", min: 50, max: 56, probability: 0.02, percentage: 2.0 },

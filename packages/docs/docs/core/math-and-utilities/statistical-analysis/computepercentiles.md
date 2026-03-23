@@ -6,15 +6,15 @@ description: "Compute 9 percentile values (p2.5 through p97.5) from a coefficien
 
 # computePercentiles
 
-**`computePercentiles(coefficients, L, H)`**
+**`computePercentiles(coefficients, lowerBound, upperBound)`**
 
-**Layer:** L0. Computes 9 percentile values by walking a 500-point CDF integration from `L` to `H` and recording the outcome value when each cumulative threshold is crossed.
+**Layer:** L0. Computes 9 percentile values by walking a 500-point CDF integration from `lowerBound` to `upperBound` and recording the outcome value when each cumulative threshold is crossed.
 
 ```typescript
 function computePercentiles(
   coefficients: number[],
-  L: number,
-  H: number,
+  lowerBound: number,
+  upperBound: number,
 ): PercentileSet
 ```
 
@@ -39,7 +39,7 @@ These 9 percentiles define the bands of the fan chart. The 2.5th-97.5th range co
 **Example:**
 
 ```typescript
-const pct = computePercentiles(market.consensus, L, H);
+const pct = computePercentiles(market.consensus, lowerBound, upperBound);
 console.log(`95% confidence: ${pct.p2_5.toFixed(1)} to ${pct.p97_5.toFixed(1)}`);
 console.log(`IQR: ${pct.p25.toFixed(1)} to ${pct.p75.toFixed(1)}`);
 console.log(`Median: ${pct.p50.toFixed(1)}`);

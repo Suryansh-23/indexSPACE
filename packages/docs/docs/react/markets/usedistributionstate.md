@@ -32,7 +32,7 @@ function useDistributionState(
 | `refetch`            | `() => Promise<void>`                        | Re-fetches both market and consensus data                                                                                                         |
 | `bucketCount`        | `number`                                     | Current bucket count (2 to 50)                                                                                                                    |
 | `setBucketCount`     | `(n: number) => void`                        | Update bucket count. Value is clamped to `[2, 50]`.                                                                                               |
-| `buckets`            | `BucketData[] \| null`                       | Pre-computed buckets over the full range `[L, H]`. Recomputes when consensus, market, bucketCount, or invalidation changes.                       |
+| `buckets`            | `BucketData[] \| null`                       | Pre-computed buckets over the full range `[lowerBound, upperBound]`. Recomputes when consensus, market, bucketCount, or invalidation changes.                       |
 | `percentiles`        | `PercentileSet \| null`                      | 9-point percentile set (p2\_5 through p97\_5) computed from `market.consensus` (via `useMarket`), not from the separately-fetched consensus curve |
 | `getBucketsForRange` | `(min: number, max: number) => BucketData[]` | Compute buckets over a custom sub-range using the current `bucketCount`. Returns empty array if consensus or market data is not yet loaded.       |
 

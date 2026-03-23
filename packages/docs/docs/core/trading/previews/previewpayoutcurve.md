@@ -30,7 +30,7 @@ async function previewPayoutCurve(
 | `marketId`    | `string \| number` | The market to preview against.                                                  |
 | `belief`      | `BeliefVector`     | The belief vector to simulate. Same format as what you'd pass to `buy`.         |
 | `collateral`  | `number`           | The collateral amount to simulate.                                              |
-| `numBuckets`  | `number`           | Number of outcome buckets (K from `market.config.K`). Must equal `belief.length - 1`. |
+| `numBuckets`  | `number`           | Number of outcome buckets (from `market.config.numBuckets`). Must equal `belief.length - 1`. |
 | `numOutcomes` | `number?`          | Number of outcome points to sample. Defaults to server-side default if omitted. |
 
 **Returns `PayoutCurve`:**
@@ -54,7 +54,7 @@ interface PayoutCurve {
 
 | Cause                                | Error message pattern                                                              | Stage |
 | ------------------------------------ | ---------------------------------------------------------------------------------- | ----- |
-| Invalid belief vector                | `"Belief vector length X does not match expected K+1 = Y"`                         | Client-side, before network request |
+| Invalid belief vector                | `"Belief vector length X does not match expected numBuckets+1 = Y"`                | Client-side, before network request |
 | Non-finite values                    | `"Belief vector contains non-finite values (NaN or Infinity)"`                     | Client-side |
 | Negative values                      | `"Belief vector contains negative values"`                                         | Client-side |
 | Sum != 1.0                           | `"Belief vector does not sum to 1.0 (sum = X)"`                                   | Client-side |
@@ -67,8 +67,8 @@ interface PayoutCurve {
 **Example:**
 
 ```typescript
-const belief = generateGaussian(75, 5, K, L, H);
-const curve = await previewPayoutCurve(ctx.client, marketId, belief, 100, K);
+const belief = generateGaussian(75, 5, numBuckets, lowerBound, upperBound);
+const curve = await previewPayoutCurve(ctx.client, marketId, belief, 100, numBuckets);
 
 console.log(`Best case: $${curve.maxPayout} if outcome = ${curve.maxPayoutOutcome}`);
 console.log(`Worst case: $${Math.min(...curve.previews.map(p => p.payout))}`);

@@ -16,7 +16,7 @@ function useCustomShape(market: MarketState | null): UseCustomShapeReturn
 
 | Parameter | Type                  | Description                                                                                                                            |
 | --------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `market`  | `MarketState \| null` | Market state providing `config.K`, `config.L`, `config.H` for belief construction. When `null`, `pVector` and `prediction` are `null`. |
+| `market`  | `MarketState \| null` | Market state providing `config.numBuckets`, `config.lowerBound`, `config.upperBound` for belief construction. When `null`, `pVector` and `prediction` are `null`. |
 
 **Returns `UseCustomShapeReturn`:**
 

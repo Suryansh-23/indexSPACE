@@ -53,8 +53,8 @@ function MarketTimeline({ marketId }: { marketId: number }) {
   if (error) return Error: {error.message};
   if (!market || !history) return null;
 
-  const { L, H } = market.config;
-  const fanData = transformHistoryToFanChart(history.snapshots, L, H);
+  const { lowerBound, upperBound } = market.config;
+  const fanData = transformHistoryToFanChart(history.snapshots, lowerBound, upperBound);
 
   return (
     

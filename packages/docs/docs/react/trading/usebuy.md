@@ -63,8 +63,8 @@ function TradeButton({ marketId }: { marketId: string }) {
 
   const handleTrade = async () => {
     if (!market) return;
-    const { K, L, H } = market.config;
-    const belief = generateGaussian(75, 5, K, L, H);
+    const { numBuckets, lowerBound, upperBound } = market.config;
+    const belief = generateGaussian(75, 5, numBuckets, lowerBound, upperBound);
     try {
       const result = await execute(belief, 10);
       console.log('Trade successful, position:', result.positionId);

@@ -965,7 +965,7 @@ type ShapeId = 'gaussian' | 'spike' | 'range' | 'bimodal' | 'dip' | 'leftskew' |
 
 ### Key Core Types Used by UI
 
-- **`MarketState`** -- Contains `config` (K, L, H), `consensus`, `title`, `xAxisUnits`, `resolutionState`.
+- **`MarketState`** -- Contains `config` (numBuckets, lowerBound, upperBound), `consensus`, `title`, `xAxisUnits`, `resolutionState`.
 - **`BuyResult`** -- Returned by `buy()`. Contains `positionId`, `belief`, `claims`, `collateral`.
 - **`SellResult`** -- Returned by `sell()`. Contains `positionId`, `collateralReturned`.
 - **`Position`** -- Contains `positionId`, `belief`, `collateral`, `claims`, `status`, `prediction`.

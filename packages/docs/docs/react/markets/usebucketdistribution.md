@@ -26,13 +26,13 @@ function useBucketDistribution(
 | Parameter    | Type               | Description                                                                             |
 | ------------ | ------------------ | --------------------------------------------------------------------------------------- |
 | `marketId`   | `string \| number` | Market identifier                                                                       |
-| `numBuckets` | `number`           | Number of equal-width outcome buckets to divide the range `[L, H]` into. Default: `12`. |
+| `numBuckets` | `number`           | Number of equal-width outcome buckets to divide the range `[lowerBound, upperBound]` into. Default: `12`. |
 | `numPoints`  | `number`           | Number of evaluation points for the consensus density curve. Default: `200`.            |
 
 **Behavior:**
 
 * Requires `FunctionSpaceProvider`. Throws if called outside one.
-* Calls `useMarket(marketId)` to obtain market config (`L`, `H`, `decimals`) and `useConsensus(marketId, numPoints)` to fetch the consensus density curve. No additional API calls are made.
+* Calls `useMarket(marketId)` to obtain market config (`lowerBound`, `upperBound`, `decimals`) and `useConsensus(marketId, numPoints)` to fetch the consensus density curve. No additional API calls are made.
 * Returns `loading` and `error` from `useConsensus` only; `useMarket` data is consumed silently.
 * The `buckets` array is memoized and recomputes when `consensus`, `market`, or `numBuckets` changes. Returns `null` until both market and consensus data are available.
 * Each `BucketData` contains `range` (formatted string), `min`/`max` (numeric bounds), `probability` (0-1 mass), and `percentage` (0-100).

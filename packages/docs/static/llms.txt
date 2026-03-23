@@ -334,6 +334,15 @@ interface FSConfig {
 }
 ```
 
+The `FunctionSpaceProvider` component also accepts these optional props:
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `config` | `FSConfig` | Yes | Configuration object (see table above) |
+| `theme` | `FSThemeInput` | No | Theme preset string or custom theme object |
+| `cache` | `CacheConfig` | No | Cache configuration: `{ staleTime?, gcTime?, defaultPollInterval?, revalidateOnFocus?, revalidateOnReconnect? }` |
+| `storedUsername` | `string \| null` | No | Previously stored username for silent re-authentication on mount |
+
 ### 4.2 Theming
 
 #### Preset Selection
@@ -835,9 +844,9 @@ import { BinaryPanel } from '@functionspace/ui';
 | Mode | Threshold Source | User-Editable | Fallback |
 |------|-----------------|---------------|----------|
 | `{ mode: 'static', value: 91 }` | Fixed at `value` | Never | -- |
-| `{ mode: 'variable', initial?: 75 }` | `initial` or market midpoint | Always | `(L + H) / 2` |
-| `{ mode: 'dynamic-mode', allowOverride?: true }` | Consensus peak (mode) | Only if `allowOverride: true` | `(L + H) / 2` |
-| `{ mode: 'dynamic-mean', allowOverride?: true }` | Consensus mean | Only if `allowOverride: true` | `(L + H) / 2` |
+| `{ mode: 'variable', initial?: 75 }` | `initial` or market midpoint | Always | `(lowerBound + upperBound) / 2` |
+| `{ mode: 'dynamic-mode', allowOverride?: true }` | Consensus peak (mode) | Only if `allowOverride: true` | `(lowerBound + upperBound) / 2` |
+| `{ mode: 'dynamic-mean', allowOverride?: true }` | Consensus mean | Only if `allowOverride: true` | `(lowerBound + upperBound) / 2` |
 
 **Minimal example:**
 
@@ -973,7 +982,7 @@ function App() {
 - The editor renders its own consensus chart at 280px height with draggable SVG control dots. A row of vertical sliders below the chart mirrors the control points.
 - Up to 2 control points can be locked, preventing accidental edits. Locks use FIFO -- locking a third point releases the oldest lock.
 - Adjusting the point count slider (5 to 25) resets all values to a bell shape and clears all locks.
-- Uses `generateCustomShape` internally (Fritsch-Carlson spline interpolation).
+- Uses `generateCustomShape` internally (quadratic B-spline evaluation).
 - Because the editor embeds its own chart, mounting `CustomShapeEditor` alongside a separate `ConsensusChart` for the same market is valid -- the context coordination still works.
 
 ---
@@ -1445,7 +1454,7 @@ Clicking a position row overlays the position's belief on the chart. Clicking th
 
 #### Post-Trade Invalidation Flow
 
-After a successful `buy()` or `sell()` call, trading widgets call `ctx.invalidate(marketId)` internally. The invalidation increments a counter in context. All data-fetching hooks (`useMarket`, `useConsensus`, `usePositions`, `useBucketDistribution`, `useMarketHistory`) watch the counter and refetch automatically.
+After a successful `buy()` or `sell()` call, trading widgets call `ctx.invalidate(marketId)` internally. `invalidate(marketId)` marks matching cache entries for that market as stale and triggers a refetch for all active subscribers. `invalidateAll()` does the same for all cache entries. All data-fetching hooks (`useMarket`, `useConsensus`, `usePositions`, `useBucketDistribution`, `useMarketHistory`) that subscribe to affected entries refetch automatically.
 
 No consumer code is needed for this flow. Trading widgets handle invalidation as part of the three-phase trade pattern. Sell actions in `PositionTable` also trigger invalidation.
 
@@ -1590,6 +1599,13 @@ The `config` object accepts these fields:
 | `password` | `string` | No | Password for auto-authentication |
 | `autoAuthenticate` | `boolean` | No | When `true` (the default if `username` and `password` are provided), the provider logs in automatically on mount |
 
+The `FunctionSpaceProvider` component also accepts these optional props (outside `config`):
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `cache` | `CacheConfig` | No | Cache configuration: `{ staleTime?, gcTime?, defaultPollInterval?, revalidateOnFocus?, revalidateOnReconnect? }` |
+| `storedUsername` | `string \| null` | No | Previously stored username for silent re-authentication on mount |
+
 #### Import Map
 
 Headless integrations pull from two packages. Core functions and types come from `@functionspace/core`. Hooks, the provider, the context object, and theme utilities come from `@functionspace/react`.
@@ -1727,7 +1743,7 @@ function useMarket(
 | `error` | `Error \| null` | Fetch error, if any |
 | `refetch` | `() => Promise<void>` | Trigger a background refetch |
 
-The `MarketState` object contains the market configuration (`market.config` with `K`, `L`, `H`, and other protocol parameters), the current consensus vector (`market.consensus`), pool statistics (`market.totalMass`, `market.poolBalance`, `market.totalVolume`), metadata (`market.title`, `market.xAxisUnits`, `market.decimals`), and resolution state (`market.resolutionState`).
+The `MarketState` object contains the market configuration (`market.config` with `numBuckets`, `lowerBound`, `upperBound`, and other protocol parameters), the current consensus vector (`market.consensus`), pool statistics (`market.totalMass`, `market.poolBalance`, `market.totalVolume`), metadata (`market.title`, `market.xAxisUnits`, `market.decimals`), and resolution state (`market.resolutionState`).
 
 **Example:**
 
@@ -1745,7 +1761,7 @@ function MarketHeader({ marketId }: { marketId: string }) {
   return (
     <div>
       <h2>{market.title}</h2>
-      <p>Range: {market.config.L} - {market.config.H} {market.xAxisUnits}</p>
+      <p>Range: {market.config.lowerBound} - {market.config.upperBound} {market.xAxisUnits}</p>
       <p>Total volume: ${market.totalVolume.toFixed(2)}</p>
       <p>Open positions: {market.positionsOpen}</p>
     </div>
@@ -2009,8 +2025,8 @@ function HistoryStats({ marketId }: { marketId: string }) {
   if (loading || !market || !history) return <div>Loading history...</div>;
   if (error) return <div>Error: {error.message}</div>;
 
-  const { L, H } = market.config;
-  const fanData = transformHistoryToFanChart(history.snapshots, L, H);
+  const { lowerBound, upperBound } = market.config;
+  const fanData = transformHistoryToFanChart(history.snapshots, lowerBound, upperBound);
 
   return (
     <div>
@@ -2327,16 +2343,16 @@ function useDistributionState(
 
 ### 5.4 Building Beliefs
 
-A belief vector is a `number[]` of length `K + 1` that sums to 1. It expresses a trader's probability distribution over possible outcomes. Every trade in the SDK starts with constructing a belief.
+A belief vector is a `number[]` of length `numBuckets + 1` that sums to 1. It expresses a trader's probability distribution over possible outcomes. Every trade in the SDK starts with constructing a belief.
 
-The three parameters `K`, `L`, and `H` always come from the market configuration. Never hardcode them.
+The three parameters `numBuckets`, `lowerBound`, and `upperBound` always come from the market configuration. Never hardcode them.
 
 ```typescript
 const { market } = useMarket(marketId);
-const { K, L, H } = market.config;
+const { numBuckets, lowerBound, upperBound } = market.config;
 ```
 
-#### `generateBelief(regions, K, L, H)` -- Universal Constructor
+#### `generateBelief(regions, numBuckets, lowerBound, upperBound)` -- Universal Constructor
 
 The L1 universal constructor. Every other generator delegates to this function. Use it directly when you need multi-region composition or fine-grained control.
 
@@ -2346,10 +2362,10 @@ import type { Region, BeliefVector } from '@functionspace/core';
 
 function generateBelief(
   regions: Region[],
-  K: number,
-  L: number,
-  H: number,
-): BeliefVector  // number[] of length K+1, sums to 1
+  numBuckets: number,
+  lowerBound: number,
+  upperBound: number,
+): BeliefVector  // number[] of length numBuckets+1, sums to 1
 ```
 
 **Parameters:**
@@ -2357,9 +2373,9 @@ function generateBelief(
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `regions` | `Region[]` | One or more region objects describing where probability mass should concentrate. Regions are additive -- their weighted kernels are summed before normalization. |
-| `K` | `number` | Polynomial degree. The output vector has `K + 1` elements. From `market.config.K`. |
-| `L` | `number` | Lower bound of the outcome space. From `market.config.L`. |
-| `H` | `number` | Upper bound of the outcome space. From `market.config.H`. |
+| `numBuckets` | `number` | Number of outcome buckets. The output vector has `numBuckets + 1` elements. From `market.config.numBuckets`. |
+| `lowerBound` | `number` | Lower bound of the outcome space. From `market.config.lowerBound`. |
+| `upperBound` | `number` | Upper bound of the outcome space. From `market.config.upperBound`. |
 
 #### Region Types
 
@@ -2389,7 +2405,7 @@ function generateBelief(
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `type` | `'spline'` | -- | Discriminator |
-| `controlX` | `number[]` | -- | X positions in outcome space `[L..H]`, sorted ascending |
+| `controlX` | `number[]` | -- | X positions in outcome space `[lowerBound..upperBound]`, sorted ascending |
 | `controlY` | `number[]` | -- | Y values (unnormalized heights) |
 | `weight` | `number` | `1` | Relative weight |
 
@@ -2399,7 +2415,7 @@ When you pass multiple regions, `generateBelief` processes each into a raw kerne
 
 ```
 for each region:
-    kernel = computeKernel(region, K, L, H)
+    kernel = computeKernel(region, numBuckets, lowerBound, upperBound)
     combined[k] += kernel[k] * region.weight
 
 return normalize(combined)  // sums to 1; returns uniform if sum <= 0
@@ -2413,13 +2429,13 @@ All L2 generators are thin wrappers around `generateBelief`. They contain no mat
 
 | Function | Signature | Equivalent `generateBelief` Call |
 |----------|-----------|----------------------------------|
-| `generateGaussian` | `(center, spread, K, L, H)` | `generateBelief([{ type: 'point', center, spread }], K, L, H)` |
-| `generateRange` | `(low, high, K, L, H, sharpness?)` | `generateBelief([{ type: 'range', low, high, sharpness: sharpness ?? 0.5 }], K, L, H)` |
-| `generateRange` | `(ranges: RangeInput[], K, L, H)` | `generateBelief(ranges.map(r => ({ type: 'range', ...r })), K, L, H)` |
-| `generateDip` | `(center, spread, K, L, H)` | `generateBelief([{ type: 'point', center, spread: spread * 1.5, inverted: true }], K, L, H)` |
-| `generateLeftSkew` | `(center, spread, K, L, H, skewAmount?)` | `generateBelief([{ type: 'point', center, spread, skew: -skewAmount }], K, L, H)` (default `skewAmount = 1`) |
-| `generateRightSkew` | `(center, spread, K, L, H, skewAmount?)` | `generateBelief([{ type: 'point', center, spread, skew: skewAmount }], K, L, H)` (default `skewAmount = 1`) |
-| `generateCustomShape` | `(controlValues, K, L, H)` | `generateBelief([{ type: 'spline', controlX: [evenly spaced L..H], controlY: controlValues }], K, L, H)` |
+| `generateGaussian` | `(center, spread, numBuckets, lowerBound, upperBound)` | `generateBelief([{ type: 'point', center, spread }], numBuckets, lowerBound, upperBound)` |
+| `generateRange` | `(low, high, numBuckets, lowerBound, upperBound, sharpness?)` | `generateBelief([{ type: 'range', low, high, sharpness: sharpness ?? 1 }], numBuckets, lowerBound, upperBound)` |
+| `generateRange` | `(ranges: RangeInput[], numBuckets, lowerBound, upperBound)` | `generateBelief(ranges.map(r => ({ type: 'range', ...r })), numBuckets, lowerBound, upperBound)` |
+| `generateDip` | `(center, spread, numBuckets, lowerBound, upperBound)` | `generateBelief([{ type: 'point', center, spread: spread * 1.5, inverted: true }], numBuckets, lowerBound, upperBound)` |
+| `generateLeftSkew` | `(center, spread, numBuckets, lowerBound, upperBound, skewAmount?)` | `generateBelief([{ type: 'point', center, spread, skew: -skewAmount }], numBuckets, lowerBound, upperBound)` (default `skewAmount = 1`) |
+| `generateRightSkew` | `(center, spread, numBuckets, lowerBound, upperBound, skewAmount?)` | `generateBelief([{ type: 'point', center, spread, skew: skewAmount }], numBuckets, lowerBound, upperBound)` (default `skewAmount = 1`) |
+| `generateCustomShape` | `(controlValues, numBuckets, lowerBound, upperBound)` | `generateBelief([{ type: 'spline', controlX: [evenly spaced lowerBound..upperBound], controlY: controlValues }], numBuckets, lowerBound, upperBound)` |
 
 `generateBellShape(numPoints, peakPosition?, spread?, zeroTailPercent?)` is a helper that generates raw Y-values for initializing a `CustomShapeEditor`. It does not produce a belief vector -- it produces the control point array that `generateCustomShape` consumes.
 
@@ -2430,8 +2446,8 @@ All L2 generators are thin wrappers around `generateBelief`. They contain no mat
 ```typescript
 import { generateGaussian } from '@functionspace/core';
 
-const { K, L, H } = market.config;
-const belief = generateGaussian(75, 5, K, L, H);
+const { numBuckets, lowerBound, upperBound } = market.config;
+const belief = generateGaussian(75, 5, numBuckets, lowerBound, upperBound);
 ```
 
 **Bimodal -- "I think it will be either 60 or 90, leaning toward 90":**
@@ -2439,11 +2455,11 @@ const belief = generateGaussian(75, 5, K, L, H);
 ```typescript
 import { generateBelief } from '@functionspace/core';
 
-const { K, L, H } = market.config;
+const { numBuckets, lowerBound, upperBound } = market.config;
 const belief = generateBelief([
   { type: 'point', center: 60, spread: 4, weight: 0.3 },
   { type: 'point', center: 90, spread: 4, weight: 0.7 },
-], K, L, H);
+], numBuckets, lowerBound, upperBound);
 ```
 
 **Left-skewed -- "Around 80, but could be quite a bit lower":**
@@ -2451,8 +2467,8 @@ const belief = generateBelief([
 ```typescript
 import { generateLeftSkew } from '@functionspace/core';
 
-const { K, L, H } = market.config;
-const belief = generateLeftSkew(80, 6, K, L, H, 0.8);
+const { numBuckets, lowerBound, upperBound } = market.config;
+const belief = generateLeftSkew(80, 6, numBuckets, lowerBound, upperBound, 0.8);
 ```
 
 **Range -- "Somewhere between 70 and 85":**
@@ -2460,8 +2476,8 @@ const belief = generateLeftSkew(80, 6, K, L, H, 0.8);
 ```typescript
 import { generateRange } from '@functionspace/core';
 
-const { K, L, H } = market.config;
-const belief = generateRange(70, 85, K, L, H, 0.5);
+const { numBuckets, lowerBound, upperBound } = market.config;
+const belief = generateRange(70, 85, numBuckets, lowerBound, upperBound, 0.5);
 ```
 
 **Dip -- "Anything but 75":**
@@ -2469,8 +2485,8 @@ const belief = generateRange(70, 85, K, L, H, 0.5);
 ```typescript
 import { generateDip } from '@functionspace/core';
 
-const { K, L, H } = market.config;
-const belief = generateDip(75, 5, K, L, H);
+const { numBuckets, lowerBound, upperBound } = market.config;
+const belief = generateDip(75, 5, numBuckets, lowerBound, upperBound);
 ```
 
 **Mixed regions -- Gaussian peak with a range floor:**
@@ -2478,11 +2494,11 @@ const belief = generateDip(75, 5, K, L, H);
 ```typescript
 import { generateBelief } from '@functionspace/core';
 
-const { K, L, H } = market.config;
+const { numBuckets, lowerBound, upperBound } = market.config;
 const belief = generateBelief([
   { type: 'point', center: 80, spread: 3, weight: 2 },
   { type: 'range', low: 60, high: 100, weight: 0.5 },
-], K, L, H);
+], numBuckets, lowerBound, upperBound);
 ```
 
 **Non-contiguous ranges -- "Either 50-60 or 80-90, but not the middle":**
@@ -2491,19 +2507,19 @@ const belief = generateBelief([
 import { generateRange } from '@functionspace/core';
 import type { RangeInput } from '@functionspace/core';
 
-const { K, L, H } = market.config;
+const { numBuckets, lowerBound, upperBound } = market.config;
 const ranges: RangeInput[] = [
   { low: 50, high: 60, weight: 1 },
   { low: 80, high: 90, weight: 1 },
 ];
-const belief = generateRange(ranges, K, L, H);
+const belief = generateRange(ranges, numBuckets, lowerBound, upperBound);
 ```
 
 ---
 
 ### 5.5 Mutation Hooks and Trade Execution (Headless)
 
-The SDK provides mutation hooks for trade execution: `useBuy`, `useSell`, `usePreviewPayout`, and `usePreviewSell`. These wrap core functions with managed loading/error state and automatic cache invalidation. They return `{ execute, loading, error, reset }`.
+The SDK provides mutation and preview hooks for trade execution: `useBuy`, `useSell`, `usePreviewPayout`, and `usePreviewSell`. These wrap core functions with managed loading/error state. `useBuy` and `useSell` auto-invalidate the affected market's cache on success; `usePreviewPayout` and `usePreviewSell` are read-only previews with no auto-invalidation. All four return `{ execute, loading, error, reset }`.
 
 #### `useBuy(marketId)` and `useSell(marketId)`
 
@@ -2538,7 +2554,7 @@ const sellPreview = await previewSellFn(positionId, { signal: controller.signal 
 Construct the belief vector from the user's inputs and write it to context immediately. This gives chart components (if mounted) an instant overlay showing the trader's intended distribution.
 
 ```typescript
-const belief = generateGaussian(center, spread, K, L, H);
+const belief = generateGaussian(center, spread, numBuckets, lowerBound, upperBound);
 ctx.setPreviewBelief(belief);
 ```
 
@@ -2590,7 +2606,7 @@ async function buy(
 | `marketId` | `string \| number` | The market to trade in |
 | `belief` | `BeliefVector` | The probability distribution to trade on |
 | `collateral` | `number` | Amount of currency to put up (minimum is typically 1) |
-| `numBuckets` | `number` | Number of outcome buckets (K from `market.config.K`). Must equal `belief.length - 1`. |
+| `numBuckets` | `number` | Number of outcome buckets (from `market.config.numBuckets`). Must equal `belief.length - 1`. |
 | `options.prediction` | `number` | Optional center-of-mass hint. Accepted for backward compatibility but no longer sent to the server. |
 
 **Returns `BuyResult`:**
@@ -2670,8 +2686,8 @@ function CustomTradeForm({ marketId }: { marketId: string }) {
   // Phase 2: Preview payout (debounced 500ms)
   useEffect(() => {
     if (!market) return;
-    const { K, L, H } = market.config;
-    const belief = generateGaussian(center, spread, K, L, H);
+    const { numBuckets, lowerBound, upperBound } = market.config;
+    const belief = generateGaussian(center, spread, numBuckets, lowerBound, upperBound);
 
     // Phase 1: instant preview
     ctx.setPreviewBelief(belief);
@@ -2708,8 +2724,8 @@ function CustomTradeForm({ marketId }: { marketId: string }) {
     if (!market) return;
 
     try {
-      const { K, L, H } = market.config;
-      const belief = generateGaussian(center, spread, K, L, H);
+      const { numBuckets, lowerBound, upperBound } = market.config;
+      const belief = generateGaussian(center, spread, numBuckets, lowerBound, upperBound);
 
       const result = await executeBuy(belief, collateral);
       // Cache invalidation and wallet refresh happen automatically
@@ -2728,7 +2744,7 @@ function CustomTradeForm({ marketId }: { marketId: string }) {
 
   if (marketLoading || !market) return <div>Loading market...</div>;
 
-  const { L, H } = market.config;
+  const { lowerBound, upperBound } = market.config;
 
   return (
     <div>
@@ -2738,8 +2754,8 @@ function CustomTradeForm({ marketId }: { marketId: string }) {
         Prediction ({market.xAxisUnits}):
         <input
           type="range"
-          min={L}
-          max={H}
+          min={lowerBound}
+          max={upperBound}
           step={0.1}
           value={center}
           onChange={e => setCenter(Number(e.target.value))}
@@ -2828,7 +2844,7 @@ import { generateGaussian } from '@functionspace/core';
 const { execute: preview } = usePreviewPayout(marketId);
 
 // Inside a useEffect, debounced 500ms after input change:
-const belief = generateGaussian(center, spread, K, L, H);
+const belief = generateGaussian(center, spread, numBuckets, lowerBound, upperBound);
 const curve = await preview(belief, collateral);
 
 // Write to context so any mounted chart renders the payout overlay
@@ -2865,7 +2881,7 @@ The core package also exports `previewPayoutCurve` and `previewSell` for use out
 ```typescript
 import { previewPayoutCurve, previewSell } from '@functionspace/core';
 
-const curve = await previewPayoutCurve(ctx.client, marketId, belief, collateral, K);
+const curve = await previewPayoutCurve(ctx.client, marketId, belief, collateral, numBuckets);
 const sellPreview = await previewSell(ctx.client, positionId, marketId);
 ```
 
@@ -3192,19 +3208,19 @@ console.log(`Account created: ${user.username}`);
 
 #### Validating Belief Vectors
 
-**`validateBeliefVector(vector, K)`** -- Pure client-side validation (no network call). Throws a descriptive error if the belief vector is invalid. Checks length matches K+1, all elements are finite, all elements are non-negative, and elements sum to 1.0 within tolerance (1e-6).
+**`validateBeliefVector(vector, numBuckets)`** -- Pure client-side validation (no network call). Throws a descriptive error if the belief vector is invalid. Checks length matches numBuckets+1, all elements are finite, all elements are non-negative, and elements sum to 1.0 within tolerance (1e-6).
 
 ```typescript
 import { validateBeliefVector } from '@functionspace/core';
 
-const { K } = market.config;
-const belief = generateGaussian(75, 5, K, L, H);
+const { numBuckets, lowerBound, upperBound } = market.config;
+const belief = generateGaussian(75, 5, numBuckets, lowerBound, upperBound);
 
 // Validates the belief vector before submission -- throws on invalid input
-validateBeliefVector(belief, K);
+validateBeliefVector(belief, numBuckets);
 
 // Safe to pass to buy() or previewPayoutCurve()
-const result = await buy(client, marketId, belief, 100, K);
+const result = await buy(client, marketId, belief, 100, numBuckets);
 ```
 
 Use `validateBeliefVector` before calling `buy()` or `previewPayoutCurve()` to catch malformed belief vectors early with clear error messages. The `generate*` functions produce valid vectors, but custom or manually constructed vectors should be validated.
@@ -3230,7 +3246,7 @@ console.log(`${openMarkets.length} markets open for trading`);
 
 #### `queryMarketState(client, marketId)`
 
-The foundational call. Returns a `MarketState` containing the consensus distribution, market config (`K`, `L`, `H`), metadata (title, units, decimals), pool balance, volume, and resolution status. Nearly every workflow begins here.
+The foundational call. Returns a `MarketState` containing the consensus distribution, market config (`numBuckets`, `lowerBound`, `upperBound`), metadata (title, units, decimals), pool balance, volume, and resolution status. Nearly every workflow begins here.
 
 ```typescript
 import { FSClient, queryMarketState } from '@functionspace/core';
@@ -3240,7 +3256,7 @@ const client = new FSClient({ baseUrl: 'https://api.example.com' });
 const market: MarketState = await queryMarketState(client, 42);
 
 console.log(market.title);                     // "What will the high temperature be?"
-console.log(market.config.L, market.config.H);  // 30, 110
+console.log(market.config.lowerBound, market.config.upperBound);  // 30, 110
 console.log(market.resolutionState);             // "open"
 console.log(market.positionsOpen);               // number of open positions
 ```
@@ -3251,7 +3267,7 @@ console.log(market.positionsOpen);               // number of open positions
 |-------|------|-------------|
 | `alpha` | `number[]` | Raw alpha vector from the AMM. |
 | `consensus` | `number[]` | Normalized probability distribution (alpha / sum). |
-| `config` | `MarketConfig` | Contains `K`, `L`, `H`, and AMM parameters. |
+| `config` | `MarketConfig` | Contains `numBuckets`, `lowerBound`, `upperBound`, and AMM parameters. |
 | `title` | `string` | Market question text. |
 | `xAxisUnits` | `string` | Unit label for the outcome axis (e.g., "USD", "degF"). |
 | `decimals` | `number` | Display precision for outcome values. |
@@ -3274,7 +3290,7 @@ import type { ConsensusCurve } from '@functionspace/core';
 const client = new FSClient({ baseUrl: 'https://api.example.com' });
 const curve: ConsensusCurve = await getConsensusCurve(client, 42, 200);
 // curve.points = [{ x: 30, y: 0.001 }, { x: 30.4, y: 0.003 }, ...]
-// curve.config = { K, L, H, ... }
+// curve.config = { numBuckets, lowerBound, upperBound, ... }
 ```
 
 #### `queryConsensusSummary(client, marketId)`
@@ -3363,9 +3379,9 @@ const trades: TradeEntry[] = await queryTradeHistory(client, 42, { limit: 50 });
 
 Trading requires three steps: extract market parameters, build a belief vector, and execute the trade.
 
-#### Step 1: Extract K, L, H from the Market
+#### Step 1: Extract numBuckets, lowerBound, upperBound from the Market
 
-Every belief generator requires `K`, `L`, and `H` from the market config. Always destructure them from a live `queryMarketState` response. Never hardcode these values.
+Every belief generator requires `numBuckets`, `lowerBound`, and `upperBound` from the market config. Always destructure them from a live `queryMarketState` response. Never hardcode these values.
 
 ```typescript
 import { FSClient, queryMarketState } from '@functionspace/core';
@@ -3377,33 +3393,33 @@ const client = new FSClient({
 });
 
 const market = await queryMarketState(client, 42);
-const { K, L, H } = market.config;
+const { numBuckets, lowerBound, upperBound } = market.config;
 ```
 
 #### Step 2: Build a Belief
 
-Use any generator function to construct a normalized `BeliefVector` (a `number[]` of length `K + 1` that sums to 1).
+Use any generator function to construct a normalized `BeliefVector` (a `number[]` of length `numBuckets + 1` that sums to 1).
 
 ```typescript
 import { generateGaussian, generateRange, generateBelief, generateDip } from '@functionspace/core';
 
 // Gaussian: "I think the outcome will be around 75"
-const belief = generateGaussian(75, 5, K, L, H);
+const belief = generateGaussian(75, 5, numBuckets, lowerBound, upperBound);
 
 // Range: "I think it will land between 70 and 85"
-const rangeBelief = generateRange(70, 85, K, L, H, 0.5);
+const rangeBelief = generateRange(70, 85, numBuckets, lowerBound, upperBound, 0.5);
 
 // Range with hard edges (sharpness 1)
-const hardRangeBelief = generateRange(70, 85, K, L, H, 1);
+const hardRangeBelief = generateRange(70, 85, numBuckets, lowerBound, upperBound, 1);
 
 // Dip: "Anything but 75"
-const dipBelief = generateDip(75, 5, K, L, H);
+const dipBelief = generateDip(75, 5, numBuckets, lowerBound, upperBound);
 
 // Advanced: multi-region composition via generateBelief
 const bimodal = generateBelief([
   { type: 'point', center: 60, spread: 4, weight: 0.3 },
   { type: 'point', center: 90, spread: 4, weight: 0.7 },
-], K, L, H);
+], numBuckets, lowerBound, upperBound);
 ```
 
 All L2 generators (`generateGaussian`, `generateRange`, `generateDip`, `generateLeftSkew`, `generateRightSkew`, `generateCustomShape`) delegate to `generateBelief` internally. Use `generateBelief` directly when you need multi-region composition or fine-grained control with `PointRegion`, `RangeRegion`, or `SplineRegion` types.
@@ -3416,7 +3432,7 @@ All L2 generators (`generateGaussian`, `generateRange`, `generateDip`, `generate
 import { buy } from '@functionspace/core';
 import type { BuyResult } from '@functionspace/core';
 
-const result: BuyResult = await buy(client, 42, belief, 100, K, { prediction: 75 });
+const result: BuyResult = await buy(client, 42, belief, 100, numBuckets, { prediction: 75 });
 // result = { positionId: string | number, belief: number[], claims: number, collateral: number, positionType?: string, positionParams?: Record<string, unknown> }
 console.log(`Opened position ${result.positionId}, claims: ${result.claims}`);
 ```
@@ -3429,7 +3445,7 @@ Parameters:
 | `marketId` | `string \| number` | Target market. |
 | `belief` | `BeliefVector` | Normalized probability vector from any generator. |
 | `collateral` | `number` | Amount of currency to commit. |
-| `numBuckets` | `number` | Number of outcome buckets (K from `market.config.K`). Must equal `belief.length - 1`. |
+| `numBuckets` | `number` | Number of outcome buckets (from `market.config.numBuckets`). Must equal `belief.length - 1`. |
 | `options.prediction` | `number?` | Optional center-of-mass hint. Accepted for backward compatibility but no longer sent to the server. |
 
 **`sell(client, positionId, marketId)`** -- Closes an open position. Returns `SellResult`.
@@ -3453,7 +3469,7 @@ Before committing, use previews to preview outcomes.
 import { previewPayoutCurve } from '@functionspace/core';
 import type { PayoutCurve } from '@functionspace/core';
 
-const curve: PayoutCurve = await previewPayoutCurve(client, 42, belief, 100, K);
+const curve: PayoutCurve = await previewPayoutCurve(client, 42, belief, 100, numBuckets);
 console.log(`Best case: $${curve.maxPayout} if outcome = ${curve.maxPayoutOutcome}`);
 console.log(`Worst case: $${Math.min(...curve.previews.map(p => p.payout))}`);
 // curve.previews = [{ outcome, payout, profitLoss }, ...]
@@ -3494,18 +3510,18 @@ async function main() {
 
   // 2. Fetch market state
   const market = await queryMarketState(client, 42);
-  const { K, L, H } = market.config;
-  console.log(`Market: ${market.title} [${L} - ${H}] ${market.xAxisUnits}`);
+  const { numBuckets, lowerBound, upperBound } = market.config;
+  console.log(`Market: ${market.title} [${lowerBound} - ${upperBound}] ${market.xAxisUnits}`);
 
   // 3. Build a belief: "I think the outcome will be around 75"
-  const belief = generateGaussian(75, 5, K, L, H);
+  const belief = generateGaussian(75, 5, numBuckets, lowerBound, upperBound);
 
   // 4. Preview the payout before committing
-  const preview = await previewPayoutCurve(client, 42, belief, 100, K);
+  const preview = await previewPayoutCurve(client, 42, belief, 100, numBuckets);
   console.log(`Best payout: $${preview.maxPayout.toFixed(2)} at outcome ${preview.maxPayoutOutcome}`);
 
   // 5. Execute the trade
-  const result = await buy(client, 42, belief, 100, K, { prediction: 75 });
+  const result = await buy(client, 42, belief, 100, numBuckets, { prediction: 75 });
   console.log(`Position opened: #${result.positionId}, claims: ${result.claims}`);
 
   // 6. Verify the position
@@ -3524,72 +3540,72 @@ These L0 functions operate on coefficient vectors and data arrays with no networ
 
 #### Density Evaluation
 
-**`evaluateDensityCurve(coefficients, L, H, numPoints?)`** -- Evaluates a coefficient vector as a continuous PDF across the full outcome range. Returns `{ x, y }[]` points suitable for charting. Default `numPoints` is 200.
+**`evaluateDensityCurve(coefficients, lowerBound, upperBound, numPoints?)`** -- Evaluates a coefficient vector as a continuous PDF across the full outcome range. Returns `{ x, y }[]` points suitable for charting. Default `numPoints` is 200.
 
 ```typescript
 import { evaluateDensityCurve, generateGaussian } from '@functionspace/core';
 
-const belief = generateGaussian(75, 5, K, L, H);
-const curve = evaluateDensityCurve(belief, L, H, 200);
+const belief = generateGaussian(75, 5, numBuckets, lowerBound, upperBound);
+const curve = evaluateDensityCurve(belief, lowerBound, upperBound, 200);
 // curve = [{ x: 30, y: 0.0001 }, { x: 30.4, y: 0.0003 }, ...]
 ```
 
-**`evaluateDensityPiecewise(coefficients, x, L, H)`** -- Evaluates density at a single point. Returns a `number` (density value, can exceed 1). Values outside `[L, H]` are clamped.
+**`evaluateDensityPiecewise(coefficients, x, lowerBound, upperBound)`** -- Evaluates density at a single point. Returns a `number` (density value, can exceed 1). Values outside `[lowerBound, upperBound]` are clamped.
 
 ```typescript
 import { evaluateDensityPiecewise } from '@functionspace/core';
 
-const density = evaluateDensityPiecewise(market.consensus, 75, L, H);
+const density = evaluateDensityPiecewise(market.consensus, 75, lowerBound, upperBound);
 console.log(`Density at 75: ${density.toFixed(4)}`);
 ```
 
 #### Statistical Analysis
 
-**`computeStatistics(coefficients, L, H)`** -- Returns `{ mean, median, mode, variance, stdDev }`.
+**`computeStatistics(coefficients, lowerBound, upperBound)`** -- Returns `{ mean, median, mode, variance, stdDev }`.
 
 ```typescript
 import { computeStatistics } from '@functionspace/core';
 import type { ConsensusSummary } from '@functionspace/core';
 
-const stats: ConsensusSummary = computeStatistics(market.consensus, L, H);
+const stats: ConsensusSummary = computeStatistics(market.consensus, lowerBound, upperBound);
 console.log(`Expected: ${stats.mean.toFixed(1)} +/- ${stats.stdDev.toFixed(1)}`);
 ```
 
-**`computePercentiles(coefficients, L, H)`** -- Returns a `PercentileSet` with 9 percentile values: `p2_5`, `p12_5`, `p25`, `p37_5`, `p50`, `p62_5`, `p75`, `p87_5`, `p97_5`.
+**`computePercentiles(coefficients, lowerBound, upperBound)`** -- Returns a `PercentileSet` with 9 percentile values: `p2_5`, `p12_5`, `p25`, `p37_5`, `p50`, `p62_5`, `p75`, `p87_5`, `p97_5`.
 
 ```typescript
 import { computePercentiles } from '@functionspace/core';
 import type { PercentileSet } from '@functionspace/core';
 
-const pct: PercentileSet = computePercentiles(market.consensus, L, H);
+const pct: PercentileSet = computePercentiles(market.consensus, lowerBound, upperBound);
 console.log(`95% CI: ${pct.p2_5.toFixed(1)} to ${pct.p97_5.toFixed(1)}`);
 console.log(`IQR: ${pct.p25.toFixed(1)} to ${pct.p75.toFixed(1)}`);
 ```
 
 #### Distribution Bucketing
 
-**`calculateBucketDistribution(points, L, H, numBuckets?, decimals?)`** -- Integrates a density curve into equal-width histogram buckets. The `points` parameter takes `{ x, y }[]` from `evaluateDensityCurve`, not raw coefficients. Returns `BucketData[]`. Default `numBuckets` is 12, clamped to `[1, 200]`.
+**`calculateBucketDistribution(points, lowerBound, upperBound, numBuckets?, decimals?)`** -- Integrates a density curve into equal-width histogram buckets. The `points` parameter takes `{ x, y }[]` from `evaluateDensityCurve`, not raw coefficients. Returns `BucketData[]`. Default `numBuckets` is 12, clamped to `[1, 200]`.
 
 ```typescript
 import { evaluateDensityCurve, calculateBucketDistribution } from '@functionspace/core';
 import type { BucketData } from '@functionspace/core';
 
-const curve = evaluateDensityCurve(market.consensus, L, H, 200);
-const buckets: BucketData[] = calculateBucketDistribution(curve, L, H, 12);
+const curve = evaluateDensityCurve(market.consensus, lowerBound, upperBound, 200);
+const buckets: BucketData[] = calculateBucketDistribution(curve, lowerBound, upperBound, 12);
 // buckets[0] = { range: "30-37", min: 30, max: 37, probability: 0.02, percentage: 2.0 }
 ```
 
 #### Fan Chart Transform
 
-**`transformHistoryToFanChart(snapshots, L, H, maxPoints?)`** -- Transforms `MarketSnapshot[]` from `queryMarketHistory` into `FanChartPoint[]` with computed statistics and percentile bands at each snapshot. Automatically downsamples to `maxPoints` (default 200).
+**`transformHistoryToFanChart(snapshots, lowerBound, upperBound, maxPoints?)`** -- Transforms `MarketSnapshot[]` from `queryMarketHistory` into `FanChartPoint[]` with computed statistics and percentile bands at each snapshot. Automatically downsamples to `maxPoints` (default 200).
 
 ```typescript
 import { queryMarketHistory, transformHistoryToFanChart } from '@functionspace/core';
 import type { FanChartPoint } from '@functionspace/core';
 
 const history = await queryMarketHistory(client, 42, 500);
-const { L, H } = market.config;
-const fanData: FanChartPoint[] = transformHistoryToFanChart(history.snapshots, L, H, 200);
+const { lowerBound, upperBound } = market.config;
+const fanData: FanChartPoint[] = transformHistoryToFanChart(history.snapshots, lowerBound, upperBound, 200);
 // fanData[0] = { timestamp, createdAt, tradeId, mean, mode, stdDev, percentiles: PercentileSet }
 ```
 
@@ -3654,7 +3670,7 @@ These constraints prevent silent failures and hard-to-debug errors in non-React 
 
 - **NEVER call `buy()` or `sell()` without authenticating first.** The client will throw `"Authentication required"`. Use auto-auth credentials in the constructor or call `loginUser()` + `client.setToken(token)` before any mutation.
 
-- **NEVER hardcode K, L, H values.** Always destructure them from `market.config` via `queryMarketState()`. Markets have different parameters, and hardcoded values produce invalid belief vectors.
+- **NEVER hardcode numBuckets, lowerBound, upperBound values.** Always destructure them from `market.config` via `queryMarketState()`. Markets have different parameters, and hardcoded values produce invalid belief vectors.
 
 - **NEVER skip `client.setToken(token)` after calling `loginUser()` directly.** The `loginUser()` function returns the token but does not set it on the client. Auto-auth via constructor credentials handles this automatically; manual auth does not.
 
@@ -3965,7 +3981,7 @@ function CustomTradeForm() {
 
   // Compute statistics from consensus
   const stats = market
-    ? computeStatistics(market.consensus, market.config.L, market.config.H)
+    ? computeStatistics(market.consensus, market.config.lowerBound, market.config.upperBound)
     : null;
 
   // Three-phase pattern:
@@ -3976,10 +3992,10 @@ function CustomTradeForm() {
   // Phase 1 + 2: Update preview and preview payout on parameter change
   useEffect(() => {
     if (!market) return;
-    const { K, L, H } = market.config;
+    const { numBuckets, lowerBound, upperBound } = market.config;
 
     // Phase 1: Build belief and set preview immediately
-    const belief = generateGaussian(center, spread, K, L, H);
+    const belief = generateGaussian(center, spread, numBuckets, lowerBound, upperBound);
     ctx.setPreviewBelief(belief);
 
     // Phase 2: Debounced payout preview
@@ -3991,7 +4007,7 @@ function CustomTradeForm() {
           MARKET_ID,
           belief,
           collateral,
-          K,
+          numBuckets,
         );
         setPayout(previewed);
         ctx.setPreviewPayout(previewed);
@@ -4018,8 +4034,8 @@ function CustomTradeForm() {
   // Phase 3: Execute trade
   const handleBuy = useCallback(async () => {
     if (!market) return;
-    const { K, L, H } = market.config;
-    const belief = generateGaussian(center, spread, K, L, H);
+    const { numBuckets, lowerBound, upperBound } = market.config;
+    const belief = generateGaussian(center, spread, numBuckets, lowerBound, upperBound);
 
     setStatus('Submitting...');
     try {
@@ -4028,7 +4044,7 @@ function CustomTradeForm() {
         MARKET_ID,
         belief,
         collateral,
-        K,
+        numBuckets,
       );
       setStatus(`Position #${result.positionId} opened. Claims: ${result.claims.toFixed(2)}`);
 
@@ -4046,7 +4062,7 @@ function CustomTradeForm() {
     return <div style={{ color: 'var(--fs-text-secondary)' }}>Loading market...</div>;
   }
 
-  const { L, H } = market.config;
+  const { lowerBound, upperBound } = market.config;
 
   return (
     <div style={{ padding: '1.5rem' }}>
@@ -4074,7 +4090,7 @@ function CustomTradeForm() {
           color: 'var(--fs-text-secondary)',
         }}>
           Consensus curve: {consensus.points.length} points
-          (range {L} to {H} {market.xAxisUnits})
+          (range {lowerBound} to {upperBound} {market.xAxisUnits})
         </div>
       )}
 
@@ -4084,8 +4100,8 @@ function CustomTradeForm() {
           Center: {center.toFixed(1)} {market.xAxisUnits}
           <input
             type="range"
-            min={L}
-            max={H}
+            min={lowerBound}
+            max={upperBound}
             step={0.1}
             value={center}
             onChange={(e) => setCenter(Number(e.target.value))}
@@ -4098,7 +4114,7 @@ function CustomTradeForm() {
           <input
             type="range"
             min={0.5}
-            max={(H - L) / 2}
+            max={(upperBound - lowerBound) / 2}
             step={0.5}
             value={spread}
             onChange={(e) => setSpread(Number(e.target.value))}
@@ -4190,9 +4206,9 @@ export default function App() {
 
 **Inner component pattern**: `CustomTradeForm` is a separate component rendered inside the `FunctionSpaceProvider`. Hooks from `@functionspace/react` must be called from a component that is a child of the provider. Calling them in the same component that renders the provider will throw.
 
-**Three-phase trade pattern**: (1) Build the belief vector with `generateGaussian` and set `ctx.setPreviewBelief(belief)` immediately for instant chart overlay feedback. (2) Debounce the `previewPayoutCurve` call (passing `K` as `numBuckets`) by 500ms and set `ctx.setPreviewPayout(previewed)` to show payout preview on the chart. (3) On user confirmation, call `buy()` with the client from context (passing `K` as `numBuckets`), then clear previews and call `ctx.invalidate(MARKET_ID)` plus `ctx.refreshUser()`.
+**Three-phase trade pattern**: (1) Build the belief vector with `generateGaussian` and set `ctx.setPreviewBelief(belief)` immediately for instant chart overlay feedback. (2) Debounce the `previewPayoutCurve` call by 500ms and set `ctx.setPreviewPayout(previewed)` to show payout preview on the chart. (3) On user confirmation, call `buy()` with the client from context, then clear previews and call `ctx.invalidate(MARKET_ID)` plus `ctx.refreshUser()`.
 
-**Market parameters**: The `K`, `L`, and `H` values are always destructured from `market.config`. Never hardcode these values -- they are specific to each market.
+**Market parameters**: The `numBuckets`, `lowerBound`, and `upperBound` values are always destructured from `market.config`. Never hardcode these values -- they are specific to each market.
 
 **Statistics from core**: `computeStatistics` is a pure function (L0) that takes a coefficient vector and market bounds. It requires no API call and returns `{ mean, median, mode, variance, stdDev }`.
 
@@ -4251,7 +4267,7 @@ Flat alphabetical listing of every public type across the three SDK packages. Ea
 type BeliefVector = number[];
 ```
 
-**Invariants:** A valid belief vector has length `K + 1`, where `K` is from `market.config.K`. All elements are non-negative. The elements sum to exactly 1 (normalized probability distribution). These invariants are enforced by the `generate*` builder functions.
+**Invariants:** A valid belief vector has length `numBuckets + 1`, where `numBuckets` is from `market.config.numBuckets`. All elements are non-negative. The elements sum to exactly 1 (normalized probability distribution). These invariants are enforced by the `generate*` builder functions.
 
 **Usage:** Passed to `buy()` as the trader's belief about outcome probabilities. Passed to `ctx.setPreviewBelief()` for chart overlays.
 
@@ -4365,9 +4381,9 @@ type BeliefVector = number[];
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `K` | `number` | Number of outcome buckets (belief vector length is `K + 1`) |
-| `L` | `number` | Lower bound of the outcome space |
-| `H` | `number` | Upper bound of the outcome space |
+| `numBuckets` | `number` | Number of outcome buckets (belief vector length is `numBuckets + 1`) |
+| `lowerBound` | `number` | Lower bound of the outcome space |
+| `upperBound` | `number` | Upper bound of the outcome space |
 | `P0` | `number` | Initial pool endowment |
 | `mu` | `number` | AMM sensitivity parameter |
 | `epsAlpha` | `number` | Minimum alpha component |
@@ -4376,7 +4392,7 @@ type BeliefVector = number[];
 | `lambdaS` | `number` | Supply-side scaling |
 | `lambdaD` | `number` | Demand-side scaling |
 
-**Usage:** Accessed via `market.config`. The three fields you use most often are `K`, `L`, and `H` -- always destructure them for belief construction: `const { K, L, H } = market.config;`
+**Usage:** Accessed via `market.config`. The three fields you use most often are `numBuckets`, `lowerBound`, and `upperBound` -- always destructure them for belief construction: `const { numBuckets, lowerBound, upperBound } = market.config;`
 
 ---
 
@@ -4432,14 +4448,14 @@ type BeliefVector = number[];
 | `participantCount` | `number` | Number of unique participants |
 | `totalVolume` | `number` | Total trading volume |
 | `positionsOpen` | `number` | Number of currently open positions |
-| `config` | `MarketConfig` | Market parameters (K, L, H, AMM params) |
+| `config` | `MarketConfig` | Market parameters (numBuckets, lowerBound, upperBound, AMM params) |
 | `title` | `string` | Human-readable market question |
 | `xAxisUnits` | `string` | Units label for the outcome axis (e.g., `"degrees F"`) |
 | `decimals` | `number` | Display precision for outcome values |
 | `resolutionState` | `'open' \| 'resolved' \| 'voided'` | Market lifecycle state |
 | `resolvedOutcome` | `number \| null` | Actual outcome value if resolved, otherwise `null` |
 
-**Usage:** The most important type in the SDK. Returned by `queryMarketState()` and `useMarket()`. Contains everything needed to render charts, build beliefs, and display market information. Always destructure `config` for belief construction: `const { K, L, H } = market.config;`
+**Usage:** The most important type in the SDK. Returned by `queryMarketState()` and `useMarket()`. Contains everything needed to render charts, build beliefs, and display market information. Always destructure `config` for belief construction: `const { numBuckets, lowerBound, upperBound } = market.config;`
 
 ---
 
@@ -4532,7 +4548,7 @@ type BeliefVector = number[];
 | `weight` | `number?` | Relative weight when combining ranges (default: 1) |
 | `sharpness` | `number?` | Edge transition: 0 = smooth cosine taper (default), 1 = hard cliff edges |
 
-**Usage:** Used by the multi-range overload of `generateRange(ranges: RangeInput[], K, L, H)`. Each `RangeInput` defines one flat-topped range segment; multiple segments are combined and normalized into a single belief vector.
+**Usage:** Used by the multi-range overload of `generateRange(ranges: RangeInput[], numBuckets, lowerBound, upperBound)`. Each `RangeInput` defines one flat-topped range segment; multiple segments are combined and normalized into a single belief vector.
 
 ---
 
@@ -4573,11 +4589,11 @@ Regions are the building blocks for `generateBelief()`. Multiple regions combine
 | Field | Type | Description |
 |-------|------|-------------|
 | `type` | `'spline'` | Discriminant (required) |
-| `controlX` | `number[]` | X positions in outcome space (`L..H`), must be sorted ascending |
+| `controlX` | `number[]` | X positions in outcome space (`lowerBound..upperBound`), must be sorted ascending |
 | `controlY` | `number[]` | Y values (unnormalized), same length as `controlX` |
 | `weight` | `number?` | Relative weight when combining regions (default: 1) |
 
-**Usage:** Passed as an array to `generateBelief(regions, K, L, H)`. The L2 convenience generators (`generateGaussian`, `generateRange`, etc.) internally construct single-region arrays and delegate to `generateBelief`. Use `Region[]` directly for multi-modal or complex composed beliefs.
+**Usage:** Passed as an array to `generateBelief(regions, numBuckets, lowerBound, upperBound)`. The L2 convenience generators (`generateGaussian`, `generateRange`, etc.) internally construct single-region arrays and delegate to `generateBelief`. Use `Region[]` directly for multi-modal or complex composed beliefs.
 
 ---
 

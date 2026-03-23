@@ -6,15 +6,15 @@ description: "Evaluate a coefficient vector into chart-ready { x, y } density po
 
 # evaluateDensityCurve
 
-**`evaluateDensityCurve(coefficients, L, H, numPoints?)`**
+**`evaluateDensityCurve(coefficients, lowerBound, upperBound, numPoints?)`**
 
-**Layer:** L0. Evaluates a coefficient vector as a continuous probability density function across the full outcome range, returning chart-ready `{ x, y }[]` points. Uses piecewise-linear interpolation between adjacent coefficients, scaled by `(K+1)/(H-L)` to produce a proper PDF (integrates to 1).
+**Layer:** L0. Evaluates a coefficient vector as a continuous probability density function across the full outcome range, returning chart-ready `{ x, y }[]` points. Uses quadratic B-spline evaluation over adjacent coefficients, scaled by `(numBuckets+1)/(upperBound-lowerBound)` to produce a proper PDF (integrates to 1). Boundary values are 0.5x interior values because the B-spline basis function support extends outside [0,1].
 
 ```typescript
 function evaluateDensityCurve(
   coefficients: number[],
-  L: number,
-  H: number,
+  lowerBound: number,
+  upperBound: number,
   numPoints?: number,  // default: 200
 ): Array<{ x: number; y: number }>
 ```
@@ -25,11 +25,11 @@ This is the function that turns raw probability vectors into renderable curves. 
 
 ```typescript
 // Render the market consensus as a chart curve
-const { consensus, config: { L, H } } = market;
-const curvePoints = evaluateDensityCurve(consensus, L, H, 200);
+const { consensus, config: { lowerBound, upperBound } } = market;
+const curvePoints = evaluateDensityCurve(consensus, lowerBound, upperBound, 200);
 // curvePoints = [{ x: 50, y: 0.001 }, { x: 50.35, y: 0.003 }, ..., { x: 120, y: 0.0 }]
 
 // Render a belief preview with the same resolution
-const belief = generateGaussian(75, 5, K, L, H);
-const beliefCurve = evaluateDensityCurve(belief, L, H, curvePoints.length);
+const belief = generateGaussian(75, 5, numBuckets, lowerBound, upperBound);
+const beliefCurve = evaluateDensityCurve(belief, lowerBound, upperBound, curvePoints.length);
 ```

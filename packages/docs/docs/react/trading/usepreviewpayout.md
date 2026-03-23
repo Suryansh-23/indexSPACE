@@ -72,8 +72,8 @@ function PayoutPreview({ marketId, center, spread, amount }: {
     if (!market || amount <= 0) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
-    const { K, L, H } = market.config;
-    const belief = generateGaussian(center, spread, K, L, H);
+    const { numBuckets, lowerBound, upperBound } = market.config;
+    const belief = generateGaussian(center, spread, numBuckets, lowerBound, upperBound);
 
     debounceRef.current = setTimeout(async () => {
       try {

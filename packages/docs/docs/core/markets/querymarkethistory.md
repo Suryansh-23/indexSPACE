@@ -48,5 +48,5 @@ interface MarketSnapshot {
 ```typescript
 const history = await queryMarketHistory(ctx.client, marketId, 100);
 // Pass to transformHistoryToFanChart() from the math utilities to get chart-ready data
-const fanData = transformHistoryToFanChart(history.snapshots, L, H);
+const fanData = transformHistoryToFanChart(history.snapshots, lowerBound, upperBound);
 ```

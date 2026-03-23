@@ -64,7 +64,7 @@ function MarketHeader({ marketId }: { marketId: number }) {
     
       <h2>{market.title}</h2>
       <p>
-        Range: {market.config.L} to {market.config.H} {market.xAxisUnits}
+        Range: {market.config.lowerBound} to {market.config.upperBound} {market.xAxisUnits}
       </p>
       <p>Status: {market.resolutionState}</p>
       <p>Participants: {market.participantCount}</p>

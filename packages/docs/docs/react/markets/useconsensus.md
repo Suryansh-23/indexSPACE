@@ -34,7 +34,7 @@ function useConsensus(
 **Behavior:**
 
 * Throws if rendered outside `FunctionSpaceProvider`.
-* Passes `numPoints` through to `getConsensusCurve`, which evaluates the consensus coefficients into `numPoints` evenly-spaced `{ x, y }` samples between `config.L` and `config.H`.
+* Passes `numPoints` through to `getConsensusCurve`, which evaluates the consensus coefficients into `numPoints` evenly-spaced `{ x, y }` samples between `config.lowerBound` and `config.upperBound`.
 * Re-fetches automatically when `marketId`, `numPoints`, or the market's cache entry is invalidated via `ctx.invalidate(marketId)`.
 * `loading` is `true` only on the first fetch. Background refetches set `isFetching` to `true` without changing `loading`.
 * `refetch()` can be called imperatively to force a background refetch at any time.
@@ -54,12 +54,12 @@ function ConsensusSummary({ marketId }: { marketId: number }) {
   if (error) return Error: {error.message};
   if (!consensus) return null;
 
-  const { L, H } = consensus.config;
+  const { lowerBound, upperBound } = consensus.config;
   const peak = consensus.points.reduce((max, p) => (p.y > max.y ? p : max), consensus.points[0]);
 
   return (
-    
-      <p>Range: {L} to {H}</p>
+
+      <p>Range: {lowerBound} to {upperBound}</p>
       <p>Peak density at {peak.x.toFixed(1)} ({consensus.points.length} points)</p>
     
   );
