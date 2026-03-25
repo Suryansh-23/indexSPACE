@@ -36,7 +36,7 @@ The SDK is organised around two orthogonal principles: **Layers** determine abst
 | Queries | Reads and interprets current server state | Read-only | `queryMarketState()`, `queryMarketPositions()` |
 | Previews | Computes hypothetical outcomes without modifying state | Read-only | `previewPayoutCurve()`, `previewSell()` |
 | Transactions | State-changing operations | Write | `buy()`, `sell()` |
-| Discovery | Find and filter markets or positions | Read-only | `discoverMarkets()` |
+| Discovery | Find and filter markets or positions | Read-only | `discoverMarkets()`, `filterMarkets()`, `discoverPopularMarkets()`, `discoverActiveMarkets()`, `discoverMarketsByCategory()` |
 | Validation | Input correctness checks before network calls | Read-only (no network) | `validateBeliefVector()` |
 
 ### Layer × Category Rule
@@ -108,7 +108,7 @@ Every new function must be classifiable by both layer AND category. This keeps t
 | Edit docs search config | `packages/docs/docusaurus.config.js` (`themes` array, `@easyops-cn/docusaurus-search-local`) |
 | Edit docs SDK integration | `packages/docs/src/plugins/sdk-webpack-plugin.js`, `packages/docs/src/theme/Root.tsx` |
 | Update AI context files | `packages/docs/static/llms.txt`, `core.txt`, `react.txt`, `ui.txt` |
-| Exported types from react | `CacheConfig`, `QueryOptions`, `FSContext`, `FSThemeInput`, `ChartColors`, `FanBandColors`, `ThemePresetId`, `FSTheme`, `ResolvedFSTheme`, `DistributionState`, `DistributionStateConfig`, `ChartZoomOptions`, `ChartZoomResult`, `UseCustomShapeReturn`, `UseBuyReturn`, `UseSellReturn`, `UsePreviewPayoutReturn`, `UsePreviewSellReturn`, `FunctionSpaceProviderProps`, `PasswordlessLoginResult` |
+| Exported types from react | `CacheConfig`, `QueryOptions`, `FSContext`, `FSThemeInput`, `ChartColors`, `FanBandColors`, `ThemePresetId`, `FSTheme`, `ResolvedFSTheme`, `DistributionState`, `DistributionStateConfig`, `ChartZoomOptions`, `ChartZoomResult`, `UseCustomShapeReturn`, `UseBuyReturn`, `UseSellReturn`, `UsePreviewPayoutReturn`, `UsePreviewSellReturn`, `FunctionSpaceProviderProps`, `PasswordlessLoginResult`, `MarketDiscoveryOptions` |
 
 ## Testing Requirements
 
@@ -134,6 +134,7 @@ cd packages/docs && npx docusaurus build  # Docs site build verification (requir
 | `tests/client-signal.test.ts` | FSClient signal forwarding and request() refactor | Changing FSClient.get(), FSClient.post(), or request() method |
 | `tests/mappings.test.ts` | Mocked-fetch mapping contract tests (raw API shape to SDK type, POST body assertions) | Changing any mapping function, API endpoint shapes, or POST request bodies |
 | `tests/validation.test.ts` | Belief vector and username validation (validateBeliefVector, validateUsername) | Changing validation logic or adding new validation functions |
+| `tests/discovery.test.ts` | filterMarkets unit tests, L2 convenience function tests | Adding or modifying discovery/filter functions |
 | `tests/components.test.tsx` | Widget smoke tests, interaction tests, and accessibility audit -- all UI components | Adding or modifying UI widgets -- see [Widget Component Testing Guide](../Docs/widget-component-testing-guide.md) |
 | `tests/density-stats.test.ts` | L0 math functions (evaluateDensityCurve, evaluateDensityPiecewise, computeStatistics) | Changing density curve evaluation, B-spline evaluation, or statistics computation |
 
@@ -238,6 +239,7 @@ Multi-agent adversarial review of recent implementation work. Invoked manually w
 ## Deferred Work
 
 - **Prediction field cleanup.** `Position.prediction` and `TradeEntry.prediction` remain on the types. `buy()` still accepts `options.prediction` (deprecated, not sent to server). `useBuy` does not forward it. Removal was deferred -- when picked up, remove fields from both types, remove the option from `buy()`, remove Prediction columns from PositionTable/TimeSales, and update consumer docs.
+- **Context-level marketId.** Pattern B (embedded overlay) may need `marketId` on `FunctionSpaceContext` so all mounted widgets react to market selection changes. Deferred until Pattern B is planned -- current components use `onSelect` callbacks instead.
 
 ## Commit Style
 

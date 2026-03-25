@@ -80,6 +80,127 @@ function DistRangeLayout({ marketId }) {
 }
 ```
 
+#### Market Discovery Patterns
+
+`MarketCard` and `MarketList` are presentational components -- they receive `MarketState` data and fire an `onSelect(marketId)` callback. The consumer decides what happens on selection. Two patterns exist depending on your app architecture.
+
+**Pattern 1: State-Driven Navigation (no router)**
+
+Use this when building single-page apps, embedded widgets, or when the host app already has a router. This pattern is also the starting point for overlay/modal market selectors.
+
+```tsx
+import { useState } from 'react';
+import { FunctionSpaceProvider, useMarkets } from '@functionspace/react';
+import { MarketList, MarketCharts, TradePanel, PositionTable } from '@functionspace/ui';
+
+const config = { apiBase: 'https://api.example.com' };
+
+function MarketDiscoveryLayout() {
+  const [selectedMarketId, setSelectedMarketId] = useState<number | null>(null);
+
+  if (selectedMarketId === null) {
+    const { markets, loading, error } = useMarkets({ state: 'open', sortBy: 'totalVolume' });
+    return <MarketList markets={markets} loading={loading} error={error} onSelect={setSelectedMarketId} />;
+  }
+
+  return (
+    <>
+      <button onClick={() => setSelectedMarketId(null)}>Back to Markets</button>
+      <MarketCharts marketId={selectedMarketId} />
+      <TradePanel marketId={selectedMarketId} />
+      <PositionTable marketId={selectedMarketId} />
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <FunctionSpaceProvider config={config} theme="fs-dark">
+      <MarketDiscoveryLayout />
+    </FunctionSpaceProvider>
+  );
+}
+```
+
+- **Pros:** Zero extra dependencies, simpler, embeddable in existing apps, no URL conflicts, ready for overlay/modal variant.
+- **Cons:** No shareable URLs, no browser back/forward, no bookmarking.
+
+**Pattern 2: Route-Driven Navigation (React Router)**
+
+Use this for standalone multi-page apps where you need shareable/bookmarkable URLs and browser back/forward navigation.
+
+```tsx
+import { BrowserRouter, Routes, Route, useParams, useNavigate } from 'react-router-dom';
+import { FunctionSpaceProvider, useMarkets } from '@functionspace/react';
+import { MarketList, MarketCharts, TradePanel, PositionTable } from '@functionspace/ui';
+
+const config = { apiBase: 'https://api.example.com' };
+
+function MarketListPage() {
+  const navigate = useNavigate();
+  const { markets, loading, error } = useMarkets({ state: 'open', sortBy: 'totalVolume' });
+  return <MarketList markets={markets} loading={loading} error={error} onSelect={(id) => navigate(`/trade/${id}`)} />;
+}
+
+function TradingPage() {
+  const { marketId } = useParams<{ marketId: string }>();
+  const navigate = useNavigate();
+  const numericId = Number(marketId);
+  if (isNaN(numericId)) return <p>Invalid market ID. <button onClick={() => navigate('/')}>Back</button></p>;
+
+  return (
+    <>
+      <button onClick={() => navigate('/')}>Back to Markets</button>
+      <MarketCharts marketId={numericId} />
+      <TradePanel marketId={numericId} />
+      <PositionTable marketId={numericId} />
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <FunctionSpaceProvider config={config} theme="fs-dark">
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<MarketListPage />} />
+          <Route path="/trade/:marketId" element={<TradingPage />} />
+        </Routes>
+      </BrowserRouter>
+    </FunctionSpaceProvider>
+  );
+}
+```
+
+- **Pros:** Shareable URLs, browser back/forward navigation, bookmarkable.
+- **Cons:** Requires `react-router-dom`, can conflict with host router, more setup.
+
+**Trade-off comparison**
+
+| Consideration | State-Driven | Route-Driven |
+|---|---|---|
+| Shareable URLs | No | Yes |
+| Browser back/forward | No | Yes |
+| Bookmarking | No | Yes |
+| Extra dependencies | None | react-router-dom |
+| Embeddable in existing apps | Yes -- no router conflicts | May conflict with host router |
+| Overlay/modal ready | Yes -- swap view toggle for modal | Less applicable |
+
+**Provider Placement Rule**
+
+`FunctionSpaceProvider` MUST wrap above the navigation boundary -- above the router or above the `useState`. This ensures auth, cache, and theme persist across navigation.
+
+```tsx
+// Correct: provider outside navigation
+<FunctionSpaceProvider config={config} theme="fs-dark">
+  {/* State-driven or Router-driven navigation inside */}
+</FunctionSpaceProvider>
+```
+
+Never create a second provider for nested routes.
+
+See [MarketCard](./markets/marketcard) and [MarketList](./markets/marketlist) for props reference.
+
 #### Three-Phase Trade Pattern
 
 Every trading widget follows the same execution pattern:

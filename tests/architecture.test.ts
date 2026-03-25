@@ -216,6 +216,7 @@ describe('SDK Architecture', () => {
 
       // Check key hooks
       expect(indexContent).toContain('useMarket');
+      expect(indexContent).toContain('useMarkets');
       expect(indexContent).toContain('useConsensus');
       expect(indexContent).toContain('usePositions');
       expect(indexContent).toContain('useTradeHistory');
@@ -315,6 +316,10 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('BucketRangeSelector');
       expect(indexContent).toContain('BucketTradePanel');
       expect(indexContent).toContain('CustomShapeEditor');
+      expect(indexContent).toContain('MarketCard');
+      expect(indexContent).toContain('MarketList');
+      expect(indexContent).toContain('MarketCardProps');
+      expect(indexContent).toContain('MarketListProps');
     });
 
     it('AuthWidget is exported from ui package', () => {
@@ -457,6 +462,23 @@ describe('SDK Architecture', () => {
         'utf-8'
       );
       expect(coreIndex).toContain('validateBeliefVector');
+    });
+
+    it('discovery functions and types are exported from core', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/core/src/index.ts'),
+        'utf-8'
+      );
+
+      expect(indexContent).toContain('filterMarkets');
+      // Explicit check for discoverMarkets as a standalone export (not just substring of discoverMarketsByCategory)
+      expect(indexContent).toMatch(/\bdiscoverMarkets\b[^B]/);
+      expect(indexContent).toContain('discoverPopularMarkets');
+      expect(indexContent).toContain('discoverActiveMarkets');
+      expect(indexContent).toContain('discoverMarketsByCategory');
+      expect(indexContent).toContain('FilterAction');
+      expect(indexContent).toContain('MarketFilter');
+      expect(indexContent).toContain('MarketDiscoveryOptions');
     });
   });
 

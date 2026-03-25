@@ -194,7 +194,9 @@ Example:
 .fs-bucket-trade-panel,
 .fs-auth-widget,
 .fs-passwordless-auth,
-.fs-custom-shape {          /* ← add new widget roots here */
+.fs-custom-shape,
+.fs-market-card,
+.fs-market-list {          /* ← add new widget roots here */
   --fs-primary-glow: color-mix(in srgb, var(--fs-primary) 20%, transparent);
   --fs-primary-light: color-mix(in srgb, var(--fs-primary) 80%, white);
   --fs-header-gradient: color-mix(in srgb, var(--fs-primary) 15%, transparent);
@@ -358,6 +360,7 @@ export function MyChart({ data }: { data: any[] }) {
 | `useSell(marketId)` | `{ execute, loading, error, reset }` | Mutation hook -- wraps `sell()` from core. Auto-invalidates market cache and refreshes wallet on success. |
 | `usePreviewPayout(marketId)` | `{ execute, loading, error, reset }` | Preview hook -- wraps `previewPayoutCurve()` from core. Manages own AbortController. No auto-invalidation. |
 | `usePreviewSell(marketId)` | `{ execute, loading, error, reset }` | Preview hook -- wraps `previewSell()` from core. Accepts optional caller-provided `AbortSignal`. No auto-invalidation. |
+| `useMarkets(options?)` | `{ markets, loading, isFetching, error, refetch }` | Market listing with optional filtering/sorting. Options combine `MarketDiscoveryOptions` (state, titleContains, categories, filters, sortBy, sortOrder, limit) and `QueryOptions` (pollInterval, enabled). |
 
 **useChartZoom invariants:** The hook cancels any pending `requestAnimationFrame` before applying a reset (via `resetTrigger` change, `fullXDomain` value change, `reset()`, or `onDoubleClick`). This prevents a race where a wheel event fired milliseconds before a reset would re-apply the zoomed domain one frame later. Pass a stable (memoized) `fullXDomain`  -- the hook resets zoom when its value changes. When the chart container has a second ref (Pattern B, e.g. `CustomShapeEditor`), create a callback ref that assigns to both refs and spread individual handlers from `containerProps` rather than using `{...containerProps}`.
 
@@ -638,7 +641,11 @@ All query functions accept an optional trailing `options?: { signal?: AbortSigna
 - `queryTradeHistory(client, marketId, options?)` → `TradeEntry[]` (composed: queryMarketPositions → positionsToTradeEntries; options accepts limit and signal)
 
 ### Discovery
-- `discoverMarkets(client, options?)` → `MarketState[]` (wraps `GET /api/views/markets/list`)
+- `discoverMarkets(client, options?)` -> `MarketState[]` (L1 -- wraps `GET /api/views/markets/list`; accepts `MarketDiscoveryOptions` for client-side filtering/sorting)
+- `filterMarkets(markets, options)` -> `MarketState[]` (L1 Discovery -- pure client-side filtering/sorting of `MarketState` arrays; field resolution checks top-level then metadata)
+- `discoverPopularMarkets(client, options?)` -> `MarketState[]` (L2 -- preset: sortBy totalVolume desc, limit 10; merges caller options)
+- `discoverActiveMarkets(client, options?)` -> `MarketState[]` (L2 -- preset: state 'open'; merges caller options)
+- `discoverMarketsByCategory(client, categories, options?)` -> `MarketState[]` (L2 -- preset: categories filter; merges caller options)
 
 ### Auth
 - `loginUser(client, username, password)` → `{ user: UserProfile, token: string }` (raw fetch, bypasses ensureAuth)
@@ -669,6 +676,15 @@ All query functions accept an optional trailing `options?: { signal?: AbortSigna
 ---
 
 **Metadata policy:** Mapping functions read fields from their primary source in the API response. lowerBound/upperBound/title come from root level. xAxisUnits/decimals come from the metadata dict (their only source). Do not add metadata fallback chains (e.g., `data.metadata?.X ?? data.X`).
+
+**API field name discrepancy:** The list endpoint (`GET /api/views/markets/list`) and single endpoint (`GET /api/views/markets/{id}`) use different field names for the same data. Both mapping functions (`discoverMarkets` and `queryMarketState`) handle their respective names and produce identical `MarketState` objects:
+
+| SDK field | List endpoint field | Single endpoint field |
+|---|---|---|
+| `participantCount` | `total_positions` | `num_positions` |
+| `positionsOpen` | `open_positions` | `positions_currently_open` |
+| `totalVolume` | Not returned (defaults to 0) | `total_volume` |
+| `createdAt` | `created_at` | Not returned (defaults to null) |
 
 ## CSS Class Naming Convention
 
@@ -731,6 +747,8 @@ onSuccess?.(result);       // Notify parent
 | `AuthWidget` | Login/signup/user bar | Uses `useAuth` hook, form state, `validateUsername` from core |
 | `PasswordlessAuthWidget` | Passwordless login/signup with modal | Uses `useAuth` hook, modal overlay, auto-signup, PASSWORD_REQUIRED sentinel, silent re-auth via `storedUsername` prop |
 | `MarketStats` | Stats display | Minimal, read-only |
+| `MarketCard` | Single market summary card | Presentational -- receives `MarketState` as prop, no internal data fetching. Displays title, consensusMean, volume, pool, positions, status badge, resolution date. `onSelect` callback. |
+| `MarketList` | Responsive grid of MarketCards | Presentational -- receives `MarketState[]` as prop. Loading (skeleton cards), error, empty, and data states. Passes `onSelect` through to cards. |
 | `ConsensusChart` | Consensus PDF visualization | Standalone chart, reads context for overlays |
 | `DistributionChart` | Distribution bar chart | Standalone chart with bucket slider |
 | `TimelineChart` | Fan chart (percentile bands over time) | Standalone chart, fetches own history data (see note below) |
@@ -1077,7 +1095,9 @@ packages/
 │   ├── queries/trades.ts     # Trade history (positionsToTradeEntries, queryTradeHistory)
 │   ├── previews/             # previewPayoutCurve, previewSell
 │   ├── transactions/         # buy, sell
-│   ├── discovery/markets.ts  # discoverMarkets
+│   ├── discovery/markets.ts      # discoverMarkets (with MarketDiscoveryOptions)
+│   ├── discovery/filters.ts      # filterMarkets (pure client-side filtering)
+│   ├── discovery/convenience.ts  # discoverPopularMarkets, discoverActiveMarkets, discoverMarketsByCategory
 │   └── auth/auth.ts          # loginUser, signupUser, fetchCurrentUser, validateUsername
 ├── react/src/
 │   ├── index.ts              # All exports
@@ -1117,6 +1137,8 @@ packages/
     │   └── PasswordlessAuthWidget.tsx
     ├── market/               # Read-only market info
     │   ├── index.ts
+    │   ├── MarketCard.tsx
+    │   ├── MarketList.tsx
     │   ├── MarketStats.tsx
     │   ├── PositionTable.tsx
     │   └── TimeSales.tsx
@@ -1171,6 +1193,6 @@ packages/docs/            # Docusaurus documentation site
 |--------|---------|----------|
 | `charts/` | Data visualizations | ConsensusChart, DistributionChart, TimelineChart, MarketCharts |
 | `trading/` | User input/actions | TradePanel, ShapeCutter, BinaryPanel, BucketRangeSelector, BucketTradePanel |
-| `market/` | Read-only market info | MarketStats, PositionTable, TimeSales |
+| `market/` | Read-only market info | MarketCard, MarketList, MarketStats, PositionTable, TimeSales |
 | `auth/` | Authentication | AuthWidget (login/signup forms), PasswordlessAuthWidget (username-only login with modal, auto-signup, silent re-auth) |
 | `components/` | Internal UI primitives (not exported from package root) | Slider, RangeSlider (rc-slider wrappers with consistent styling) |

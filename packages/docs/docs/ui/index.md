@@ -36,4 +36,8 @@ All trading components clear `ctx.setPreviewBelief(null)` and `ctx.setPreviewPay
 
 **Exclusivity:** Only one trading component should be mounted at a time. Mounting multiple trading components simultaneously causes conflicting `previewBelief` and `previewPayout` writes to context.
 
+#### Market Browsing
+
+`MarketCard` and `MarketList` are presentational display components for market discovery. They receive `MarketState` data from the `useMarkets` hook and delegate navigation via an `onSelect` callback. See [Market Discovery Patterns](./composition-and-usage#market-discovery-patterns) for state-driven and route-driven integration approaches.
+
 ---

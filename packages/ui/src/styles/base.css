@@ -12,7 +12,9 @@
 .fs-bucket-trade-panel,
 .fs-auth-widget,
 .fs-custom-shape,
-.fs-passwordless-auth {
+.fs-passwordless-auth,
+.fs-market-card,
+.fs-market-list {
   --fs-primary-glow: color-mix(in srgb, var(--fs-primary) 20%, transparent);
   --fs-primary-light: color-mix(in srgb, var(--fs-primary) 80%, white);
   --fs-header-gradient: color-mix(in srgb, var(--fs-primary) 15%, transparent);
@@ -1930,4 +1932,251 @@
   font-weight: 400;
   color: var(--fs-text-secondary);
   opacity: 0.8;
+}
+
+/* ── Market Card ── */
+
+.fs-market-card {
+  background: var(--fs-surface);
+  border: var(--fs-border-width) solid var(--fs-border);
+  border-radius: var(--fs-radius-lg);
+  padding: 1.5rem;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform var(--fs-transition-speed), box-shadow var(--fs-transition-speed);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.fs-market-card:hover {
+  transform: scale(1.015);
+  will-change: transform;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.fs-market-card-hover-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom right, var(--fs-surface-hover), transparent);
+  opacity: 0;
+  transition: opacity var(--fs-transition-speed);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.fs-market-card:hover .fs-market-card-hover-overlay {
+  opacity: 1;
+}
+
+.fs-market-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 5.75rem;
+  position: relative;
+  z-index: 1;
+}
+
+.fs-market-card-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--fs-text);
+  margin: 0;
+  line-height: 2rem;
+  letter-spacing: -0.025em;
+}
+
+.fs-market-card-badge {
+  display: inline-block;
+  padding: 0.125rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+}
+
+.fs-market-card-badge.open {
+  background: color-mix(in srgb, var(--fs-positive) 10%, transparent);
+  color: var(--fs-positive);
+  border-color: color-mix(in srgb, var(--fs-positive) 30%, transparent);
+}
+
+.fs-market-card-badge.resolved {
+  background: color-mix(in srgb, var(--fs-negative) 10%, transparent);
+  color: var(--fs-negative);
+  border-color: color-mix(in srgb, var(--fs-negative) 30%, transparent);
+}
+
+.fs-market-card-badge.voided {
+  background: color-mix(in srgb, var(--fs-accent) 10%, transparent);
+  color: var(--fs-accent);
+  border-color: color-mix(in srgb, var(--fs-accent) 30%, transparent);
+}
+
+.fs-market-card-consensus {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 6rem;
+  padding: 0.75rem;
+  background: var(--fs-input-bg);
+  border: var(--fs-border-width) solid var(--fs-border);
+  border-radius: var(--fs-radius-md);
+  position: relative;
+  z-index: 1;
+}
+
+.fs-market-card-consensus-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.fs-market-card-consensus-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--fs-text-muted);
+  text-transform: uppercase;
+}
+
+.fs-market-card-consensus-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--fs-text);
+}
+
+.fs-market-card-consensus-range {
+  font-size: 0.75rem;
+  color: var(--fs-text-muted);
+}
+
+.fs-market-card-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  position: relative;
+  z-index: 1;
+}
+
+.fs-market-card-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.25rem;
+  background: var(--fs-bg-secondary);
+  border-radius: var(--fs-radius-md);
+}
+
+.fs-market-card-stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+}
+
+.fs-market-card-stat-icon-volume {
+  color: var(--fs-positive);
+}
+
+.fs-market-card-stat-icon-liquidity {
+  color: var(--fs-primary);
+}
+
+.fs-market-card-stat-icon-traders {
+  color: var(--fs-accent);
+}
+
+.fs-market-card-stat-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--fs-text);
+}
+
+.fs-market-card-stat-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--fs-text-muted);
+}
+
+.fs-market-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  z-index: 1;
+}
+
+.fs-market-card-date {
+  font-size: 0.75rem;
+  color: var(--fs-text-muted);
+}
+
+.fs-market-card-trade-btn {
+  padding: 0.375rem 1rem;
+  border: none;
+  border-radius: var(--fs-radius-md);
+  background: linear-gradient(to right, var(--fs-primary), var(--fs-accent));
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 500;
+  height: 2.25rem;
+  cursor: pointer;
+  transition: background var(--fs-transition-speed), box-shadow var(--fs-transition-speed);
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+}
+
+.fs-market-card-trade-btn:hover {
+  background: linear-gradient(to right, var(--fs-primary-light), var(--fs-accent));
+  box-shadow: 0 2px 8px var(--fs-primary-glow);
+}
+
+/* ── Market List ── */
+
+.fs-market-list,
+.fs-market-list-loading {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .fs-market-list,
+  .fs-market-list-loading {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .fs-market-list,
+  .fs-market-list-loading {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.fs-market-list-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--fs-text-muted);
+  font-size: 0.875rem;
+}
+
+.fs-market-list-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--fs-negative);
+  font-size: 0.875rem;
 }

@@ -118,6 +118,8 @@ import { FunctionSpaceProvider } from '../packages/react/src';
 import { PasswordlessAuthWidget } from '../packages/ui/src/auth/PasswordlessAuthWidget';
 import {
   MarketStats,
+  MarketCard,
+  MarketList,
   TimeSales,
   ConsensusChart,
   DistributionChart,
@@ -1757,6 +1759,275 @@ describe('AuthWidget', () => {
     await waitFor(() => {
       expect(screen.getByText('Sign In')).toBeDefined();
     });
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+});
+
+// ── Presentational market widgets ──
+
+const mockMarketForCard = {
+  marketId: 1,
+  title: 'Test Market',
+  consensusMean: 50.0,
+  config: { numBuckets: 10, lowerBound: 0, upperBound: 100, K: 10, L: 0, H: 100, P0: 1, mu: 1, epsAlpha: 0.01, tau: 1, gamma: 1, lambdaS: 0, lambdaD: 0 },
+  alpha: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
+  consensus: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
+  totalMass: 1.1,
+  poolBalance: 10000,
+  totalVolume: 50000,
+  positionsOpen: 42,
+  participantCount: 100,
+  resolutionState: 'open' as const,
+  resolvedOutcome: null,
+  xAxisUnits: 'USD',
+  decimals: 2,
+  createdAt: '2025-01-01T00:00:00Z',
+  expiresAt: '2026-06-01T00:00:00Z',
+  resolvedAt: null,
+  marketType: 'standard',
+  marketSubtype: null,
+  metadata: {},
+};
+
+describe('MarketCard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    cleanup();
+  });
+
+  it('throws when rendered without FunctionSpaceProvider', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => {
+      render(<MarketCard market={mockMarketForCard as any} />);
+    }).toThrow('MarketCard must be used within FunctionSpaceProvider');
+    spy.mockRestore();
+  });
+
+  it('renders market title', () => {
+    const wrapper = createWrapper();
+    const { container } = render(<MarketCard market={mockMarketForCard as any} />, { wrapper });
+    expect(container.textContent).toContain('Test Market');
+  });
+
+  it('renders consensus mean with units', () => {
+    const wrapper = createWrapper();
+    const { container } = render(<MarketCard market={mockMarketForCard as any} />, { wrapper });
+    expect(container.textContent).toContain('50');
+    expect(container.textContent).toContain('USD');
+  });
+
+  it('renders formatted volume', () => {
+    const wrapper = createWrapper();
+    const { container } = render(<MarketCard market={mockMarketForCard as any} />, { wrapper });
+    expect(container.textContent).toContain('50.0K');
+  });
+
+  it('renders formatted liquidity', () => {
+    const wrapper = createWrapper();
+    const { container } = render(<MarketCard market={mockMarketForCard as any} />, { wrapper });
+    expect(container.textContent).toContain('10.0K');
+    expect(container.textContent).toContain('Liquidity');
+  });
+
+  it('renders traders count', () => {
+    const wrapper = createWrapper();
+    const { container } = render(<MarketCard market={mockMarketForCard as any} />, { wrapper });
+    expect(container.textContent).toContain('42');
+    expect(container.textContent).toContain('Traders');
+  });
+
+  it('renders status badge Active for open market', () => {
+    const wrapper = createWrapper();
+    const { container } = render(<MarketCard market={mockMarketForCard as any} />, { wrapper });
+    expect(container.textContent).toContain('Active');
+  });
+
+  it('calls onSelect on card click', () => {
+    const wrapper = createWrapper();
+    const onSelect = vi.fn();
+    const { container } = render(<MarketCard market={mockMarketForCard as any} onSelect={onSelect} />, { wrapper });
+    const card = container.querySelector('.fs-market-card') as HTMLElement;
+    fireEvent.click(card);
+    expect(onSelect).toHaveBeenCalledWith(1);
+  });
+
+  it('trade button click area triggers card onSelect (no separate handler)', () => {
+    const wrapper = createWrapper();
+    const onSelect = vi.fn();
+    const { container } = render(<MarketCard market={mockMarketForCard as any} onSelect={onSelect} />, { wrapper });
+    const btn = container.querySelector('.fs-market-card-trade-btn') as HTMLElement;
+    fireEvent.click(btn);
+    // The trade button is a decorative span with no click handler; the click bubbles to the card
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith(1);
+  });
+
+  it('renders resolution date with Resolves prefix when expiresAt is set', () => {
+    const wrapper = createWrapper();
+    const { container } = render(<MarketCard market={mockMarketForCard as any} />, { wrapper });
+    expect(container.textContent).toContain('Resolves');
+    expect(container.textContent).toContain('Jun 1, 2026');
+  });
+
+  it('renders Resolves TBD when expiresAt is null', () => {
+    const wrapper = createWrapper();
+    const noExpiry = { ...mockMarketForCard, expiresAt: null };
+    const { container } = render(<MarketCard market={noExpiry as any} />, { wrapper });
+    expect(container.textContent).toContain('Resolves TBD');
+  });
+
+  it('renders range string from lowerBound and upperBound', () => {
+    const wrapper = createWrapper();
+    const { container } = render(<MarketCard market={mockMarketForCard as any} />, { wrapper });
+    expect(container.textContent).toContain('0');
+    expect(container.textContent).toContain('100');
+    expect(container.textContent).toContain('0 - 100');
+  });
+
+  it('renders Resolved badge when resolutionState is resolved', () => {
+    const wrapper = createWrapper();
+    const resolved = { ...mockMarketForCard, resolutionState: 'resolved' as const };
+    const { container } = render(<MarketCard market={resolved as any} />, { wrapper });
+    expect(container.textContent).toContain('Resolved');
+  });
+
+  it('renders Voided badge when resolutionState is voided', () => {
+    const wrapper = createWrapper();
+    const voided = { ...mockMarketForCard, resolutionState: 'voided' as const };
+    const { container } = render(<MarketCard market={voided as any} />, { wrapper });
+    expect(container.textContent).toContain('Voided');
+  });
+
+  it('calls onSelect on Enter keydown', () => {
+    const wrapper = createWrapper();
+    const onSelect = vi.fn();
+    const { container } = render(<MarketCard market={mockMarketForCard as any} onSelect={onSelect} />, { wrapper });
+    const card = container.querySelector('.fs-market-card') as HTMLElement;
+    fireEvent.keyDown(card, { key: 'Enter' });
+    expect(onSelect).toHaveBeenCalledWith(1);
+  });
+
+  it('calls onSelect on Space keydown', () => {
+    const wrapper = createWrapper();
+    const onSelect = vi.fn();
+    const { container } = render(<MarketCard market={mockMarketForCard as any} onSelect={onSelect} />, { wrapper });
+    const card = container.querySelector('.fs-market-card') as HTMLElement;
+    fireEvent.keyDown(card, { key: ' ' });
+    expect(onSelect).toHaveBeenCalledWith(1);
+  });
+
+  it('renders -- instead of NaN when consensusMean is NaN', () => {
+    const wrapper = createWrapper();
+    const nanMean = { ...mockMarketForCard, consensusMean: NaN };
+    const { container } = render(<MarketCard market={nanMean as any} />, { wrapper });
+    expect(container.textContent).toContain('--');
+    expect(container.textContent).not.toContain('NaN');
+  });
+
+  it('renders -- instead of NaN when totalVolume is NaN (formatCompactNumber guard)', () => {
+    const wrapper = createWrapper();
+    const nanVolume = { ...mockMarketForCard, totalVolume: NaN };
+    const { container } = render(<MarketCard market={nanVolume as any} />, { wrapper });
+    expect(container.textContent).toContain('--');
+    expect(container.textContent).not.toContain('NaN');
+  });
+
+  it('renders Market Consensus label', () => {
+    const wrapper = createWrapper();
+    const { container } = render(<MarketCard market={mockMarketForCard as any} />, { wrapper });
+    expect(container.textContent).toContain('Market Consensus');
+  });
+
+  it('renders Range prefix', () => {
+    const wrapper = createWrapper();
+    const { container } = render(<MarketCard market={mockMarketForCard as any} />, { wrapper });
+    expect(container.textContent).toContain('Range:');
+  });
+
+  it('unmounts without errors', () => {
+    const wrapper = createWrapper();
+    const { unmount } = render(<MarketCard market={mockMarketForCard as any} />, { wrapper });
+    expect(() => unmount()).not.toThrow();
+  });
+
+  it('accessibility audit', async () => {
+    const wrapper = createWrapper();
+    const { container } = render(<MarketCard market={mockMarketForCard as any} />, { wrapper });
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+});
+
+describe('MarketList', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    cleanup();
+  });
+
+  it('throws when rendered without FunctionSpaceProvider', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => {
+      render(<MarketList markets={[]} />);
+    }).toThrow('MarketList must be used within FunctionSpaceProvider');
+    spy.mockRestore();
+  });
+
+  it('renders loading state with skeleton cards', () => {
+    const wrapper = createWrapper();
+    const { container } = render(<MarketList markets={[]} loading={true} />, { wrapper });
+    expect(container.querySelector('.fs-skeleton')).toBeTruthy();
+  });
+
+  it('renders error state with error message', () => {
+    const wrapper = createWrapper();
+    const { container } = render(<MarketList markets={[]} error={new Error('Network error')} />, { wrapper });
+    expect(container.textContent).toContain('Network error');
+  });
+
+  it('renders default empty state', () => {
+    const wrapper = createWrapper();
+    const { container } = render(<MarketList markets={[]} />, { wrapper });
+    expect(container.textContent).toContain('No markets found');
+  });
+
+  it('renders custom empty message', () => {
+    const wrapper = createWrapper();
+    const { container } = render(<MarketList markets={[]} emptyMessage="Nothing here" />, { wrapper });
+    expect(container.textContent).toContain('Nothing here');
+  });
+
+  it('renders correct card count', () => {
+    const wrapper = createWrapper();
+    const threeMarkets = [
+      { ...mockMarketForCard, marketId: 1 },
+      { ...mockMarketForCard, marketId: 2, title: 'Market Two' },
+      { ...mockMarketForCard, marketId: 3, title: 'Market Three' },
+    ];
+    const { container } = render(<MarketList markets={threeMarkets as any} />, { wrapper });
+    const cards = container.querySelectorAll('.fs-market-card');
+    expect(cards.length).toBe(3);
+  });
+
+  it('passes onSelect through to cards', () => {
+    const wrapper = createWrapper();
+    const onSelect = vi.fn();
+    const markets = [{ ...mockMarketForCard, marketId: 7 }];
+    const { container } = render(<MarketList markets={markets as any} onSelect={onSelect} />, { wrapper });
+    const card = container.querySelector('.fs-market-card') as HTMLElement;
+    fireEvent.click(card);
+    expect(onSelect).toHaveBeenCalledWith(7);
+  });
+
+  it('unmounts without errors', () => {
+    const wrapper = createWrapper();
+    const { unmount } = render(<MarketList markets={[]} />, { wrapper });
+    expect(() => unmount()).not.toThrow();
+  });
+
+  it('accessibility audit', async () => {
+    const wrapper = createWrapper();
+    const { container } = render(<MarketList markets={[mockMarketForCard] as any} />, { wrapper });
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });

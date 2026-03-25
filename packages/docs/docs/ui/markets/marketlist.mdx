@@ -1,0 +1,84 @@
+---
+title: "MarketList"
+sidebar_position: 3
+description: "MarketList widget displaying a responsive grid of MarketCard components with loading, error, and empty states."
+---
+
+# MarketList
+
+**`MarketList`**
+
+Presentational list component that renders a responsive grid of `MarketCard` components. Receives an array of `MarketState` objects as props -- does not fetch data internally. Handles loading, error, and empty states.
+
+```tsx
+import { MarketList } from '@functionspace/ui';
+```
+
+**CSS classes:** `fs-market-list`, `fs-market-list-loading`, `fs-market-list-error`, `fs-market-list-empty`
+
+**Props:**
+
+| Prop           | Type                          | Default              | Description                                        |
+| -------------- | ----------------------------- | -------------------- | -------------------------------------------------- |
+| `markets`      | `MarketState[]`               | required             | Array of market state objects to display            |
+| `onSelect`     | `(marketId: number) => void`  | --                   | Called when a card or its Trade button is clicked   |
+| `loading`      | `boolean`                     | `false`              | Shows skeleton loading cards when true              |
+| `error`        | `Error \| null`               | --                   | Displays error message when provided               |
+| `emptyMessage` | `string`                      | `'No markets found'` | Custom message when the markets array is empty      |
+
+**States:**
+
+| State    | Condition                   | Render                                |
+| -------- | --------------------------- | ------------------------------------- |
+| Loading  | `loading={true}`            | 6 skeleton placeholder cards          |
+| Error    | `error` is truthy           | Error message text                    |
+| Empty    | `markets.length === 0`      | Empty state message                   |
+| Data     | `markets.length > 0`        | Grid of `MarketCard` components       |
+
+**Behavior:**
+
+* Each card receives the `onSelect` callback, so clicking any card bubbles to the parent.
+* Requires `FunctionSpaceProvider` ancestor (throws if missing).
+* Loading skeletons match the `MarketCard` layout structure.
+
+**Handling Selection:**
+
+Wire `onSelect` to your app's navigation:
+
+- **State-driven:** `onSelect=\{(id) => setSelectedMarketId(id)\}`
+- **Route-driven:** `onSelect=\{(id) => navigate('/trade/' + id)\}`
+
+See [Market Discovery Patterns](../composition-and-usage#market-discovery-patterns) for complete browse-to-trade examples with both approaches.
+
+**Example:**
+
+```tsx
+import { FunctionSpaceProvider, useMarkets } from '@functionspace/react';
+import { MarketList } from '@functionspace/ui';
+
+function MarketDashboard() {
+  const { markets, loading, error } = useMarkets({ state: 'open', sortBy: 'totalVolume' });
+
+  return (
+    <MarketList
+      markets={markets ?? []}
+      loading={loading}
+      error={error}
+      onSelect={(id) => console.log('Navigate to market:', id)}
+      emptyMessage="No open markets available"
+    />
+  );
+}
+
+function App() {
+  return (
+    <FunctionSpaceProvider config={{ baseUrl: 'https://api.example.com' }} theme="fs-dark">
+      <MarketDashboard />
+    </FunctionSpaceProvider>
+  );
+}
+```
+
+**Related:** `MarketCard` (individual card), `useMarkets` (data hook for market listing)
+
+---
