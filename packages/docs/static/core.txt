@@ -83,7 +83,7 @@ Core-only integrations use manual auth -- the developer calls `loginUser()` dire
 
 | # | Limitation | Impact | Workaround |
 |---|-----------|--------|------------|
-| 4 | **No market search or filtering.** `discoverMarkets()` returns all available markets as a flat `MarketState[]` array. The function accepts no search, filter, sort, or pagination parameters. | Applications that need to display a subset of markets must fetch the entire market list on every call. There is no server-side filtering. | Call `discoverMarkets(client)` and filter the returned array client-side using standard `Array.filter()`, `Array.sort()`, or `Array.find()` methods. |
+| 4 | **No server-side market filtering.** `discoverMarkets()` fetches all markets from the server and applies filtering client-side. There is no server-side search, filter, sort, or pagination. | The full market list is fetched on every call regardless of filter options. For large market counts, the initial payload is always the full list. | Use `MarketDiscoveryOptions` with `discoverMarkets(client, options)` for client-side filtering, sorting, and limiting. Use `filterMarkets(markets, options)` for pure client-side filtering of an existing array. Use `discoverPopularMarkets()`, `discoverActiveMarkets()`, or `discoverMarketsByCategory()` for common presets. |
 | 7 | **Settlement not yet implemented.** The `Position` type includes `settlementPayout` and `MarketState` includes `resolvedOutcome` fields, but no settlement functions exist in the SDK. Markets can be resolved server-side, but the SDK provides no functions to trigger or process settlement. | Positions in resolved markets cannot be settled through the SDK. The `settlementPayout` field is always `null` in current responses. | Monitor the `resolutionState` field on `MarketState` for `'resolved'` or `'voided'` status. Settlement processing must be handled outside the SDK until settlement functions are added. |
 
 ---
@@ -310,17 +310,69 @@ const result = await buy(client, marketId, belief, 100, numBuckets);
 
 All query functions take an `FSClient` as their first argument and return a Promise. They work in guest mode (no authentication required).
 
-### `discoverMarkets(client)`
+### `discoverMarkets(client, options?)`
 
-Lists all available markets. Returns `MarketState[]`. No search or filter parameters are supported -- filter client-side.
+Lists available markets with optional client-side filtering, sorting, and limiting. Returns `MarketState[]`. The full market list is always fetched from the server; filtering is applied client-side.
 
 ```typescript
 import { FSClient, discoverMarkets } from '@functionspace/core';
 
 const client = new FSClient({ baseUrl: 'https://api.example.com' });
+
+// All markets
 const markets = await discoverMarkets(client);
-const openMarkets = markets.filter(m => m.resolutionState === 'open');
-console.log(`${openMarkets.length} markets open for trading`);
+
+// Filtered and sorted
+const openByVolume = await discoverMarkets(client, {
+  state: 'open',
+  sortBy: 'totalVolume',
+  sortOrder: 'desc',
+  limit: 20,
+});
+```
+
+`MarketDiscoveryOptions` fields: `state`, `titleContains`, `categories`, `filters` (custom `MarketFilter[]` with AND logic), `sortBy`, `sortOrder` (`'asc'` | `'desc'`, default `'desc'`), `limit`, `signal`.
+
+### `filterMarkets(markets, options)`
+
+Pure client-side filtering, sorting, and limiting of a `MarketState[]` array. Same options as `MarketDiscoveryOptions` (minus `signal`). Does not make network requests.
+
+```typescript
+import { filterMarkets } from '@functionspace/core';
+
+const filtered = filterMarkets(allMarkets, {
+  state: 'open',
+  sortBy: 'totalVolume',
+  sortOrder: 'desc',
+  limit: 10,
+});
+```
+
+### `discoverPopularMarkets(client, options?)`
+
+L2 convenience wrapper. Preset: `sortBy: 'totalVolume'`, `sortOrder: 'desc'`, `limit: 10`. Caller options override presets.
+
+```typescript
+import { discoverPopularMarkets } from '@functionspace/core';
+const popular = await discoverPopularMarkets(client);
+```
+
+### `discoverActiveMarkets(client, options?)`
+
+L2 convenience wrapper. Preset: `state: 'open'`. Caller options override presets.
+
+```typescript
+import { discoverActiveMarkets } from '@functionspace/core';
+const active = await discoverActiveMarkets(client);
+```
+
+### `discoverMarketsByCategory(client, categories, options?)`
+
+L2 convenience wrapper. Preset: `categories` filter from the provided array. Caller options override presets.
+
+```typescript
+import { discoverMarketsByCategory } from '@functionspace/core';
+const weather = await discoverMarketsByCategory(client, ['weather']);
 ```
 
 ### `queryMarketState(client, marketId)`
@@ -357,6 +409,13 @@ console.log(market.positionsOpen);               // number of open positions
 | `positionsOpen` | `number` | Currently open positions. |
 | `resolutionState` | `'open' \| 'resolved' \| 'voided'` | Market lifecycle state. |
 | `resolvedOutcome` | `number \| null` | Settlement value, or null if unresolved. |
+| `marketId` | `number` | Unique market identifier. |
+| `createdAt` | `string \| null` | ISO 8601 creation timestamp. |
+| `expiresAt` | `string \| null` | ISO 8601 expiration timestamp, or null if no expiry. |
+| `resolvedAt` | `string \| null` | ISO 8601 resolution timestamp, or null if unresolved. |
+| `marketType` | `string` | Market type (e.g., `'standard'`). |
+| `marketSubtype` | `string \| null` | Market subtype, or null. |
+| `metadata` | `Record<string, unknown>` | Arbitrary metadata from the server. |
 
 ### `getConsensusCurve(client, marketId, numPoints?)`
 
@@ -752,7 +811,7 @@ These constraints prevent silent failures and hard-to-debug errors in non-React 
 
 - **NEVER assume `signupUser()` returns a token.** It returns only `{ user: UserProfile }`. You must follow with `loginUser()` to obtain a session token.
 
-- **NEVER assume `discoverMarkets()` supports search or filter parameters.** It returns all markets as a flat array. Filter client-side with `Array.filter()`.
+- **NEVER assume `discoverMarkets()` filters server-side.** The full market list is always fetched from the server. `MarketDiscoveryOptions` filtering, sorting, and limiting are applied client-side after the fetch. For reusable client-side filtering, use `filterMarkets()`. For common presets, use `discoverPopularMarkets()`, `discoverActiveMarkets()`, or `discoverMarketsByCategory()`.
 
 - **NEVER pass raw API response objects directly to SDK functions that expect typed data.** Use `mapPosition()` to convert snake_case API responses into the SDK's camelCase `Position` type.
 
@@ -974,6 +1033,14 @@ type BeliefVector = number[];
 | `decimals` | `number` | Display precision for outcome values |
 | `resolutionState` | `'open' \| 'resolved' \| 'voided'` | Market lifecycle state |
 | `resolvedOutcome` | `number \| null` | Actual outcome value if resolved, otherwise `null` |
+| `marketId` | `number` | Unique market identifier |
+| `createdAt` | `string \| null` | ISO 8601 creation timestamp |
+| `expiresAt` | `string \| null` | ISO 8601 expiration timestamp, or null if no expiry |
+| `resolvedAt` | `string \| null` | ISO 8601 resolution timestamp, or null if unresolved |
+| `marketType` | `string` | Market type (e.g., `'standard'`) |
+| `marketSubtype` | `string \| null` | Market subtype, or null |
+| `metadata` | `Record<string, unknown>` | Arbitrary metadata from the server |
+| `consensusMean` | `number` | Weighted mean of the consensus distribution |
 
 **Usage:** The most important type in the SDK. Returned by `queryMarketState()`. Contains everything needed to render charts, build beliefs, and display market information. Always destructure `config` for belief construction: `const { numBuckets, lowerBound, upperBound } = market.config;`
 

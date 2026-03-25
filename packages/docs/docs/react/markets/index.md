@@ -12,6 +12,7 @@ Data-fetching hooks for market state, consensus curves, distribution analysis, a
 | Hook | Returns | Description |
 |------|---------|-------------|
 | **useMarket** | `market` | Complete market state (config, consensus coefficients, metadata) |
+| **useMarkets** | `markets` | Market listing with optional filtering, sorting, limiting, and polling |
 | **useConsensus** | `consensus` | Consensus density curve as chart-ready `{ x, y }[]` points |
 | **useMarketHistory** | `history` | Historical market snapshots with fan chart transform support |
 | **useBucketDistribution** | `buckets` | Pre-computed outcome buckets with probability percentages |

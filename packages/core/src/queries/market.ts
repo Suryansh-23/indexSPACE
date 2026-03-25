@@ -28,6 +28,11 @@ export async function queryMarketState(
   const upperBound = data.upper_bound;
   if (upperBound == null) throw new Error('Missing upper_bound in market response');
 
+  const n = consensus.length - 1;
+  const consensusMean = n > 0
+    ? lowerBound + (upperBound - lowerBound) * consensus.reduce((sum: number, c: number, k: number) => sum + (k / n) * c, 0)
+    : lowerBound;
+
   return {
     alpha: alphaVector,
     consensus,
@@ -35,7 +40,7 @@ export async function queryMarketState(
     poolBalance: data.current_pool,
     participantCount: data.num_positions,
     totalVolume: data.total_volume ?? 0,
-    positionsOpen: data.positions_currently_open,
+    positionsOpen: data.positions_currently_open ?? 0,
     config: {
       numBuckets,
       lowerBound,
@@ -54,8 +59,17 @@ export async function queryMarketState(
     title: data.title,
     xAxisUnits: data.metadata?.x_axis_units ?? '',
     decimals: data.metadata?.decimals ?? 0,
+    // TODO: Add 'voided' mapping when API provides the field. Currently only is_settled boolean maps to 'resolved'/'open'.
     resolutionState: data.is_settled ? 'resolved' : 'open',
     resolvedOutcome: data.settlement_outcome ?? null,
+    marketId: data.market_id,
+    createdAt: data.created_at ?? null,
+    expiresAt: data.expires_at ?? null,
+    resolvedAt: data.resolved_at ?? null,
+    marketType: data.market_type ?? 'standard',
+    marketSubtype: data.market_subtype ?? null,
+    metadata: data.metadata ?? {},
+    consensusMean,
   };
 }
 

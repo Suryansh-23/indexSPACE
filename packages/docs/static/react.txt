@@ -51,7 +51,7 @@ Description: A TypeScript SDK for embedding prediction market trading widgets in
 
 ### 1.2 What This Package Does
 
-The `@functionspace/react` package provides the React integration layer for the FunctionSpace Trading SDK. It includes `FunctionSpaceProvider` (which manages auth, theming, and shared state), data-fetching hooks (`useMarket`, `useConsensus`, `usePositions`, etc.), mutation hooks (`useBuy`, `useSell`), preview hooks (`usePreviewPayout`, `usePreviewSell`), state hooks (`useAuth`, `useCustomShape`, `useChartZoom`), and the context API for cross-component coordination.
+The `@functionspace/react` package provides the React integration layer for the FunctionSpace Trading SDK. It includes `FunctionSpaceProvider` (which manages auth, theming, and shared state), data-fetching hooks (`useMarket`, `useMarkets`, `useConsensus`, `usePositions`, etc.), mutation hooks (`useBuy`, `useSell`), preview hooks (`usePreviewPayout`, `usePreviewSell`), state hooks (`useAuth`, `useCustomShape`, `useChartZoom`), and the context API for cross-component coordination.
 
 ### 1.3 Package Dependency Chain
 
@@ -87,7 +87,7 @@ This document covers `@functionspace/core` + `@functionspace/react` (headless cu
 | # | Limitation | Impact | Workaround |
 |---|-----------|--------|------------|
 | 2 | **No real-time transport (WebSocket/SSE).** The SDK has no push-based data delivery. All data freshness depends on polling or explicit refetch calls. Changes made by other users are not automatically visible without polling. | Market state, consensus curves, and position data go stale between refetches. In multi-user scenarios, the local view drifts from server state until the next poll or refetch. | Use `pollInterval` on any data hook to poll for updates (e.g., `useConsensus(marketId, 200, { pollInterval: 3000 })`). Call `ctx.invalidate(marketId)` after local trades for immediate refetch. |
-| 4 | **No market search or filtering.** `discoverMarkets()` returns all available markets as a flat `MarketState[]` array. The function accepts no search, filter, sort, or pagination parameters. | Applications that need to display a subset of markets must fetch the entire market list on every call. There is no server-side filtering. | Call `discoverMarkets(client)` and filter the returned array client-side using standard `Array.filter()`, `Array.sort()`, or `Array.find()` methods. |
+| 4 | **No server-side market filtering.** `discoverMarkets()` fetches all markets from the server and applies filtering client-side. There is no server-side search, filter, sort, or pagination. | The full market list is fetched on every call regardless of filter options. | Use `useMarkets(options)` with `MarketDiscoveryOptions` for client-side filtering, sorting, and limiting with automatic caching and polling support. |
 | 7 | **Settlement not yet implemented.** The `Position` type includes `settlementPayout` and `MarketState` includes `resolvedOutcome` fields, but no settlement functions exist in the SDK. | Positions in resolved markets cannot be settled through the SDK. The `settlementPayout` field is always `null` in current responses. | Monitor the `resolutionState` field on `MarketState` for `'resolved'` or `'voided'` status. Settlement processing must be handled outside the SDK until settlement functions are added. |
 
 ---
@@ -205,6 +205,7 @@ import type { FSContext } from '@functionspace/react';
 // Data hooks
 import {
   useMarket,
+  useMarkets,
   useConsensus,
   usePositions,
   useTradeHistory,
@@ -284,7 +285,7 @@ function useMarket(
 | `error` | `Error \| null` | Fetch error, if any |
 | `refetch` | `() => Promise<void>` | Trigger a background refetch |
 
-The `MarketState` object contains the market configuration (`market.config` with `numBuckets`, `lowerBound`, `upperBound`, and other protocol parameters), the current consensus vector (`market.consensus`), pool statistics (`market.totalMass`, `market.poolBalance`, `market.totalVolume`), metadata (`market.title`, `market.xAxisUnits`, `market.decimals`), and resolution state (`market.resolutionState`).
+The `MarketState` object contains the market configuration (`market.config` with `numBuckets`, `lowerBound`, `upperBound`, and other protocol parameters), the current consensus vector (`market.consensus`), pool statistics (`market.totalMass`, `market.poolBalance`, `market.totalVolume`), metadata (`market.title`, `market.xAxisUnits`, `market.decimals`, `market.metadata`), identity and lifecycle fields (`market.marketId`, `market.createdAt`, `market.expiresAt`, `market.resolvedAt`), classification (`market.marketType`, `market.marketSubtype`), the consensus mean (`market.consensusMean`), and resolution state (`market.resolutionState`).
 
 **Example:**
 
@@ -307,6 +308,116 @@ function MarketHeader({ marketId }: { marketId: string }) {
       <p>Open positions: {market.positionsOpen}</p>
     </div>
   );
+}
+```
+
+### `useMarkets(options?)`
+
+Fetches a list of markets with optional client-side filtering, sorting, limiting, and polling.
+
+```typescript
+function useMarkets(
+  options?: MarketDiscoveryOptions & QueryOptions,
+): {
+  markets: MarketState[];
+  loading: boolean;
+  isFetching: boolean;
+  error: Error | null;
+  refetch: () => Promise<void>;
+}
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `options.state` | `string?` | Filter by `resolutionState` (e.g., `'open'`). |
+| `options.titleContains` | `string?` | Case-insensitive substring match on market title. |
+| `options.categories` | `string[]?` | Filter by category overlap. |
+| `options.filters` | `MarketFilter[]?` | Custom field-level filters (AND logic). |
+| `options.sortBy` | `string?` | Field name to sort by (e.g., `'totalVolume'`). |
+| `options.sortOrder` | `'asc' \| 'desc'?` | Sort direction. Default: `'desc'`. |
+| `options.limit` | `number?` | Maximum number of results. |
+| `options.pollInterval` | `number?` | Polling interval in ms. Default: `0` (no polling). |
+| `options.enabled` | `boolean?` | When `false`, suppresses fetching. Default: `true`. |
+
+**Return shape:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `markets` | `MarketState[]` | Filtered/sorted market list, or `[]` while loading |
+| `loading` | `boolean` | `true` only on the first fetch (no cached data) |
+| `isFetching` | `boolean` | `true` whenever a request is in flight |
+| `error` | `Error \| null` | Fetch error, if any |
+| `refetch` | `() => Promise<void>` | Trigger a background refetch |
+
+The hook delegates to `discoverMarkets(client, options)` from core. Filtering, sorting, and limiting are all client-side -- the full market list is fetched from the server on every request. Cache keys are derived from the discovery options, so different option combinations use separate cache entries.
+
+**Example -- list all markets:**
+
+```tsx
+import { useMarkets } from '@functionspace/react';
+
+function MarketList() {
+  const { markets, loading, error } = useMarkets();
+
+  if (loading) return <div>Loading markets...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+
+  return (
+    <ul>
+      {markets.map(m => (
+        <li key={m.marketId}>{m.title} -- {m.resolutionState}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+**Example -- filtered with polling:**
+
+```tsx
+import { useMarkets } from '@functionspace/react';
+
+function PopularMarkets() {
+  const { markets, loading, isFetching } = useMarkets({
+    state: 'open',
+    sortBy: 'totalVolume',
+    sortOrder: 'desc',
+    limit: 10,
+    pollInterval: 30000,
+  });
+
+  if (loading) return <div>Loading...</div>;
+
+  return (
+    <div>
+      {isFetching && <span>Refreshing...</span>}
+      <ul>
+        {markets.map(m => (
+          <li key={m.marketId}>{m.title} -- Volume: {m.totalVolume}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+**With MarketList component:**
+
+```tsx
+import { useMarkets } from '@functionspace/react';
+import { MarketList } from '@functionspace/ui';
+
+function MarketBrowser({ onSelect }: { onSelect: (id: number) => void }) {
+  const { markets, loading, error } = useMarkets({
+    state: 'open',
+    sortBy: 'totalVolume',
+    sortOrder: 'desc',
+    pollInterval: 5000,
+  });
+
+  return <MarketList markets={markets ?? []} loading={loading} error={error} onSelect={onSelect} />;
 }
 ```
 
@@ -1202,7 +1313,7 @@ These rules prevent the most common integration mistakes. Each maps to a silent 
 
 See the complete core type reference in `core.txt`. Key types used in headless mode:
 
-- **`MarketState`** -- Returned by `useMarket()`. Contains `config` (with `numBuckets`, `lowerBound`, `upperBound`), `consensus`, `title`, `xAxisUnits`, `resolutionState`, and pool statistics.
+- **`MarketState`** -- Returned by `useMarket()`. Contains `config` (with `numBuckets`, `lowerBound`, `upperBound`), `consensus`, `title`, `xAxisUnits`, `resolutionState`, pool statistics, identity/lifecycle fields (`marketId`, `createdAt`, `expiresAt`, `resolvedAt`), classification (`marketType`, `marketSubtype`), `metadata`, and `consensusMean`.
 - **`ConsensusCurve`** -- Returned by `useConsensus()`. Contains `points: Array<{x, y}>` and `config`.
 - **`Position`** -- Returned by `usePositions()`. Contains `positionId`, `belief`, `collateral`, `claims`, `status`, `prediction`.
 - **`BuyResult`** -- Returned by `buy()`. Contains `positionId`, `belief`, `claims`, `collateral`, `positionType?`, `positionParams?`.

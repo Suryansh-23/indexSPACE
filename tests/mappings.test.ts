@@ -108,6 +108,14 @@ const expectedMarketState = {
   decimals: 2,
   resolutionState: 'open',
   resolvedOutcome: null,
+  marketId: 1,
+  createdAt: null,
+  expiresAt: null,
+  resolvedAt: null,
+  marketType: 'standard',
+  marketSubtype: null,
+  metadata: mockMarketStateRaw.metadata,
+  consensusMean: 46.00000000000001,
 };
 
 const mockPositionsRaw = {
@@ -449,6 +457,14 @@ const expectedDiscoverMarkets = [
     decimals: 2,
     resolutionState: 'open',
     resolvedOutcome: null,
+    marketId: 1,
+    createdAt: '2026-03-13T13:48:25.106364',
+    expiresAt: null,
+    resolvedAt: null,
+    marketType: 'standard',
+    marketSubtype: null,
+    metadata: mockDiscoverMarketsRaw.markets[0].metadata,
+    consensusMean: 46.00000000000001,
   },
   {
     alpha: [5, 5],
@@ -468,6 +484,14 @@ const expectedDiscoverMarkets = [
     decimals: 0,
     resolutionState: 'resolved',
     resolvedOutcome: 0,
+    marketId: 2,
+    createdAt: '2026-03-13T13:48:25.106364',
+    expiresAt: null,
+    resolvedAt: null,
+    marketType: 'standard',
+    marketSubtype: null,
+    metadata: mockDiscoverMarketsRaw.markets[1].metadata,
+    consensusMean: 0.5,
   },
 ];
 

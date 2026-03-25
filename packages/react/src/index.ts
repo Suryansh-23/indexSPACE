@@ -6,6 +6,8 @@ export { FS_DARK, FS_LIGHT, NATIVE_DARK, NATIVE_LIGHT, THEME_PRESETS } from './t
 export type { ThemePresetId, ChartColors, FanBandColors } from './themes.js';
 export { resolveChartColors, getPresetChartColors } from './themes.js';
 export { useMarket } from './useMarket.js';
+export { useMarkets } from './useMarkets.js';
+export type { MarketDiscoveryOptions } from '@functionspace/core';
 export { useConsensus } from './useConsensus.js';
 export { usePositions } from './usePositions.js';
 export { useTradeHistory } from './useTradeHistory.js';

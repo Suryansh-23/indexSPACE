@@ -34,6 +34,14 @@ interface MarketState {
   decimals: number;           // Display precision for outcome values
   resolutionState: 'open' | 'resolved' | 'voided';
   resolvedOutcome: number | null;  // Settlement value (null if unresolved)
+  marketId: number;           // Unique market identifier
+  createdAt: string | null;   // ISO 8601 creation timestamp (null from single-market endpoint)
+  expiresAt: string | null;   // ISO 8601 expiration timestamp, or null if no expiry
+  resolvedAt: string | null;  // ISO 8601 resolution timestamp, or null if unresolved
+  marketType: string;         // Market type (e.g., 'standard', 'walkthrough')
+  marketSubtype: string | null; // Market subtype, or null
+  metadata: Record<string, unknown>; // Server metadata (categories, tags, custom fields)
+  consensusMean: number;      // Scalar consensus mean (closed-form from coefficient array)
 }
 ```
 

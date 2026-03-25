@@ -89,11 +89,12 @@ vi.mock('@functionspace/core', () => ({
   sell: vi.fn(),
   previewPayoutCurve: vi.fn(),
   previewSell: vi.fn(),
+  discoverMarkets: vi.fn(),
 }));
 
-import { FunctionSpaceProvider, useMarket, useConsensus, usePositions, useTradeHistory, useBucketDistribution, useMarketHistory, useDistributionState, useAuth, useCustomShape, useChartZoom, useBuy, useSell, usePreviewPayout, usePreviewSell } from '../packages/react/src';
+import { FunctionSpaceProvider, useMarket, useMarkets, useConsensus, usePositions, useTradeHistory, useBucketDistribution, useMarketHistory, useDistributionState, useAuth, useCustomShape, useChartZoom, useBuy, useSell, usePreviewPayout, usePreviewSell } from '../packages/react/src';
 import type { ChartZoomOptions } from '../packages/react/src';
-import { queryMarketState, getConsensusCurve, queryMarketPositions, queryTradeHistory, queryMarketHistory, calculateBucketDistribution, computePercentiles, FSClient, loginUser, passwordlessLoginUser, silentReAuth, buy, sell, previewPayoutCurve, previewSell } from '@functionspace/core';
+import { queryMarketState, getConsensusCurve, queryMarketPositions, queryTradeHistory, queryMarketHistory, calculateBucketDistribution, computePercentiles, FSClient, loginUser, passwordlessLoginUser, silentReAuth, buy, sell, previewPayoutCurve, previewSell, discoverMarkets } from '@functionspace/core';
 import { QueryCache } from '../packages/react/src/cache/QueryCache';
 import { QueryCacheContext } from '../packages/react/src/QueryCacheContext';
 import { FunctionSpaceContext } from '../packages/react/src/context';
@@ -353,6 +354,193 @@ describe('useMarket hook', () => {
 
     // The poll timer is now set. We need to wait for it to fire.
     // Use real timers but a short pollInterval so it fires quickly.
+    await waitFor(() => {
+      expect(resolvers.length).toBeGreaterThan(initialCount);
+    }, { timeout: 3000 });
+  });
+});
+
+// ============================================================================
+// useMarkets hook
+// ============================================================================
+
+const mockMarketsList = [
+  {
+    marketId: 1,
+    title: 'Bitcoin Price',
+    resolutionState: 'open',
+    totalVolume: 50000,
+    poolBalance: 10000,
+    config: { numBuckets: 60, lowerBound: 0, upperBound: 100, K: 60, L: 0, H: 100 },
+    metadata: { categories: ['crypto'] },
+  },
+  {
+    marketId: 2,
+    title: 'Election',
+    resolutionState: 'resolved',
+    totalVolume: 100000,
+    poolBalance: 25000,
+    config: { numBuckets: 60, lowerBound: 0, upperBound: 100, K: 60, L: 0, H: 100 },
+    metadata: { categories: ['politics'] },
+  },
+];
+
+describe('useMarkets hook', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('throws error when used outside provider', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => {
+      renderHook(() => useMarkets());
+    }).toThrow('useMarkets must be used within FunctionSpaceProvider');
+    spy.mockRestore();
+  });
+
+  it('returns data after successful fetch', async () => {
+    vi.mocked(discoverMarkets).mockResolvedValue(mockMarketsList as any);
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useMarkets(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.markets).toEqual(mockMarketsList);
+    expect(result.current.error).toBe(null);
+    expect(vi.mocked(discoverMarkets)).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+  });
+
+  it('returns loading initially', async () => {
+    vi.mocked(discoverMarkets).mockImplementation(() => new Promise(() => {})); // Never resolves
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useMarkets(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(true);
+    });
+    expect(result.current.isFetching).toBe(true);
+    expect(result.current.markets).toEqual([]);
+  });
+
+  it('loading vs isFetching on refetch', async () => {
+    let callCount = 0;
+    vi.mocked(discoverMarkets).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return Promise.resolve(mockMarketsList as any);
+      return new Promise((resolve) => setTimeout(() => resolve(mockMarketsList as any), 50));
+    });
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useMarkets(), { wrapper });
+
+    // Wait for initial data
+    await waitFor(() => {
+      expect(result.current.markets).toHaveLength(2);
+    });
+    expect(result.current.loading).toBe(false);
+
+    // Trigger refetch -- should have isFetching=true but loading=false (data already present)
+    act(() => {
+      result.current.refetch();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isFetching).toBe(true);
+    });
+    expect(result.current.loading).toBe(false); // We already have data, so loading stays false
+
+    // Wait for refetch to complete
+    await waitFor(() => {
+      expect(result.current.isFetching).toBe(false);
+    });
+  });
+
+  it('returns error on fetch failure', async () => {
+    vi.mocked(discoverMarkets).mockRejectedValue(new Error('Discovery failed'));
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useMarkets(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.error).not.toBe(null);
+    });
+
+    expect(result.current.markets).toEqual([]);
+    expect(result.current.error?.message).toBe('Discovery failed');
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('error clears on successful refetch', async () => {
+    vi.mocked(discoverMarkets).mockRejectedValue(new Error('Discovery failed'));
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useMarkets(), { wrapper });
+
+    // Wait for error
+    await waitFor(() => {
+      expect(result.current.error).not.toBe(null);
+    });
+    expect(result.current.error?.message).toBe('Discovery failed');
+
+    // Switch to success for the refetch
+    vi.mocked(discoverMarkets).mockResolvedValue(mockMarketsList as any);
+
+    await act(async () => {
+      await result.current.refetch();
+    });
+
+    expect(result.current.error).toBe(null);
+    expect(result.current.markets).toEqual(mockMarketsList);
+  });
+
+  it('refetch returns Promise', async () => {
+    vi.mocked(discoverMarkets).mockResolvedValue(mockMarketsList as any);
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useMarkets(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.markets).toHaveLength(2);
+    });
+
+    // Switch mock for the refetch
+    const updatedList = [...mockMarketsList, { marketId: 3, title: 'New Market' }];
+    vi.mocked(discoverMarkets).mockResolvedValue(updatedList as any);
+
+    await act(async () => {
+      await result.current.refetch();
+    });
+
+    expect(result.current.markets).toHaveLength(3);
+  });
+
+  it('pollInterval causes periodic refetches', async () => {
+    let resolvers: Array<(v: any) => void> = [];
+    vi.mocked(discoverMarkets).mockImplementation(() => {
+      return new Promise((resolve) => {
+        resolvers.push(resolve);
+      });
+    });
+
+    const { wrapper } = createCacheWrapper();
+    renderHook(
+      () => useMarkets({ pollInterval: 500 }),
+      { wrapper },
+    );
+
+    // Resolve initial fetch(es) -- StrictMode may cause more than one
+    await waitFor(() => expect(resolvers.length).toBeGreaterThanOrEqual(1));
+    const initialCount = resolvers.length;
+    act(() => { resolvers.forEach(r => r(mockMarketsList)); });
+
+    // Wait for poll interval to trigger another fetch
     await waitFor(() => {
       expect(resolvers.length).toBeGreaterThan(initialCount);
     }, { timeout: 3000 });
@@ -1055,6 +1243,21 @@ describe('Hook Return Shape', () => {
     vi.mocked(getConsensusCurve).mockResolvedValue({ points: [] });
     vi.mocked(queryMarketPositions).mockResolvedValue([]);
     vi.mocked(queryTradeHistory).mockResolvedValue([]);
+    vi.mocked(discoverMarkets).mockResolvedValue([]);
+  });
+
+  it('useMarkets returns { markets, loading, isFetching, error, refetch }', async () => {
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useMarkets(), { wrapper });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current).toHaveProperty('markets');
+    expect(result.current).toHaveProperty('loading');
+    expect(result.current).toHaveProperty('isFetching');
+    expect(result.current).toHaveProperty('error');
+    expect(result.current).toHaveProperty('refetch');
+    expect(typeof result.current.refetch).toBe('function');
   });
 
   it('useMarket returns { market, loading, isFetching, error, refetch }', async () => {

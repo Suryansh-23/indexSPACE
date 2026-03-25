@@ -179,13 +179,14 @@ All data-fetching hooks share a common pattern:
 
 #### Hooks Overview
 
-All 14 hooks provided by `@functionspace/react`, grouped by category.
+All 15 hooks provided by `@functionspace/react`, grouped by category.
 
 **Data Hooks**
 
 | Hook | Description | Docs |
 |------|-------------|------|
 | `useMarket` | Market metadata, config, state | [Details](./markets/usemarket) |
+| `useMarkets` | Market discovery with filtering, sorting, limiting | [Details](./markets/usemarkets) |
 | `useConsensus` | Probability density curves | [Details](./markets/useconsensus) |
 | `usePositions` | User and market positions | [Details](./positions/usepositions) |
 | `useMarketHistory` | Alpha vector snapshots over time | [Details](./markets/usemarkethistory) |
