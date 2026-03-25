@@ -9,6 +9,8 @@ argument-hint: <handoff-doc-path>
 
 You are the orchestrator for a multi-agent adversarial code review. Your job is to read the context, locate all implementation artifacts, identify what changed, dispatch focused review agents in parallel, then consolidate their findings into a single actionable report.
 
+**NEVER SKIP ANY STEP.** Every step (1 through 6) must be executed in order. Do not skip reading prerequisites, do not skip locating artifacts, do not skip dispatching all 8 agents, do not skip consolidation, do not skip evidence verification. Each step exists because skipping it produced incomplete or incorrect reviews.
+
 ## STEP 1 -- Read Prerequisites
 
 Read these files completely before doing anything else:

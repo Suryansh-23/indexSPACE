@@ -9,6 +9,12 @@ argument-hint: <source-path-or-feature-description>
 
 You are the **orchestrator** for a planning pipeline that produces validated implementation plans for the FunctionSpace Trading SDK. You take either a pointer to existing UI code or a feature idea and produce a plan in the exact format that `/implement-feature` consumes.
 
+**NEVER SKIP ANY PHASE.** Every phase (0 through 6) must be executed in order, even if:
+- You believe Phase 0 docs haven't changed -- read them again, they are living documents
+- Clarifying questions seem obvious -- ask them anyway; assumptions cause the most waste
+- Research seems redundant from prior context -- dispatch agents anyway; context compression loses details
+- The plan seems correct without validation -- validate anyway; validators catch what you miss
+
 **The plan provides context, justifications, architectural reasoning, and intended outcomes -- not specific code changes.** The implementation agents downstream validate assertions, appraise suggestions, and propose their own code.
 
 ## Architecture
@@ -118,7 +124,7 @@ The backend is `fs_core/` (Python/FastAPI):
 
 The user provides minimal pointers -- file names, component names, or descriptions of where to look. Dispatch 3 discovery agents in a single message:
 
-**Agent 1: Component tree discovery**
+**Agent 1: Component tree + visual fidelity discovery**
 
 ```
 Explore the codebase starting from [component the user named].
@@ -131,8 +137,15 @@ Explore the codebase starting from [component the user named].
    - Keep tracing up until you find the data source.
 3. Trace DOWNWARD: find all imported sub-components, utility functions, and libraries.
 4. Map the full component hierarchy as a tree.
+5. VISUAL FIDELITY EXTRACTION (critical for UI components):
+   a. Record every user-visible text string VERBATIM (labels, headings, button text, status text, placeholder text). Copy the exact text, do not paraphrase.
+   b. Record exact font sizes and weights -- translate Tailwind classes to CSS values (text-2xl = 1.5rem, font-semibold = 600, etc.)
+   c. Record exact spacing: padding, margin, gap, min-height, max-width values from Tailwind or inline styles.
+   d. Record icon library and exact icon names (e.g., lucide-react: TrendingUp, Droplets, Users). For each icon, extract the SVG viewBox and path data so the SDK can inline them without depending on the icon library.
+   e. Record exact layout configuration: flex ratios, grid templates, alignment, justify, wrap behavior.
+   f. Record interactive CSS: hover transforms, transition durations, gradients, box-shadow values.
 
-Return: component tree with file paths, each component's role, and the data source chain.
+Return: component tree with file paths, each component's role, data source chain, AND a visual fidelity table with every text string, size, spacing, icon, and layout value extracted from the source.
 ```
 
 **Agent 2: Data pipeline discovery**
@@ -193,18 +206,47 @@ For each file discovered, classify:
 
 ### Step 4: Visual Fidelity Requirements
 
-**The SDK widget must be visually identical to the source.** The user should not be able to tell them apart.
+**The SDK widget must be visually identical to the source.** The user should not be able to tell them apart. This means COPYING detail from the source, not summarizing or paraphrasing it.
 
-Document:
+**Text content -- copy exactly, do not paraphrase:**
 
-- Exact chart type and configuration (Recharts component, axes, tooltips, legends)
-- Layout structure (ASCII diagram of the widget)
-- Spacing, sizing, proportions
-- Interactive behaviors (hover states, click actions, transitions, animations)
-- Color mapping: source Tailwind classes -> SDK theme tokens (`var(--fs-*)` in CSS, `ctx.chartColors.*` in Recharts SVG props)
-- Typography and font sizes
+- Read every user-visible string in the source component (labels, headings, placeholder text, button text, status text)
+- Record them VERBATIM in the requirements doc. If the source says "Liquidity", the requirements must say "Liquidity" -- not "Pool" or "Balance" or any synonym
+- Include the exact casing (uppercase, title case, sentence case) as it appears in the source
 
-**Note:** Colors flow through the SDK theme system, so exact hex values change. But the visual structure, proportions, and behavior must match exactly.
+**Typography -- extract exact values:**
+
+- For every text element, record the source's font size, font weight, and line height. Translate Tailwind classes to CSS values (e.g., `text-2xl` = `1.5rem`, `font-semibold` = `600`)
+- Record min-height, padding, and margin values that affect layout proportions (e.g., `min-h-[92px]` = `min-height: 92px`)
+- These values go in the requirements doc as a table, not as prose descriptions
+
+**Icons -- extract exact SVG paths:**
+
+- If the source uses an icon library (lucide-react, heroicons, etc.), record the exact icon name AND extract the SVG `<path>` data from the library
+- The SDK must not depend on the icon library, so the implementation agent needs the raw SVG paths to inline. Provide them in the requirements doc.
+- If you cannot extract the SVG paths during planning, provide the exact icon library name and icon name so the implementation agent can look them up
+
+**Layout structure:**
+
+- ASCII diagram of the widget (existing requirement)
+- For EACH section of the layout: exact padding, margin, gap values from the source
+- Flex/grid configuration: exact ratios, column templates, alignment
+
+**Spacing, sizing, proportions:**
+
+- Do not write "the header has some vertical space." Write "the header has `min-height: 92px` and `padding-bottom: 1rem`"
+- Every dimension that affects visual appearance must be a concrete number, not a description
+
+**Color mapping:**
+
+- Source Tailwind classes -> SDK theme tokens (`var(--fs-*)` in CSS, `ctx.chartColors.*` in Recharts SVG props)
+- For gradients: record the exact gradient definition (e.g., `linear-gradient(to right, var(--fs-primary), var(--fs-accent))`)
+
+**Interactive behaviors:**
+
+- Hover states, click actions, transitions, animations with exact CSS values (duration, easing, transform)
+
+**The standard for this section is: an implementation agent reading only the requirements doc should be able to reproduce the source widget pixel-for-pixel without ever reading the source file.** If they would need to look at the source to get a detail right, that detail is missing from the requirements.
 
 ### Step 5: Improvement Opportunities
 
