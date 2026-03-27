@@ -31,4 +31,6 @@ export { usePreviewPayout } from './usePreviewPayout.js';
 export type { UsePreviewPayoutReturn } from './usePreviewPayout.js';
 export { usePreviewSell } from './usePreviewSell.js';
 export type { UsePreviewSellReturn } from './usePreviewSell.js';
+export { useMarketFilters } from './useMarketFilters.js';
+export type { SortOption, UseMarketFiltersConfig, UseMarketFiltersReturn, MarketFilterBarProps } from './useMarketFilters.js';
 

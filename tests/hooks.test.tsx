@@ -92,8 +92,8 @@ vi.mock('@functionspace/core', () => ({
   discoverMarkets: vi.fn(),
 }));
 
-import { FunctionSpaceProvider, useMarket, useMarkets, useConsensus, usePositions, useTradeHistory, useBucketDistribution, useMarketHistory, useDistributionState, useAuth, useCustomShape, useChartZoom, useBuy, useSell, usePreviewPayout, usePreviewSell } from '../packages/react/src';
-import type { ChartZoomOptions } from '../packages/react/src';
+import { FunctionSpaceProvider, useMarket, useMarkets, useConsensus, usePositions, useTradeHistory, useBucketDistribution, useMarketHistory, useDistributionState, useAuth, useCustomShape, useChartZoom, useBuy, useSell, usePreviewPayout, usePreviewSell, useMarketFilters } from '../packages/react/src';
+import type { ChartZoomOptions, SortOption } from '../packages/react/src';
 import { queryMarketState, getConsensusCurve, queryMarketPositions, queryTradeHistory, queryMarketHistory, calculateBucketDistribution, computePercentiles, FSClient, loginUser, passwordlessLoginUser, silentReAuth, buy, sell, previewPayoutCurve, previewSell, discoverMarkets } from '@functionspace/core';
 import { QueryCache } from '../packages/react/src/cache/QueryCache';
 import { QueryCacheContext } from '../packages/react/src/QueryCacheContext';
@@ -3152,4 +3152,396 @@ describe('useChartZoom hook', () => {
   // and getBoundingClientRect, which JSDOM does not support. The zoomed-state behavior
   // (filterVisibleData, yDomain narrowing, cursor styles) is covered by the pure function
   // tests in chart-zoom.test.ts. Full interaction testing should use a browser-based runner.
+});
+
+// ============================================================================
+// useMarketFilters hook (derived)
+// ============================================================================
+
+const mockMarketsWithCategories = [
+  {
+    marketId: 1,
+    title: 'Bitcoin Price',
+    resolutionState: 'open',
+    totalVolume: 50000,
+    poolBalance: 10000,
+    positionsOpen: 5,
+    config: { numBuckets: 60, lowerBound: 0, upperBound: 100, K: 60, L: 0, H: 100 },
+    metadata: { categories: ['crypto', 'finance'] },
+  },
+  {
+    marketId: 2,
+    title: 'Election Outcome',
+    resolutionState: 'open',
+    totalVolume: 100000,
+    poolBalance: 25000,
+    positionsOpen: 12,
+    config: { numBuckets: 60, lowerBound: 0, upperBound: 100, K: 60, L: 0, H: 100 },
+    metadata: { categories: ['politics'] },
+  },
+  {
+    marketId: 3,
+    title: 'Weather Forecast',
+    resolutionState: 'resolved',
+    totalVolume: 20000,
+    poolBalance: 5000,
+    positionsOpen: 3,
+    config: { numBuckets: 60, lowerBound: 0, upperBound: 100, K: 60, L: 0, H: 100 },
+    metadata: { categories: ['science', 'crypto'] },
+  },
+];
+
+describe('useMarketFilters hook', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useRealTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('throws error when used outside provider', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => {
+      renderHook(() => useMarketFilters());
+    }).toThrow('useMarketFilters must be used within FunctionSpaceProvider');
+    spy.mockRestore();
+  });
+
+  it('returns markets after data loads', async () => {
+    vi.mocked(discoverMarkets).mockResolvedValue(mockMarketsWithCategories as any);
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useMarketFilters(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.markets).toEqual(mockMarketsWithCategories);
+    expect(result.current.error).toBe(null);
+  });
+
+  it('provides 5 default sort options', () => {
+    vi.mocked(discoverMarkets).mockResolvedValue([]);
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useMarketFilters(), { wrapper });
+
+    expect(result.current.sortOptions).toHaveLength(5);
+    expect(result.current.sortOptions.map((s: SortOption) => s.field)).toEqual([
+      'totalVolume', 'poolBalance', 'positionsOpen', 'createdAt', 'expiresAt',
+    ]);
+    expect(result.current.sortOptions[0]).toEqual({ field: 'totalVolume', label: 'Volume', defaultOrder: 'desc' });
+    expect(result.current.sortOptions[3]).toEqual({ field: 'createdAt', label: 'Newest', defaultOrder: 'desc' });
+    expect(result.current.sortOptions[4]).toEqual({ field: 'expiresAt', label: 'Ending Soon', defaultOrder: 'asc' });
+  });
+
+  it('custom sort options override defaults', () => {
+    vi.mocked(discoverMarkets).mockResolvedValue([]);
+
+    const customSorts: SortOption[] = [
+      { field: 'title', label: 'Name', defaultOrder: 'asc' },
+    ];
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(
+      () => useMarketFilters({ sortOptions: customSorts }),
+      { wrapper },
+    );
+
+    expect(result.current.sortOptions).toEqual(customSorts);
+  });
+
+  it('setSearchText updates searchText immediately', () => {
+    vi.useFakeTimers();
+    vi.mocked(discoverMarkets).mockResolvedValue([]);
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useMarketFilters(), { wrapper });
+
+    act(() => {
+      result.current.setSearchText('bitcoin');
+    });
+
+    expect(result.current.searchText).toBe('bitcoin');
+  });
+
+  it('debounced: titleContains not updated until timer fires', () => {
+    vi.useFakeTimers();
+    vi.mocked(discoverMarkets).mockResolvedValue([]);
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useMarketFilters(), { wrapper });
+
+    act(() => {
+      result.current.setSearchText('bitcoin');
+    });
+
+    // Before debounce fires, discoveryOptions should not have titleContains
+    expect(result.current.discoveryOptions.titleContains).toBeUndefined();
+
+    // At 299ms, still within debounce window -- titleContains should remain undefined
+    act(() => {
+      vi.advanceTimersByTime(299);
+    });
+    expect(result.current.discoveryOptions.titleContains).toBeUndefined();
+
+    // At 300ms, debounce fires
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+
+    // After debounce fires, discoveryOptions should have titleContains
+    expect(result.current.discoveryOptions.titleContains).toBe('bitcoin');
+  });
+
+  it('toggleCategory adds and removes categories', async () => {
+    vi.mocked(discoverMarkets).mockResolvedValue(mockMarketsWithCategories as any);
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useMarketFilters(), { wrapper });
+
+    // Add a category
+    act(() => {
+      result.current.toggleCategory('crypto');
+    });
+    expect(result.current.selectedCategories).toEqual(['crypto']);
+
+    // Add another
+    act(() => {
+      result.current.toggleCategory('politics');
+    });
+    expect(result.current.selectedCategories).toEqual(['crypto', 'politics']);
+
+    // Remove first
+    act(() => {
+      result.current.toggleCategory('crypto');
+    });
+    expect(result.current.selectedCategories).toEqual(['politics']);
+  });
+
+  it('empty selectedCategories does not add category filter', () => {
+    vi.mocked(discoverMarkets).mockResolvedValue([]);
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useMarketFilters(), { wrapper });
+
+    expect(result.current.selectedCategories).toEqual([]);
+    expect(result.current.discoveryOptions.filters).toBeUndefined();
+  });
+
+  it('setSortField updates field and applies defaultOrder', () => {
+    vi.mocked(discoverMarkets).mockResolvedValue([]);
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useMarketFilters(), { wrapper });
+
+    // Default
+    expect(result.current.activeSortField).toBe('totalVolume');
+    expect(result.current.sortOrder).toBe('desc');
+
+    // Change to a field with ascending default
+    act(() => {
+      result.current.setSortField('expiresAt');
+    });
+    expect(result.current.activeSortField).toBe('expiresAt');
+    expect(result.current.sortOrder).toBe('asc');
+  });
+
+  it('toggleSortOrder flips between asc and desc', () => {
+    vi.mocked(discoverMarkets).mockResolvedValue([]);
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useMarketFilters(), { wrapper });
+
+    expect(result.current.sortOrder).toBe('desc');
+
+    act(() => {
+      result.current.toggleSortOrder();
+    });
+    expect(result.current.sortOrder).toBe('asc');
+
+    act(() => {
+      result.current.toggleSortOrder();
+    });
+    expect(result.current.sortOrder).toBe('desc');
+  });
+
+  it('resetFilters clears all filter state', () => {
+    vi.useFakeTimers();
+    vi.mocked(discoverMarkets).mockResolvedValue([]);
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useMarketFilters(), { wrapper });
+
+    // Set some filters
+    act(() => {
+      result.current.setSearchText('test');
+      result.current.toggleCategory('crypto');
+      result.current.setSortField('expiresAt');
+    });
+
+    expect(result.current.searchText).toBe('test');
+    expect(result.current.selectedCategories).toEqual(['crypto']);
+    expect(result.current.activeSortField).toBe('expiresAt');
+    expect(result.current.sortOrder).toBe('asc');
+
+    // Reset
+    act(() => {
+      result.current.resetFilters();
+    });
+
+    expect(result.current.searchText).toBe('');
+    expect(result.current.selectedCategories).toEqual([]);
+    expect(result.current.activeSortField).toBe('totalVolume');
+    expect(result.current.sortOrder).toBe('desc');
+  });
+
+  it('clearCategories clears only categories without affecting search or sort', () => {
+    vi.useFakeTimers();
+    vi.mocked(discoverMarkets).mockResolvedValue([]);
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useMarketFilters(), { wrapper });
+
+    // Setup: set searchText, toggle a category, change sort
+    act(() => {
+      result.current.setSearchText('bitcoin');
+      result.current.toggleCategory('crypto');
+      result.current.toggleCategory('politics');
+      result.current.setSortField('expiresAt');
+    });
+
+    expect(result.current.searchText).toBe('bitcoin');
+    expect(result.current.selectedCategories).toEqual(['crypto', 'politics']);
+    expect(result.current.activeSortField).toBe('expiresAt');
+    expect(result.current.sortOrder).toBe('asc');
+
+    // Call clearCategories
+    act(() => {
+      result.current.clearCategories();
+    });
+
+    // Verify: selectedCategories is empty, searchText unchanged, sort unchanged
+    expect(result.current.selectedCategories).toEqual([]);
+    expect(result.current.searchText).toBe('bitcoin');
+    expect(result.current.activeSortField).toBe('expiresAt');
+    expect(result.current.sortOrder).toBe('asc');
+  });
+
+  it('categories config flows to discoveryOptions.categories', () => {
+    vi.mocked(discoverMarkets).mockResolvedValue([]);
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(
+      () => useMarketFilters({ categories: ['crypto', 'politics'] }),
+      { wrapper },
+    );
+
+    expect(result.current.discoveryOptions.categories).toEqual(['crypto', 'politics']);
+  });
+
+  it('availableCategories from config.categories', () => {
+    vi.mocked(discoverMarkets).mockResolvedValue(mockMarketsWithCategories as any);
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(
+      () => useMarketFilters({ categories: ['crypto', 'politics'] }),
+      { wrapper },
+    );
+
+    expect(result.current.availableCategories).toEqual(['crypto', 'politics']);
+  });
+
+  it('availableCategories from featured + metadata', async () => {
+    vi.mocked(discoverMarkets).mockResolvedValue(mockMarketsWithCategories as any);
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(
+      () => useMarketFilters({ featuredCategories: ['politics'] }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    // Featured first, then unique non-featured from metadata
+    expect(result.current.availableCategories[0]).toBe('politics');
+    expect(result.current.availableCategories).toContain('crypto');
+    expect(result.current.availableCategories).toContain('finance');
+    expect(result.current.availableCategories).toContain('science');
+    // No duplicates
+    const unique = new Set(result.current.availableCategories);
+    expect(unique.size).toBe(result.current.availableCategories.length);
+  });
+
+  it('availableCategories from metadata only (no config)', async () => {
+    vi.mocked(discoverMarkets).mockResolvedValue(mockMarketsWithCategories as any);
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useMarketFilters(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    // Should extract all unique categories from metadata
+    expect(result.current.availableCategories).toContain('crypto');
+    expect(result.current.availableCategories).toContain('finance');
+    expect(result.current.availableCategories).toContain('politics');
+    expect(result.current.availableCategories).toContain('science');
+  });
+
+  it('resultCount equals markets.length', async () => {
+    vi.mocked(discoverMarkets).mockResolvedValue(mockMarketsWithCategories as any);
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useMarketFilters(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.resultCount).toBe(3);
+    expect(result.current.resultCount).toBe(result.current.markets.length);
+  });
+
+  it('filterBarProps contains all expected fields', async () => {
+    vi.mocked(discoverMarkets).mockResolvedValue(mockMarketsWithCategories as any);
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useMarketFilters(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    const props = result.current.filterBarProps;
+    expect(props).toHaveProperty('searchText');
+    expect(props).toHaveProperty('onSearchChange');
+    expect(props).toHaveProperty('onSearchClear');
+    expect(props).toHaveProperty('availableCategories');
+    expect(props).toHaveProperty('selectedCategories');
+    expect(props).toHaveProperty('onToggleCategory');
+    expect(props).toHaveProperty('onClearCategories');
+    expect(props).toHaveProperty('sortOptions');
+    expect(props).toHaveProperty('activeSortField');
+    expect(props).toHaveProperty('sortOrder');
+    expect(props).toHaveProperty('onSortFieldChange');
+    expect(props).toHaveProperty('onSortOrderToggle');
+    expect(props).toHaveProperty('resultCount');
+    expect(props).toHaveProperty('loading');
+    expect(props).toHaveProperty('onReset');
+    expect(typeof props.onSearchChange).toBe('function');
+    expect(typeof props.onSearchClear).toBe('function');
+    expect(typeof props.onToggleCategory).toBe('function');
+    expect(typeof props.onClearCategories).toBe('function');
+    expect(typeof props.onSortFieldChange).toBe('function');
+    expect(typeof props.onSortOrderToggle).toBe('function');
+    expect(typeof props.onReset).toBe('function');
+    expect(props.resultCount).toBe(3);
+  });
 });

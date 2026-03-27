@@ -1,0 +1,118 @@
+---
+title: "MarketFilterBar"
+sidebar_position: 5
+description: "MarketFilterBar widget providing search, category chips, and sort controls for market discovery."
+---
+
+# MarketFilterBar
+
+**`MarketFilterBar`**
+
+Presentational filter bar component providing search input, category filter chips, sort dropdown, sort order toggle, and result count. Designed to be driven by `useMarketFilters` -- spread its `filterBarProps` directly.
+
+```tsx
+import { MarketFilterBar } from '@functionspace/ui';
+```
+
+**CSS class:** `fs-market-filter-bar`
+
+**Props:**
+
+| Prop | Type | Default | Description |
+| ---- | ---- | ------- | ----------- |
+| `searchText` | `string` | required | Current search input value |
+| `onSearchChange` | `(text: string) => void` | required | Called on every keystroke |
+| `onSearchClear` | `() => void` | required | Called when the clear button is clicked |
+| `searchPlaceholder` | `string` | `'Search markets...'` | Placeholder text for the search input |
+| `availableCategories` | `string[]` | required | Categories to display as filter chips |
+| `selectedCategories` | `string[]` | required | Currently active category filters |
+| `onToggleCategory` | `(category: string) => void` | required | Called when a category chip is clicked |
+| `featuredCategories` | `string[]?` | -- | Categories to display first in the chip row |
+| `sortOptions` | `SortOption[]` | required | Options for the sort dropdown |
+| `activeSortField` | `string` | required | Currently active sort field |
+| `sortOrder` | `'asc' \| 'desc'` | required | Current sort direction |
+| `onSortFieldChange` | `(field: string) => void` | required | Called when sort dropdown changes |
+| `onSortOrderToggle` | `() => void` | required | Called when sort order button is clicked |
+| `resultCount` | `number` | required | Number of matching markets |
+| `loading` | `boolean?` | -- | Adds a loading modifier class |
+| `onReset` | `() => void` | required | Reset all filters (search, categories, sort) to initial state |
+| `onClearCategories` | `(() => void)?` | -- | Clear category selection only. When provided, the "All" chip calls this instead of `onReset` |
+| `maxWidth` | `string?` | `'100%'` | CSS max-width for the filter bar container |
+
+**Layout:**
+
+The filter bar renders three rows:
+
+1. **Search row** -- text input with a search icon and a clear button (visible when text is entered).
+2. **Category chips row** -- an "All" chip (clears category selection via `onClearCategories` if provided, otherwise falls back to `onReset`) followed by one chip per category. Active chips receive the `fs-market-filter-chip-active` class. When `featuredCategories` is provided, those categories appear first.
+3. **Info row** -- result count on the left (`"N markets"`), sort dropdown and sort order toggle on the right.
+
+**Behavior:**
+
+* Requires `FunctionSpaceProvider` ancestor (throws if missing).
+* When `loading` is `true`, the root element gets the `fs-market-filter-loading` class.
+* Category names are capitalized for display (first letter uppercase).
+* The sort order button shows an up arrow for ascending and a down arrow for descending.
+
+**Example -- driven by useMarketFilters:**
+
+```tsx
+import { FunctionSpaceProvider, useMarketFilters } from '@functionspace/react';
+import { MarketFilterBar, MarketList } from '@functionspace/ui';
+
+function MarketBrowser() {
+  const { markets, loading, error, filterBarProps } = useMarketFilters({
+    state: 'open',
+    pollInterval: 10000,
+  });
+
+  return (
+    <div>
+      <MarketFilterBar {...filterBarProps} />
+      <MarketList
+        markets={markets}
+        loading={loading}
+        error={error}
+        onSelect={(id) => console.log('Selected:', id)}
+      />
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <FunctionSpaceProvider config={{ baseUrl: 'https://api.example.com' }} theme="fs-dark">
+      <MarketBrowser />
+    </FunctionSpaceProvider>
+  );
+}
+```
+
+**Example -- with featured categories and custom placeholder:**
+
+```tsx
+import { useMarketFilters } from '@functionspace/react';
+import { MarketFilterBar, MarketList } from '@functionspace/ui';
+
+function FilteredMarkets() {
+  const { markets, loading, error, filterBarProps } = useMarketFilters({
+    state: 'open',
+    featuredCategories: ['sports', 'crypto', 'politics'],
+  });
+
+  return (
+    <div>
+      <MarketFilterBar
+        {...filterBarProps}
+        searchPlaceholder="Find a prediction market..."
+        maxWidth="800px"
+      />
+      <MarketList markets={markets} loading={loading} error={error} />
+    </div>
+  );
+}
+```
+
+**Related:** `useMarketFilters` (state management hook), `MarketOverlay` (uses `MarketFilterBar` internally), `MarketList` (renders the filtered results)
+
+---
