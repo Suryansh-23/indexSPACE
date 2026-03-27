@@ -39,7 +39,7 @@ export async function queryMarketState(
     totalMass,
     poolBalance: data.current_pool,
     participantCount: data.num_positions,
-    totalVolume: data.total_volume ?? 0,
+    totalVolume: (data.total_deposited ?? 0) + (data.total_withdrawn ?? 0),
     positionsOpen: data.positions_currently_open ?? 0,
     config: {
       numBuckets,

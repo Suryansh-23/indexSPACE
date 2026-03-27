@@ -42,7 +42,7 @@ export async function discoverMarkets(
       totalMass,
       poolBalance: item.current_pool,
       participantCount: item.total_positions,
-      totalVolume: item.total_volume ?? 0,
+      totalVolume: (item.total_deposited ?? 0) + (item.total_withdrawn ?? 0),
       positionsOpen: item.open_positions ?? 0,
       config: {
         numBuckets,
