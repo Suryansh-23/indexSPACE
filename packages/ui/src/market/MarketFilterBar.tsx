@@ -1,4 +1,4 @@
-import React, { useContext, useId, useState } from 'react';
+import React, { useContext, useId, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { FunctionSpaceContext } from '@functionspace/react';
 import type { MarketFilterBarProps, SortOption } from '@functionspace/react';
 import '../styles/base.css';
@@ -35,21 +35,65 @@ export function MarketFilterBar(props: MarketFilterBarProps) {
     maxWidth,
   } = props;
 
-  const [categoriesExpanded, setCategoriesExpanded] = useState(false);
+  const [visibleRows, setVisibleRows] = useState(1);
 
-  // Order categories: featured first (if provided), then the rest
-  const orderedCategories = featuredCategories
-    ? [
-        ...featuredCategories.filter(c => availableCategories.includes(c)),
-        ...availableCategories.filter(c => !featuredCategories.includes(c)),
-      ]
-    : availableCategories;
+  // Order categories: featured first (if provided), then the rest; selected promoted to front
+  const orderedCategories = useMemo(() => {
+    const featured = featuredCategories
+      ? [
+          ...featuredCategories.filter(c => availableCategories.includes(c)),
+          ...availableCategories.filter(c => !featuredCategories.includes(c)),
+        ]
+      : availableCategories;
 
-  // When featured categories are provided and there are more available, show only featured unless expanded
-  const hasOverflow = featuredCategories && orderedCategories.length > featuredCategories.length;
-  const visibleCategories = hasOverflow && !categoriesExpanded
-    ? orderedCategories.slice(0, featuredCategories.length)
-    : orderedCategories;
+    const selected = featured.filter(c => selectedCategories.includes(c));
+    const unselected = featured.filter(c => !selectedCategories.includes(c));
+    return [...selected, ...unselected];
+  }, [availableCategories, selectedCategories, featuredCategories]);
+
+  // ResizeObserver measurement
+  const chipContainerRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef({ rowHeight: 0, totalRows: 1 });
+  const [, forceUpdate] = useState(0);
+
+  useEffect(() => {
+    const container = chipContainerRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver(() => {
+      const prevTotal = measureRef.current.totalRows;
+
+      // Temporarily remove max-height to measure full content
+      const prevMaxHeight = container.style.maxHeight;
+      container.style.maxHeight = 'none';
+
+      const scrollHeight = container.scrollHeight;
+      const firstChip = container.firstElementChild as HTMLElement | null;
+      const rowHeight = firstChip ? firstChip.offsetHeight + 8 : 0; // 8px = 0.5rem gap
+      const totalRows = rowHeight > 0 ? Math.ceil(scrollHeight / rowHeight) : 1;
+
+      // Restore max-height
+      container.style.maxHeight = prevMaxHeight;
+
+      measureRef.current = { rowHeight, totalRows };
+
+      if (totalRows !== prevTotal) {
+        forceUpdate(c => c + 1);
+      }
+    });
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  const { rowHeight, totalRows } = measureRef.current;
+  const hasOverflow = totalRows > visibleRows;
+  const maxHeight = rowHeight > 0 ? visibleRows * rowHeight : undefined;
+
+  const handleMoreLess = useCallback(() => {
+    const { totalRows: total } = measureRef.current;
+    setVisibleRows(v => v < total ? v + 1 : 1);
+  }, []);
 
   const rootClassName = `fs-market-filter-bar${loading ? ' fs-market-filter-loading' : ''}`;
 
@@ -88,32 +132,30 @@ export function MarketFilterBar(props: MarketFilterBarProps) {
         )}
       </div>
 
-      {/* Row 2: Category chips */}
-      <div className="fs-market-filter-categories">
-        <button
-          className={`fs-market-filter-chip${selectedCategories.length === 0 ? ' fs-market-filter-chip-active' : ''}`}
-          aria-pressed={selectedCategories.length === 0}
-          onClick={onClearCategories ?? onReset}
-        >
-          All
-        </button>
-        {visibleCategories.map((category) => (
+      {/* Row 2: Category chips + More */}
+      <div className="fs-market-filter-categories-row">
+        <div className="fs-market-filter-categories" ref={chipContainerRef} style={maxHeight ? { maxHeight } : undefined}>
           <button
-            key={category}
-            className={`fs-market-filter-chip${selectedCategories.includes(category) ? ' fs-market-filter-chip-active' : ''}`}
-            aria-pressed={selectedCategories.includes(category)}
-            onClick={() => onToggleCategory(category)}
+            className={`fs-market-filter-chip${selectedCategories.length === 0 ? ' fs-market-filter-chip-active' : ''}`}
+            aria-pressed={selectedCategories.length === 0}
+            onClick={onClearCategories ?? onReset}
           >
-            {capitalize(category)}
+            All
           </button>
-        ))}
-        {hasOverflow && (
-          <button
-            className="fs-market-filter-chip fs-market-filter-chip-more"
-            onClick={() => setCategoriesExpanded(!categoriesExpanded)}
-            aria-expanded={categoriesExpanded}
-          >
-            {categoriesExpanded ? 'Less' : `+${orderedCategories.length - featuredCategories!.length} More`}
+          {orderedCategories.map((category) => (
+            <button
+              key={category}
+              className={`fs-market-filter-chip${selectedCategories.includes(category) ? ' fs-market-filter-chip-active' : ''}`}
+              aria-pressed={selectedCategories.includes(category)}
+              onClick={() => onToggleCategory(category)}
+            >
+              {capitalize(category)}
+            </button>
+          ))}
+        </div>
+        {(hasOverflow || visibleRows > 1) && (
+          <button className="fs-market-filter-chip fs-market-filter-chip-more" onClick={handleMoreLess}>
+            {hasOverflow ? `+${totalRows - visibleRows} More` : 'Less'}
           </button>
         )}
       </div>

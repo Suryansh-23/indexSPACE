@@ -42,7 +42,6 @@ export interface MarketFilterBarProps {
   loading?: boolean;
   onReset: () => void;
   maxWidth?: string;
-  maxVisibleCategories?: number;
 }
 
 const SEARCH_DEBOUNCE_MS = 300;

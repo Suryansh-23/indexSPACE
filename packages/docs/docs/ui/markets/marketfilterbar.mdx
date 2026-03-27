@@ -44,7 +44,7 @@ import { MarketFilterBar } from '@functionspace/ui';
 The filter bar renders three rows:
 
 1. **Search row** -- text input with a search icon and a clear button (visible when text is entered).
-2. **Category chips row** -- an "All" chip (clears category selection via `onClearCategories` if provided, otherwise falls back to `onReset`) followed by one chip per category. Active chips receive the `fs-market-filter-chip-active` class. When `featuredCategories` is provided, those categories appear first.
+2. **Category chips row** -- an "All" chip (clears category selection via `onClearCategories` if provided, otherwise falls back to `onReset`) followed by one chip per category. Active chips receive the `fs-market-filter-chip-active` class. Selected categories are promoted to the front of the row so they remain visible. When `featuredCategories` is provided, those categories appear first within each group. The row defaults to a single line with overflow hidden -- a "+N More" button appears when chips overflow the container. Each click reveals one additional row. A "Less" button collapses back to one row. The overflow responds to container width changes automatically via ResizeObserver.
 3. **Info row** -- result count on the left (`"N markets"`), sort dropdown and sort order toggle on the right.
 
 **Behavior:**

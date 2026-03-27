@@ -2247,10 +2247,20 @@
   color: var(--fs-text);
 }
 
+.fs-market-filter-categories-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
 .fs-market-filter-categories {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  overflow: hidden;
+  transition: max-height var(--fs-transition-speed) ease-out;
+  flex: 1;
+  min-width: 0;
 }
 
 .fs-market-filter-chip {

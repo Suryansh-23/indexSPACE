@@ -2511,9 +2511,20 @@ describe('MarketFilterBar', () => {
     onReset: vi.fn(),
   };
 
+  const mockResizeObserver = vi.fn((_callback: any) => ({
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+  }));
+
   beforeEach(() => {
     vi.clearAllMocks();
     cleanup();
+    vi.stubGlobal('ResizeObserver', mockResizeObserver);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('throws when rendered without FunctionSpaceProvider', () => {
@@ -2697,48 +2708,56 @@ describe('MarketFilterBar', () => {
     expect(mockFilterBarProps.onReset).not.toHaveBeenCalled();
   });
 
-  it('shows +More chip when featuredCategories has fewer than availableCategories', () => {
+  it('selected categories appear before unselected in chip order', () => {
     const wrapper = createWrapper();
     const { container } = render(
       <MarketFilterBar
         {...mockFilterBarProps}
         availableCategories={['crypto', 'politics', 'sports', 'economics', 'science']}
-        featuredCategories={['crypto', 'politics']}
+        selectedCategories={['sports']}
       />,
       { wrapper },
     );
-    const moreChip = container.querySelector('.fs-market-filter-chip-more');
-    expect(moreChip).not.toBeNull();
-    expect(moreChip!.textContent).toBe('+3 More');
-    // Only All + 2 featured + More visible (not the 3 overflow categories)
-    const chips = container.querySelectorAll('.fs-market-filter-chip');
-    expect(chips.length).toBe(4); // All + crypto + politics + More
+    const chips = container.querySelectorAll('.fs-market-filter-categories .fs-market-filter-chip');
+    // First chip is "All", second should be the selected "Sports"
+    const labels = Array.from(chips).map(c => c.textContent);
+    expect(labels[0]).toBe('All');
+    expect(labels[1]).toBe('Sports');
+    // Sports should come before the unselected categories
+    const sportsIdx = labels.indexOf('Sports');
+    const cryptoIdx = labels.indexOf('Crypto');
+    expect(sportsIdx).toBeLessThan(cryptoIdx);
   });
 
-  it('expands categories when +More is clicked', () => {
-    const wrapper = createWrapper();
-    const { container } = render(
-      <MarketFilterBar
-        {...mockFilterBarProps}
-        availableCategories={['crypto', 'politics', 'sports', 'economics', 'science']}
-        featuredCategories={['crypto', 'politics']}
-      />,
-      { wrapper },
-    );
-    const moreChip = container.querySelector('.fs-market-filter-chip-more') as HTMLElement;
-    fireEvent.click(moreChip);
-    // Now all 5 categories + All + Less button visible
-    const chips = container.querySelectorAll('.fs-market-filter-chip');
-    expect(chips.length).toBe(7); // All + 5 categories + Less
-    expect(moreChip.textContent).toBe('Less');
-  });
-
-  it('does not show +More when no featuredCategories provided', () => {
+  it('does not render +More when ResizeObserver reports no overflow', () => {
+    const mockObserver = vi.fn((_cb: any) => ({
+      observe: vi.fn(),
+      unobserve: vi.fn(),
+      disconnect: vi.fn(),
+    }));
+    vi.stubGlobal('ResizeObserver', mockObserver);
     const wrapper = createWrapper();
     const { container } = render(
       <MarketFilterBar {...mockFilterBarProps} />,
       { wrapper },
     );
+    const moreChip = container.querySelector('.fs-market-filter-chip-more');
+    expect(moreChip).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it('all category chips render inside the chip container', () => {
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketFilterBar
+        {...mockFilterBarProps}
+        availableCategories={['crypto', 'politics', 'sports', 'economics', 'science']}
+      />,
+      { wrapper },
+    );
+    // All chips inside the container (All + 5 categories), no +More since no overflow in jsdom
+    const chips = container.querySelectorAll('.fs-market-filter-categories .fs-market-filter-chip');
+    expect(chips.length).toBe(6); // All + 5 categories
     const moreChip = container.querySelector('.fs-market-filter-chip-more');
     expect(moreChip).toBeNull();
   });
