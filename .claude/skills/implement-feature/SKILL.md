@@ -314,6 +314,8 @@ After writing the completion report, present the user with the following prompt 
 > - Plan: `Docs/plans/<feature-name>-plan.md`
 > - Validation: `Docs/plans/<feature-name>-validation/`
 > - Completion report: `Docs/plans/<feature-name>-complete.md`
+>
+> **DO NOT SKIP STEPS. Every step (1 through 6) in implement-feature-review must be executed in order. No exceptions.**
 
 Fill in the actual paths. This gives the review agent full traceability from spec to plan to validation to implementation.
 

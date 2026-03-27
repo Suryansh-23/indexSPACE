@@ -8,6 +8,7 @@ internal_sdk_docs/ui_images/
 .DS_Store
 .vscode/
 .claude/worktrees/
+.superpowers/
 
 # Docusaurus
 packages/docs/build/

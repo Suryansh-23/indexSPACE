@@ -582,9 +582,6 @@ Present the validated plan to the user:
 > [Corrections: any issues found by validators and how they were fixed]
 > [Decisions: any open questions that need user input]
 >
-> **To implement, run:**
-> `/implement-feature Docs/plans/<feature-name>-plan.md`
->
 > **Artifacts produced by this planning session:**
 >
 > - Requirements doc: `Docs/<feature-name>-requirements.md`
@@ -593,6 +590,12 @@ Present the validated plan to the user:
 >
 > The plan references the requirements doc in its "Input Source" section.
 > implement-feature will read both during its own Phase 1.
+>
+> **To implement, run:**
+>
+> `/implement-feature Docs/plans/<feature-name>-plan.md`
+>
+> **DO NOT SKIP STEPS. Every phase (0 through 7) in implement-feature must be executed in order. No exceptions.**
 
 ---
 

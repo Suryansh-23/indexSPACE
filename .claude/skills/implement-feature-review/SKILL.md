@@ -212,4 +212,4 @@ Before presenting the summary, verify the consolidation report contains:
    - Any coverage blind spots (files reviewed by fewer than 2 agents)
    - Whether doc updates are recommended
    - The full path to the review file
-3. Tell the user: "The review is at `{OUTPUT_DIR}/review-{FEATURE_NAME}.md` -- this file can be handed to another agent with `/implement-feature` for remediation."
+3. Tell the user: "The review is at `{OUTPUT_DIR}/review-{FEATURE_NAME}.md` -- this file can be handed to another agent with `/implement-feature` for remediation. **DO NOT SKIP STEPS. Every phase (0 through 7) in implement-feature must be executed in order. No exceptions.**"
