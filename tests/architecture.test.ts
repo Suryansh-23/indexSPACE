@@ -122,7 +122,7 @@ describe('SDK Architecture', () => {
       // State/action hooks and internal helpers don't follow the data-fetching pattern
       const nonDataHooks = ['useAuth', 'useCustomShape', 'useChartZoom', 'useCacheSubscription'];
       // Derived hooks compose other hooks, they don't subscribe to cache directly
-      const derivedHooks = ['useBucketDistribution', 'useDistributionState'];
+      const derivedHooks = ['useBucketDistribution', 'useDistributionState', 'useMarketFilters'];
       // Mutation/preview hooks use useState, not useCacheSubscription
       const mutationHooks = ['useBuy', 'useSell', 'usePreviewPayout', 'usePreviewSell'];
       const excludeHooks = [...nonDataHooks, ...derivedHooks, ...mutationHooks];
@@ -230,12 +230,16 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('useSell');
       expect(indexContent).toContain('usePreviewPayout');
       expect(indexContent).toContain('usePreviewSell');
+      expect(indexContent).toContain('useMarketFilters');
 
       // Return types
       expect(indexContent).toContain('UseBuyReturn');
       expect(indexContent).toContain('UseSellReturn');
       expect(indexContent).toContain('UsePreviewPayoutReturn');
       expect(indexContent).toContain('UsePreviewSellReturn');
+      expect(indexContent).toContain('UseMarketFiltersReturn');
+      expect(indexContent).toContain('MarketFilterBarProps');
+      expect(indexContent).toContain('SortOption');
     });
 
     it('chart zoom types and helper are exported from react package', () => {
@@ -318,8 +322,11 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('CustomShapeEditor');
       expect(indexContent).toContain('MarketCard');
       expect(indexContent).toContain('MarketList');
+      expect(indexContent).toContain('MarketOverlay');
+      expect(indexContent).toContain('MarketFilterBar');
       expect(indexContent).toContain('MarketCardProps');
       expect(indexContent).toContain('MarketListProps');
+      expect(indexContent).toContain('MarketOverlayProps');
     });
 
     it('AuthWidget is exported from ui package', () => {

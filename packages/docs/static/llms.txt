@@ -1380,6 +1380,94 @@ function TradingView({ marketId, onBack }: { marketId: number; onBack: () => voi
 
 ---
 
+#### `MarketOverlay`
+
+Compound widget that combines market discovery with a slide-over overlay panel. Internally uses `useMarketFilters` to manage search, category, and sort state, renders a `MarketFilterBar` and `MarketList`, and opens an `Overlay` when a market is selected. The consumer provides a render prop that receives the selected `marketId`.
+
+**Import:**
+
+```tsx
+import { MarketOverlay } from '@functionspace/ui';
+```
+
+**Props:**
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `(marketId: number) => React.ReactNode` | required | Render prop receiving the selected market ID |
+| `state` | `string?` | -- | Filter by resolution state (e.g., `'open'`) |
+| `categories` | `string[]?` | -- | Fixed list of available categories |
+| `pollInterval` | `number?` | -- | Polling interval in ms for refreshing market data |
+| `emptyMessage` | `string` | `'No markets found'` | Custom empty state text |
+| `showFilterBar` | `boolean` | `true` | Show or hide the MarketFilterBar |
+| `featuredCategories` | `string[]?` | -- | Categories to display first in filter chips |
+| `sortOptions` | `SortOption[]?` | 5 defaults | Custom sort options for the filter bar |
+| `searchPlaceholder` | `string?` | `'Search markets...'` | Placeholder text for the search input |
+| `filterBarMaxWidth` | `string?` | -- | CSS max-width for the filter bar |
+
+**Minimal example:**
+
+```tsx
+import { FunctionSpaceProvider } from '@functionspace/react';
+import { MarketOverlay, MarketCharts, TradePanel } from '@functionspace/ui';
+
+function App() {
+  return (
+    <FunctionSpaceProvider config={{ baseUrl: 'https://api.example.com' }} theme="fs-dark">
+      <MarketOverlay state="open" featuredCategories={['sports', 'crypto']}>
+        {(marketId) => (
+          <>
+            <MarketCharts marketId={marketId} />
+            <TradePanel marketId={marketId} />
+          </>
+        )}
+      </MarketOverlay>
+    </FunctionSpaceProvider>
+  );
+}
+```
+
+**Layout swapping:** If you need full-page navigation instead of an overlay panel, use `MarketList` directly with the state-driven or route-driven patterns above.
+
+---
+
+#### `MarketFilterBar`
+
+Presentational filter bar providing search input, category filter chips, sort dropdown, and result count. Designed to be driven by `useMarketFilters` -- spread its `filterBarProps` directly.
+
+**Import:**
+
+```tsx
+import { MarketFilterBar } from '@functionspace/ui';
+```
+
+**Props:** `searchText`, `onSearchChange`, `onSearchClear`, `searchPlaceholder?`, `availableCategories`, `selectedCategories`, `onToggleCategory`, `featuredCategories?`, `sortOptions`, `activeSortField`, `sortOrder`, `onSortFieldChange`, `onSortOrderToggle`, `resultCount`, `loading?`, `onReset`, `maxWidth?`.
+
+All required props are provided by the `filterBarProps` bundle from `useMarketFilters`.
+
+**Example:**
+
+```tsx
+import { useMarketFilters } from '@functionspace/react';
+import { MarketFilterBar, MarketList } from '@functionspace/ui';
+
+function MarketBrowser() {
+  const { markets, loading, error, filterBarProps } = useMarketFilters({
+    state: 'open',
+    pollInterval: 10000,
+  });
+
+  return (
+    <div>
+      <MarketFilterBar {...filterBarProps} />
+      <MarketList markets={markets} loading={loading} error={error} />
+    </div>
+  );
+}
+```
+
+---
+
 #### `AuthWidget`
 
 Self-contained authentication widget handling login, signup, and logout flows. Reads all auth state from context -- no required props.
@@ -1806,6 +1894,7 @@ import type { FSContext } from '@functionspace/react';
 import {
   useMarket,
   useMarkets,
+  useMarketFilters,
   useConsensus,
   usePositions,
   useTradeHistory,
@@ -1972,6 +2061,65 @@ function MarketBrowser() {
         <li key={m.marketId}>{m.title} -- Pool: ${m.poolBalance.toFixed(2)}</li>
       ))}
     </ul>
+  );
+}
+```
+
+#### `useMarketFilters(config?)`
+
+Manages search, category filtering, and sorting state on top of `useMarkets`. Debounces search (300ms), returns filtered markets plus a `filterBarProps` bundle for `MarketFilterBar`.
+
+```typescript
+function useMarketFilters(
+  config?: UseMarketFiltersConfig,
+): UseMarketFiltersReturn
+```
+
+**Config:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `categories` | `string[]?` | -- | Fixed list of categories (overrides metadata-derived) |
+| `featuredCategories` | `string[]?` | -- | Categories to display first |
+| `sortOptions` | `SortOption[]?` | 5 defaults | Custom sort options (`{ field, label, defaultOrder? }`) |
+| `defaultSortField` | `string?` | `'totalVolume'` | Initial sort field |
+| `defaultSortOrder` | `'asc' \| 'desc'?` | `'desc'` | Initial sort direction |
+| `pollInterval` | `number?` | -- | Polling interval in ms |
+| `enabled` | `boolean?` | `true` | When `false`, suppresses fetching |
+| `state` | `string?` | -- | Filter by resolution state |
+
+**Key return fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `markets` | `MarketState[]` | Filtered, sorted results |
+| `loading` | `boolean` | `true` only on first fetch |
+| `filterBarProps` | `MarketFilterBarProps` | Pre-built props bundle -- spread onto `MarketFilterBar` |
+| `searchText` | `string` | Current search input |
+| `selectedCategories` | `string[]` | Active category filters |
+| `activeSortField` | `string` | Current sort field |
+| `sortOrder` | `'asc' \| 'desc'` | Current sort direction |
+| `resultCount` | `number` | Number of matching markets |
+| `setSearchText`, `clearSearch`, `toggleCategory`, `setSortField`, `toggleSortOrder`, `resetFilters` | functions | Individual filter actions |
+
+**Example:**
+
+```tsx
+import { useMarketFilters } from '@functionspace/react';
+import { MarketFilterBar, MarketList } from '@functionspace/ui';
+
+function MarketBrowser() {
+  const { markets, loading, error, filterBarProps } = useMarketFilters({
+    state: 'open',
+    featuredCategories: ['sports', 'crypto'],
+    pollInterval: 10000,
+  });
+
+  return (
+    <div>
+      <MarketFilterBar {...filterBarProps} />
+      <MarketList markets={markets} loading={loading} error={error} />
+    </div>
   );
 }
 ```
@@ -4498,7 +4646,7 @@ These rules apply to all full-app generation scenarios. Violating them produces 
 
 2. **NEVER add a second `FunctionSpaceProvider` for nested routes.** A single provider at the app root is correct. Multiple providers create independent client instances, independent auth state, and independent preview coordination. Widgets in different providers cannot communicate. The only valid use of multiple providers is rendering completely independent market views on the same page (e.g., a showcase with multiple layouts).
 
-3. **NEVER place SDK widgets outside the provider tree.** Every widget calls `useContext(FunctionSpaceContext)` internally and throws an explicit error if the context is null: `"<WidgetName> must be used within FunctionSpaceProvider"`. This includes chart components, trading components, `MarketStats`, `MarketCard`, `MarketList`, `PositionTable`, `TimeSales`, and `AuthWidget`.
+3. **NEVER place SDK widgets outside the provider tree.** Every widget calls `useContext(FunctionSpaceContext)` internally and throws an explicit error if the context is null: `"<WidgetName> must be used within FunctionSpaceProvider"`. This includes chart components, trading components, `MarketStats`, `MarketCard`, `MarketList`, `MarketFilterBar`, `MarketOverlay`, `PositionTable`, `TimeSales`, and `AuthWidget`.
 
 4. **NEVER use monorepo workspace references in production builds.** Do not add `resolve.alias` entries mapping `@functionspace/*` to local `packages/` paths. This pattern is only for the SDK's own monorepo development. Published packages resolve automatically from `node_modules`.
 

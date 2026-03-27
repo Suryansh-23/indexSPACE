@@ -108,7 +108,7 @@ Every new function must be classifiable by both layer AND category. This keeps t
 | Edit docs search config | `packages/docs/docusaurus.config.js` (`themes` array, `@easyops-cn/docusaurus-search-local`) |
 | Edit docs SDK integration | `packages/docs/src/plugins/sdk-webpack-plugin.js`, `packages/docs/src/theme/Root.tsx` |
 | Update AI context files | `packages/docs/static/llms.txt`, `core.txt`, `react.txt`, `ui.txt` |
-| Exported types from react | `CacheConfig`, `QueryOptions`, `FSContext`, `FSThemeInput`, `ChartColors`, `FanBandColors`, `ThemePresetId`, `FSTheme`, `ResolvedFSTheme`, `DistributionState`, `DistributionStateConfig`, `ChartZoomOptions`, `ChartZoomResult`, `UseCustomShapeReturn`, `UseBuyReturn`, `UseSellReturn`, `UsePreviewPayoutReturn`, `UsePreviewSellReturn`, `FunctionSpaceProviderProps`, `PasswordlessLoginResult`, `MarketDiscoveryOptions` |
+| Exported types from react | `CacheConfig`, `QueryOptions`, `FSContext`, `FSThemeInput`, `ChartColors`, `FanBandColors`, `ThemePresetId`, `FSTheme`, `ResolvedFSTheme`, `DistributionState`, `DistributionStateConfig`, `ChartZoomOptions`, `ChartZoomResult`, `UseCustomShapeReturn`, `UseBuyReturn`, `UseSellReturn`, `UsePreviewPayoutReturn`, `UsePreviewSellReturn`, `FunctionSpaceProviderProps`, `PasswordlessLoginResult`, `MarketDiscoveryOptions`, `SortOption`, `UseMarketFiltersConfig`, `UseMarketFiltersReturn`, `MarketFilterBarProps` |
 
 ## Testing Requirements
 
@@ -239,7 +239,7 @@ Multi-agent adversarial review of recent implementation work. Invoked manually w
 ## Deferred Work
 
 - **Prediction field cleanup.** `Position.prediction` and `TradeEntry.prediction` remain on the types. `buy()` still accepts `options.prediction` (deprecated, not sent to server). `useBuy` does not forward it. Removal was deferred -- when picked up, remove fields from both types, remove the option from `buy()`, remove Prediction columns from PositionTable/TimeSales, and update consumer docs.
-- **Context-level marketId.** Pattern B (embedded overlay) may need `marketId` on `FunctionSpaceContext` so all mounted widgets react to market selection changes. Deferred until Pattern B is planned -- current components use `onSelect` callbacks instead.
+- **Context-level marketId.** Phase 2B (MarketOverlay) uses render props and `onSelect` callbacks for market selection. A context-level `marketId` on `FunctionSpaceContext` was not needed for this pattern. Remains deferred as a potential future enhancement if multiple independent widgets need to react to market selection changes simultaneously across the widget tree.
 
 ## Commit Style
 

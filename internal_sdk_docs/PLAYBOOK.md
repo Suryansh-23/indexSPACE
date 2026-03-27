@@ -196,7 +196,10 @@ Example:
 .fs-passwordless-auth,
 .fs-custom-shape,
 .fs-market-card,
-.fs-market-list {          /* ← add new widget roots here */
+.fs-market-list,
+.fs-overlay-panel,
+.fs-market-filter-bar,
+.fs-market-overlay {       /* ← add new widget roots here */
   --fs-primary-glow: color-mix(in srgb, var(--fs-primary) 20%, transparent);
   --fs-primary-light: color-mix(in srgb, var(--fs-primary) 80%, white);
   --fs-header-gradient: color-mix(in srgb, var(--fs-primary) 15%, transparent);
@@ -361,6 +364,7 @@ export function MyChart({ data }: { data: any[] }) {
 | `usePreviewPayout(marketId)` | `{ execute, loading, error, reset }` | Preview hook -- wraps `previewPayoutCurve()` from core. Manages own AbortController. No auto-invalidation. |
 | `usePreviewSell(marketId)` | `{ execute, loading, error, reset }` | Preview hook -- wraps `previewSell()` from core. Accepts optional caller-provided `AbortSignal`. No auto-invalidation. |
 | `useMarkets(options?)` | `{ markets, loading, isFetching, error, refetch }` | Market listing with optional filtering/sorting. Options combine `MarketDiscoveryOptions` (state, titleContains, categories, filters, sortBy, sortOrder, limit) and `QueryOptions` (pollInterval, enabled). |
+| `useMarketFilters(config?)` | `{ markets, loading, isFetching, error, refetch, searchText, selectedCategories, activeSortField, sortOrder, resultCount, setSearchText, clearSearch, toggleCategory, setSortField, toggleSortOrder, resetFilters, availableCategories, sortOptions, filterBarProps, discoveryOptions }` | Search, category, and sort state on top of `useMarkets`. Config: `categories?`, `featuredCategories?`, `sortOptions?`, `defaultSortField?`, `defaultSortOrder?`, `pollInterval?`, `enabled?`, `state?`. Returns a memoized `filterBarProps` bundle for `MarketFilterBar`. |
 
 **useChartZoom invariants:** The hook cancels any pending `requestAnimationFrame` before applying a reset (via `resetTrigger` change, `fullXDomain` value change, `reset()`, or `onDoubleClick`). This prevents a race where a wheel event fired milliseconds before a reset would re-apply the zoomed domain one frame later. Pass a stable (memoized) `fullXDomain`  -- the hook resets zoom when its value changes. When the chart container has a second ref (Pattern B, e.g. `CustomShapeEditor`), create a callback ref that assigns to both refs and spread individual handlers from `containerProps` rather than using `{...containerProps}`.
 
@@ -749,6 +753,8 @@ onSuccess?.(result);       // Notify parent
 | `MarketStats` | Stats display | Minimal, read-only |
 | `MarketCard` | Single market summary card | Presentational -- receives `MarketState` as prop, no internal data fetching. Displays title, consensusMean, volume, pool, positions, status badge, resolution date. `onSelect` callback. |
 | `MarketList` | Responsive grid of MarketCards | Presentational -- receives `MarketState[]` as prop. Loading (skeleton cards), error, empty, and data states. Passes `onSelect` through to cards. |
+| `MarketFilterBar` | Search, category chips, sort controls | Presentational filter bar driven by `useMarketFilters`. Spread `filterBarProps` from the hook. Props: `searchText`, `onSearchChange`, `onSearchClear`, `searchPlaceholder?`, `availableCategories`, `selectedCategories`, `onToggleCategory`, `featuredCategories?`, `sortOptions`, `activeSortField`, `sortOrder`, `onSortFieldChange`, `onSortOrderToggle`, `resultCount`, `loading?`, `onReset`, `maxWidth?`. |
+| `MarketOverlay` | Browse-and-trade overlay | Compound widget combining `MarketFilterBar` + `MarketList` + `Overlay`. Uses `useMarketFilters` internally. Render prop `children(marketId)` for panel content. Props: `state?`, `categories?`, `pollInterval?`, `emptyMessage?`, `showFilterBar?`, `featuredCategories?`, `sortOptions?`, `searchPlaceholder?`, `filterBarMaxWidth?`. |
 | `ConsensusChart` | Consensus PDF visualization | Standalone chart, reads context for overlays |
 | `DistributionChart` | Distribution bar chart | Standalone chart with bucket slider |
 | `TimelineChart` | Fan chart (percentile bands over time) | Standalone chart, fetches own history data (see note below) |
@@ -1138,12 +1144,15 @@ packages/
     ├── market/               # Read-only market info
     │   ├── index.ts
     │   ├── MarketCard.tsx
+    │   ├── MarketFilterBar.tsx
     │   ├── MarketList.tsx
+    │   ├── MarketOverlay.tsx
     │   ├── MarketStats.tsx
     │   ├── PositionTable.tsx
     │   └── TimeSales.tsx
     └── components/           # Internal UI primitives (NOT exported from package root)
         ├── index.ts
+        ├── Overlay.tsx
         ├── Slider.tsx
         └── RangeSlider.tsx
 
@@ -1193,6 +1202,6 @@ packages/docs/            # Docusaurus documentation site
 |--------|---------|----------|
 | `charts/` | Data visualizations | ConsensusChart, DistributionChart, TimelineChart, MarketCharts |
 | `trading/` | User input/actions | TradePanel, ShapeCutter, BinaryPanel, BucketRangeSelector, BucketTradePanel |
-| `market/` | Read-only market info | MarketCard, MarketList, MarketStats, PositionTable, TimeSales |
+| `market/` | Read-only market info | MarketCard, MarketList, MarketOverlay, MarketStats, PositionTable, TimeSales |
 | `auth/` | Authentication | AuthWidget (login/signup forms), PasswordlessAuthWidget (username-only login with modal, auto-signup, silent re-auth) |
-| `components/` | Internal UI primitives (not exported from package root) | Slider, RangeSlider (rc-slider wrappers with consistent styling) |
+| `components/` | Internal UI primitives (not exported from package root) | Slider, RangeSlider (rc-slider wrappers with consistent styling), Overlay (reusable modal shell) |

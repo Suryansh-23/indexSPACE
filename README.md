@@ -115,6 +115,7 @@ import { FunctionSpaceProvider } from '@functionspace/react';
 | `useChartZoom(options)` | `{ containerRef, xDomain, yDomain, isZoomed, isPanning, containerProps, reset }` | Zoom and pan interaction for charts |
 | `useCustomShape(market)` | `{ controlValues, pVector, prediction, setControlValue, toggleLock, ... }` | Custom shape editing with draggable control points |
 | `useMarkets(options?)` | `{ markets, loading, error, refetch }` | Market discovery with filtering, sorting, limiting |
+| `useMarketFilters(config?)` | `{ markets, loading, filterBarProps, ... }` | Search, category, sort state on top of useMarkets |
 
 **Theme System** -- Pass a preset string or a custom color scheme. The provider resolves 30 CSS tokens and chart-specific color values, making them available to all widgets automatically. See [Theming](#theming) for full documentation.
 
@@ -151,6 +152,8 @@ Pre-built React components organized by purpose. Each widget is self-contained -
 | `TimeSales` | `marketId` | Real-time trade log |
 | `MarketCard` | `market`, `onSelect?` | Summary card for a single market (title, consensus mean, volume, liquidity, traders, status) |
 | `MarketList` | `markets`, `onSelect?`, `loading?` | Scrollable list of MarketCards for market discovery |
+| `MarketFilterBar` | `...filterBarProps` | Search, category chips, sort controls -- driven by `useMarketFilters` |
+| `MarketOverlay` | `children`, `state?`, `showFilterBar?`, `featuredCategories?`, ... | Browse-and-trade overlay with filter bar, MarketList, and slide-over panel |
 
 **Auth** (`auth/`)
 
@@ -402,6 +405,6 @@ packages/
     ├── styles/base.css        All widget styles (CSS variables only)
     ├── charts/               ConsensusChart, DistributionChart, TimelineChart, MarketCharts
     ├── trading/              TradePanel, ShapeCutter, BinaryPanel, BucketRangeSelector, BucketTradePanel, CustomShapeEditor
-    ├── market/               MarketStats, PositionTable, TimeSales
+    ├── market/               MarketStats, MarketFilterBar, MarketOverlay, PositionTable, TimeSales
     └── auth/                 AuthWidget
 ```

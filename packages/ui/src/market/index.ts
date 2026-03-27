@@ -8,3 +8,6 @@ export { PositionTable } from './PositionTable.js';
 export type { PositionTableProps, PositionTabId } from './PositionTable.js';
 export { TimeSales } from './TimeSales.js';
 export type { TimeSalesProps } from './TimeSales.js';
+export { MarketOverlay } from './MarketOverlay.js';
+export type { MarketOverlayProps } from './MarketOverlay.js';
+export { MarketFilterBar } from './MarketFilterBar.js';

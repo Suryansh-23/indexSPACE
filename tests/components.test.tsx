@@ -112,6 +112,7 @@ vi.mock('@functionspace/core', () => ({
   sell: vi.fn().mockResolvedValue({ collateralReturned: 95 }),
   previewPayoutCurve: vi.fn().mockResolvedValue({ maxPayout: 200, previews: [] }),
   previewSell: vi.fn().mockResolvedValue({ collateralReturned: 95 }),
+  discoverMarkets: vi.fn(),
 }));
 
 import { FunctionSpaceProvider } from '../packages/react/src';
@@ -120,6 +121,8 @@ import {
   MarketStats,
   MarketCard,
   MarketList,
+  MarketOverlay,
+  MarketFilterBar,
   TimeSales,
   ConsensusChart,
   DistributionChart,
@@ -134,6 +137,7 @@ import {
   PositionTable,
   AuthWidget,
 } from '../packages/ui/src';
+import { Overlay } from '../packages/ui/src/components/Overlay';
 import {
   queryMarketState,
   getConsensusCurve,
@@ -145,6 +149,7 @@ import {
   loginUser,
   signupUser,
   previewPayoutCurve,
+  discoverMarkets,
 } from '@functionspace/core';
 
 const mockConfig = {
@@ -227,6 +232,7 @@ function setupMocksForData() {
   vi.mocked(queryMarketPositions).mockResolvedValue(mockPositions as any);
   vi.mocked(queryTradeHistory).mockResolvedValue(mockTrades as any);
   vi.mocked(queryMarketHistory).mockResolvedValue(mockHistory as any);
+  vi.mocked(discoverMarkets).mockResolvedValue([mockMarketForCard] as any);
 }
 
 function setupMocksForLoading() {
@@ -235,6 +241,7 @@ function setupMocksForLoading() {
   vi.mocked(queryMarketPositions).mockImplementation(() => new Promise(() => {}));
   vi.mocked(queryTradeHistory).mockImplementation(() => new Promise(() => {}));
   vi.mocked(queryMarketHistory).mockImplementation(() => new Promise(() => {}));
+  vi.mocked(discoverMarkets).mockReturnValue(new Promise(() => {}) as any);
 }
 
 function setupMocksForError() {
@@ -243,6 +250,7 @@ function setupMocksForError() {
   vi.mocked(queryMarketPositions).mockRejectedValue(new Error('API Error'));
   vi.mocked(queryTradeHistory).mockRejectedValue(new Error('API Error'));
   vi.mocked(queryMarketHistory).mockRejectedValue(new Error('API Error'));
+  vi.mocked(discoverMarkets).mockRejectedValue(new Error('API Error'));
 }
 
 describe('PasswordlessAuthWidget', () => {
@@ -2030,5 +2038,708 @@ describe('MarketList', () => {
     const { container } = render(<MarketList markets={[mockMarketForCard] as any} />, { wrapper });
     const results = await axe(container);
     expect(results).toHaveNoViolations();
+  });
+});
+
+// ── Overlay (internal primitive) ──
+
+describe('Overlay', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    cleanup();
+    document.body.style.overflow = '';
+  });
+
+  it('renders nothing when open=false', () => {
+    const { container } = render(
+      <Overlay open={false} onClose={vi.fn()}>
+        <span>Content</span>
+      </Overlay>,
+    );
+    expect(container.querySelector('.fs-overlay-backdrop')).toBeNull();
+  });
+
+  it('renders backdrop and panel when open=true', () => {
+    const { container } = render(
+      <Overlay open={true} onClose={vi.fn()}>
+        <span>Content</span>
+      </Overlay>,
+    );
+    expect(container.querySelector('.fs-overlay-backdrop')).not.toBeNull();
+    expect(container.querySelector('.fs-overlay-panel')).not.toBeNull();
+  });
+
+  it('renders title in header as h2', () => {
+    const { container } = render(
+      <Overlay open={true} onClose={vi.fn()} title="Test Title">
+        <span>Content</span>
+      </Overlay>,
+    );
+    const heading = container.querySelector('h2');
+    expect(heading).not.toBeNull();
+    expect(heading!.textContent).toBe('Test Title');
+  });
+
+  it('renders children in body', () => {
+    const { container } = render(
+      <Overlay open={true} onClose={vi.fn()}>
+        <span>Child Content</span>
+      </Overlay>,
+    );
+    expect(container.textContent).toContain('Child Content');
+  });
+
+  it('calls onClose on backdrop click', () => {
+    const onClose = vi.fn();
+    const { container } = render(
+      <Overlay open={true} onClose={onClose}>
+        <span>Content</span>
+      </Overlay>,
+    );
+    const backdrop = container.querySelector('.fs-overlay-backdrop') as HTMLElement;
+    fireEvent.click(backdrop);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT call onClose on panel click', () => {
+    const onClose = vi.fn();
+    const { container } = render(
+      <Overlay open={true} onClose={onClose}>
+        <span>Content</span>
+      </Overlay>,
+    );
+    const panel = container.querySelector('.fs-overlay-panel') as HTMLElement;
+    fireEvent.click(panel);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('calls onClose on close button click', () => {
+    const onClose = vi.fn();
+    const { container } = render(
+      <Overlay open={true} onClose={onClose}>
+        <span>Content</span>
+      </Overlay>,
+    );
+    const closeBtn = container.querySelector('.fs-overlay-close') as HTMLElement;
+    fireEvent.click(closeBtn);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onClose on Escape key', () => {
+    const onClose = vi.fn();
+    render(
+      <Overlay open={true} onClose={onClose}>
+        <span>Content</span>
+      </Overlay>,
+    );
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('sets role=dialog and aria-modal on panel', () => {
+    const { container } = render(
+      <Overlay open={true} onClose={vi.fn()}>
+        <span>Content</span>
+      </Overlay>,
+    );
+    const panel = container.querySelector('.fs-overlay-panel') as HTMLElement;
+    expect(panel.getAttribute('role')).toBe('dialog');
+    expect(panel.getAttribute('aria-modal')).toBe('true');
+  });
+
+  it('locks body scroll when open and restores on close', () => {
+    const { unmount } = render(
+      <Overlay open={true} onClose={vi.fn()}>
+        <span>Content</span>
+      </Overlay>,
+    );
+    expect(document.body.style.overflow).toBe('hidden');
+    unmount();
+    expect(document.body.style.overflow).not.toBe('hidden');
+  });
+
+  it('unmounts without errors', () => {
+    const { unmount } = render(
+      <Overlay open={true} onClose={vi.fn()}>
+        <span>Content</span>
+      </Overlay>,
+    );
+    expect(() => unmount()).not.toThrow();
+  });
+
+  it('accessibility audit', async () => {
+    const { container } = render(
+      <main>
+        <Overlay open={true} onClose={vi.fn()} title="Accessible Overlay">
+          <span>Content</span>
+        </Overlay>
+      </main>,
+    );
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+
+  it('traps focus within panel on Tab', () => {
+    const { container } = render(
+      <Overlay open={true} onClose={vi.fn()} title="Trap Test">
+        <button>First</button>
+        <button>Second</button>
+      </Overlay>
+    );
+    const closeBtn = container.querySelector('.fs-overlay-close') as HTMLElement;
+    const firstBtn = container.querySelector('button:not(.fs-overlay-close)') as HTMLElement; // "First" button
+    // Focus the last focusable element (Second button)
+    const buttons = container.querySelectorAll('button');
+    const lastBtn = buttons[buttons.length - 1] as HTMLElement;
+    lastBtn.focus();
+    // Tab should wrap to close button (first focusable in panel)
+    fireEvent.keyDown(lastBtn, { key: 'Tab' });
+    // Focus should have wrapped (the handler calls preventDefault and focuses first)
+    expect(document.activeElement).toBe(closeBtn);
+  });
+});
+
+// ── MarketOverlay ──
+
+describe('MarketOverlay', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    cleanup();
+    document.body.style.overflow = '';
+  });
+
+  it('throws when rendered without FunctionSpaceProvider', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => {
+      render(<MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>);
+    }).toThrow('MarketOverlay must be used within FunctionSpaceProvider');
+    spy.mockRestore();
+  });
+
+  it('renders MarketList on mount', async () => {
+    setupMocksForData();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-market-card')).not.toBeNull();
+    });
+  });
+
+  it('shows loading state', () => {
+    setupMocksForLoading();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
+      { wrapper },
+    );
+    expect(container.querySelector('.fs-skeleton')).not.toBeNull();
+  });
+
+  it('shows error state', async () => {
+    setupMocksForError();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.textContent).toContain('API Error');
+    });
+  });
+
+  it('shows default empty message', async () => {
+    vi.mocked(discoverMarkets).mockResolvedValue([]);
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.textContent).toContain('No markets found');
+    });
+  });
+
+  it('shows custom empty message', async () => {
+    vi.mocked(discoverMarkets).mockResolvedValue([]);
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketOverlay emptyMessage="Custom">{(id) => <div>Layout {id}</div>}</MarketOverlay>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.textContent).toContain('Custom');
+    });
+  });
+
+  it('opens overlay when card is clicked', async () => {
+    setupMocksForData();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-market-card')).not.toBeNull();
+    });
+    const card = container.querySelector('.fs-market-card') as HTMLElement;
+    fireEvent.click(card);
+    await waitFor(() => {
+      expect(container.querySelector('.fs-overlay-backdrop')).not.toBeNull();
+    });
+  });
+
+  it('passes marketId to children render prop', async () => {
+    setupMocksForData();
+    const wrapper = createWrapper();
+    const childFn = vi.fn().mockReturnValue(<div>Layout</div>);
+    const { container } = render(
+      <MarketOverlay>{childFn}</MarketOverlay>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-market-card')).not.toBeNull();
+    });
+    const card = container.querySelector('.fs-market-card') as HTMLElement;
+    fireEvent.click(card);
+    await waitFor(() => {
+      expect(childFn).toHaveBeenCalledWith(mockMarketForCard.marketId);
+    });
+  });
+
+  it('shows market title in overlay header', async () => {
+    setupMocksForData();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-market-card')).not.toBeNull();
+    });
+    const card = container.querySelector('.fs-market-card') as HTMLElement;
+    fireEvent.click(card);
+    await waitFor(() => {
+      const heading = container.querySelector('h2');
+      expect(heading).not.toBeNull();
+      expect(heading!.textContent).toBe('Test Market');
+    });
+  });
+
+  it('closes overlay on backdrop click', async () => {
+    setupMocksForData();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-market-card')).not.toBeNull();
+    });
+    fireEvent.click(container.querySelector('.fs-market-card') as HTMLElement);
+    await waitFor(() => {
+      expect(container.querySelector('.fs-overlay-backdrop')).not.toBeNull();
+    });
+    fireEvent.click(container.querySelector('.fs-overlay-backdrop') as HTMLElement);
+    await waitFor(() => {
+      expect(container.querySelector('.fs-overlay-backdrop')).toBeNull();
+    });
+  });
+
+  it('closes overlay on Escape key', async () => {
+    setupMocksForData();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-market-card')).not.toBeNull();
+    });
+    fireEvent.click(container.querySelector('.fs-market-card') as HTMLElement);
+    await waitFor(() => {
+      expect(container.querySelector('.fs-overlay-backdrop')).not.toBeNull();
+    });
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => {
+      expect(container.querySelector('.fs-overlay-backdrop')).toBeNull();
+    });
+  });
+
+  it('closes overlay on close button', async () => {
+    setupMocksForData();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-market-card')).not.toBeNull();
+    });
+    fireEvent.click(container.querySelector('.fs-market-card') as HTMLElement);
+    await waitFor(() => {
+      expect(container.querySelector('.fs-overlay-close')).not.toBeNull();
+    });
+    fireEvent.click(container.querySelector('.fs-overlay-close') as HTMLElement);
+    await waitFor(() => {
+      expect(container.querySelector('.fs-overlay-backdrop')).toBeNull();
+    });
+  });
+
+  it('MarketList remains mounted while overlay is open', async () => {
+    setupMocksForData();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-market-card')).not.toBeNull();
+    });
+    fireEvent.click(container.querySelector('.fs-market-card') as HTMLElement);
+    await waitFor(() => {
+      expect(container.querySelector('.fs-overlay-backdrop')).not.toBeNull();
+    });
+    // Both the market card and overlay should be present simultaneously
+    expect(container.querySelector('.fs-market-card')).not.toBeNull();
+    expect(container.querySelector('.fs-overlay-backdrop')).not.toBeNull();
+  });
+
+  it('passes state prop through to discoverMarkets', async () => {
+    vi.mocked(discoverMarkets).mockResolvedValue([mockMarketForCard] as any);
+    const wrapper = createWrapper();
+    render(
+      <MarketOverlay state="open">{(id) => <div>Layout {id}</div>}</MarketOverlay>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(vi.mocked(discoverMarkets)).toHaveBeenCalled();
+    });
+    const callArgs = vi.mocked(discoverMarkets).mock.calls[0];
+    expect(callArgs[1]).toEqual(expect.objectContaining({ state: 'open' }));
+  });
+
+  it('passes categories prop through to discoverMarkets', async () => {
+    vi.mocked(discoverMarkets).mockResolvedValue([mockMarketForCard] as any);
+    const wrapper = createWrapper();
+    render(
+      <MarketOverlay categories={['crypto', 'politics']}>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(vi.mocked(discoverMarkets)).toHaveBeenCalled();
+    });
+    const callArgs = vi.mocked(discoverMarkets).mock.calls[0];
+    expect(callArgs[1]).toEqual(expect.objectContaining({ categories: ['crypto', 'politics'] }));
+  });
+
+  it('renders MarketFilterBar by default (showFilterBar=true)', async () => {
+    setupMocksForData();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-market-filter-bar')).not.toBeNull();
+    });
+  });
+
+  it('does not render MarketFilterBar when showFilterBar=false', async () => {
+    setupMocksForData();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketOverlay showFilterBar={false}>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-market-card')).not.toBeNull();
+    });
+    expect(container.querySelector('.fs-market-filter-bar')).toBeNull();
+  });
+
+  it('unmounts without errors', async () => {
+    setupMocksForData();
+    const wrapper = createWrapper();
+    const { unmount } = render(
+      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
+      { wrapper },
+    );
+    await act(async () => {});
+    expect(() => unmount()).not.toThrow();
+  });
+
+  it('accessibility audit', async () => {
+    setupMocksForData();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <main>
+        <MarketOverlay showFilterBar={false}>{(id) => <div>Layout {id}</div>}</MarketOverlay>
+      </main>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-market-card')).not.toBeNull();
+    });
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+});
+
+// ── MarketFilterBar ──
+
+describe('MarketFilterBar', () => {
+  const mockFilterBarProps = {
+    searchText: '',
+    onSearchChange: vi.fn(),
+    onSearchClear: vi.fn(),
+    availableCategories: ['crypto', 'politics', 'sports'],
+    selectedCategories: [] as string[],
+    onToggleCategory: vi.fn(),
+    sortOptions: [
+      { field: 'totalVolume', label: 'Volume', defaultOrder: 'desc' as const },
+      { field: 'createdAt', label: 'Newest', defaultOrder: 'desc' as const },
+    ],
+    activeSortField: 'totalVolume',
+    sortOrder: 'desc' as const,
+    onSortFieldChange: vi.fn(),
+    onSortOrderToggle: vi.fn(),
+    resultCount: 24,
+    loading: false,
+    onReset: vi.fn(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    cleanup();
+  });
+
+  it('throws when rendered without FunctionSpaceProvider', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => {
+      render(<MarketFilterBar {...mockFilterBarProps} />);
+    }).toThrow('MarketFilterBar must be used within FunctionSpaceProvider');
+    spy.mockRestore();
+  });
+
+  it('renders search input with default placeholder "Search markets..."', () => {
+    const wrapper = createWrapper();
+    const { container } = render(<MarketFilterBar {...mockFilterBarProps} />, { wrapper });
+    const input = container.querySelector('input') as HTMLInputElement;
+    expect(input).not.toBeNull();
+    expect(input.placeholder).toBe('Search markets...');
+  });
+
+  it('renders custom placeholder when provided', () => {
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketFilterBar {...mockFilterBarProps} searchPlaceholder="Find a market..." />,
+      { wrapper },
+    );
+    const input = container.querySelector('input') as HTMLInputElement;
+    expect(input.placeholder).toBe('Find a market...');
+  });
+
+  it('renders category chips for each availableCategories', () => {
+    const wrapper = createWrapper();
+    const { container } = render(<MarketFilterBar {...mockFilterBarProps} />, { wrapper });
+    const chips = container.querySelectorAll('.fs-market-filter-chip');
+    // "All" chip + 3 category chips
+    expect(chips.length).toBe(4);
+  });
+
+  it('"All" chip has aria-pressed="true" when selectedCategories empty', () => {
+    const wrapper = createWrapper();
+    const { container } = render(<MarketFilterBar {...mockFilterBarProps} />, { wrapper });
+    const chips = container.querySelectorAll('.fs-market-filter-chip');
+    const allChip = chips[0] as HTMLElement;
+    expect(allChip.textContent).toBe('All');
+    expect(allChip.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('category chip has aria-pressed="true" when in selectedCategories', () => {
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketFilterBar {...mockFilterBarProps} selectedCategories={['crypto']} />,
+      { wrapper },
+    );
+    const chips = container.querySelectorAll('.fs-market-filter-chip');
+    // Find the crypto chip
+    const cryptoChip = Array.from(chips).find(c => c.textContent === 'Crypto') as HTMLElement;
+    expect(cryptoChip).toBeDefined();
+    expect(cryptoChip.getAttribute('aria-pressed')).toBe('true');
+    // "All" chip should NOT be active
+    const allChip = chips[0] as HTMLElement;
+    expect(allChip.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('clicking category chip calls onToggleCategory with category name', () => {
+    const onToggleCategory = vi.fn();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketFilterBar {...mockFilterBarProps} onToggleCategory={onToggleCategory} />,
+      { wrapper },
+    );
+    const chips = container.querySelectorAll('.fs-market-filter-chip');
+    // Click the "Crypto" chip (index 1, since 0 is "All")
+    const cryptoChip = Array.from(chips).find(c => c.textContent === 'Crypto') as HTMLElement;
+    fireEvent.click(cryptoChip);
+    expect(onToggleCategory).toHaveBeenCalledWith('crypto');
+  });
+
+  it('typing in search input calls onSearchChange', () => {
+    const onSearchChange = vi.fn();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketFilterBar {...mockFilterBarProps} onSearchChange={onSearchChange} />,
+      { wrapper },
+    );
+    const input = container.querySelector('input') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'bitcoin' } });
+    expect(onSearchChange).toHaveBeenCalledWith('bitcoin');
+  });
+
+  it('clear button visible when searchText non-empty, calls onSearchClear', () => {
+    const onSearchClear = vi.fn();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketFilterBar {...mockFilterBarProps} searchText="bitcoin" onSearchClear={onSearchClear} />,
+      { wrapper },
+    );
+    const clearBtn = container.querySelector('.fs-market-filter-search-clear') as HTMLElement;
+    expect(clearBtn).not.toBeNull();
+    fireEvent.click(clearBtn);
+    expect(onSearchClear).toHaveBeenCalled();
+  });
+
+  it('sort select shows option labels', () => {
+    const wrapper = createWrapper();
+    const { container } = render(<MarketFilterBar {...mockFilterBarProps} />, { wrapper });
+    const select = container.querySelector('select') as HTMLSelectElement;
+    expect(select).not.toBeNull();
+    const options = select.querySelectorAll('option');
+    expect(options.length).toBe(2);
+    expect(options[0].textContent).toBe('Volume');
+    expect(options[1].textContent).toBe('Newest');
+  });
+
+  it('changing sort select calls onSortFieldChange', () => {
+    const onSortFieldChange = vi.fn();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketFilterBar {...mockFilterBarProps} onSortFieldChange={onSortFieldChange} />,
+      { wrapper },
+    );
+    const select = container.querySelector('select') as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: 'createdAt' } });
+    expect(onSortFieldChange).toHaveBeenCalledWith('createdAt');
+  });
+
+  it('sort order button calls onSortOrderToggle', () => {
+    const onSortOrderToggle = vi.fn();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketFilterBar {...mockFilterBarProps} onSortOrderToggle={onSortOrderToggle} />,
+      { wrapper },
+    );
+    const sortOrderBtn = container.querySelector('.fs-market-filter-sort-order') as HTMLElement;
+    fireEvent.click(sortOrderBtn);
+    expect(onSortOrderToggle).toHaveBeenCalled();
+  });
+
+  it('result count shows "24 markets"', () => {
+    const wrapper = createWrapper();
+    const { container } = render(<MarketFilterBar {...mockFilterBarProps} />, { wrapper });
+    const count = container.querySelector('.fs-market-filter-count');
+    expect(count).not.toBeNull();
+    expect(count!.textContent).toBe('24 markets');
+  });
+
+  it('unmounts without errors', () => {
+    const wrapper = createWrapper();
+    const { unmount } = render(<MarketFilterBar {...mockFilterBarProps} />, { wrapper });
+    expect(() => unmount()).not.toThrow();
+  });
+
+  it('accessibility audit', async () => {
+    const wrapper = createWrapper();
+    const { container } = render(
+      <main>
+        <MarketFilterBar {...mockFilterBarProps} />
+      </main>,
+      { wrapper },
+    );
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+
+  it('applies loading class when loading=true', () => {
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketFilterBar {...mockFilterBarProps} loading={true} />,
+      { wrapper },
+    );
+    expect(container.querySelector('.fs-market-filter-loading')).not.toBeNull();
+  });
+
+  it('All chip calls onClearCategories when provided', () => {
+    const onClearCategories = vi.fn();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketFilterBar {...mockFilterBarProps} onClearCategories={onClearCategories} />,
+      { wrapper },
+    );
+    const allChip = container.querySelector('.fs-market-filter-chip');
+    fireEvent.click(allChip!);
+    expect(onClearCategories).toHaveBeenCalledTimes(1);
+    expect(mockFilterBarProps.onReset).not.toHaveBeenCalled();
+  });
+
+  it('shows +More chip when featuredCategories has fewer than availableCategories', () => {
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketFilterBar
+        {...mockFilterBarProps}
+        availableCategories={['crypto', 'politics', 'sports', 'economics', 'science']}
+        featuredCategories={['crypto', 'politics']}
+      />,
+      { wrapper },
+    );
+    const moreChip = container.querySelector('.fs-market-filter-chip-more');
+    expect(moreChip).not.toBeNull();
+    expect(moreChip!.textContent).toBe('+3 More');
+    // Only All + 2 featured + More visible (not the 3 overflow categories)
+    const chips = container.querySelectorAll('.fs-market-filter-chip');
+    expect(chips.length).toBe(4); // All + crypto + politics + More
+  });
+
+  it('expands categories when +More is clicked', () => {
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketFilterBar
+        {...mockFilterBarProps}
+        availableCategories={['crypto', 'politics', 'sports', 'economics', 'science']}
+        featuredCategories={['crypto', 'politics']}
+      />,
+      { wrapper },
+    );
+    const moreChip = container.querySelector('.fs-market-filter-chip-more') as HTMLElement;
+    fireEvent.click(moreChip);
+    // Now all 5 categories + All + Less button visible
+    const chips = container.querySelectorAll('.fs-market-filter-chip');
+    expect(chips.length).toBe(7); // All + 5 categories + Less
+    expect(moreChip.textContent).toBe('Less');
+  });
+
+  it('does not show +More when no featuredCategories provided', () => {
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketFilterBar {...mockFilterBarProps} />,
+      { wrapper },
+    );
+    const moreChip = container.querySelector('.fs-market-filter-chip-more');
+    expect(moreChip).toBeNull();
   });
 });

@@ -201,6 +201,60 @@ Never create a second provider for nested routes.
 
 See [MarketCard](./markets/marketcard) and [MarketList](./markets/marketlist) for props reference.
 
+#### Embedded Market Discovery
+
+`MarketOverlay` provides a self-contained browse-and-trade flow using an overlay panel. It manages search, category, and sort state internally via `useMarketFilters`, renders a `MarketFilterBar` and `MarketList`, and opens a slide-over panel when a card is clicked. You supply the trading UI via a render prop:
+
+```tsx
+<FunctionSpaceProvider config={config} theme="fs-dark">
+  <MarketOverlay state="open" featuredCategories={['sports', 'crypto']}>
+    {(marketId) => (
+      <>
+        <MarketCharts marketId={marketId} />
+        <TradePanel marketId={marketId} />
+      </>
+    )}
+  </MarketOverlay>
+</FunctionSpaceProvider>
+```
+
+If you need full-page navigation instead of an overlay, use the state-driven or route-driven patterns above with `MarketList` directly.
+
+See [MarketOverlay](./markets/marketoverlay) for props reference.
+
+#### Market Filter Bar
+
+`MarketFilterBar` is a presentational filter component providing search, category chips, and sort controls. It is driven by the `useMarketFilters` hook, which manages all filter state and returns a `filterBarProps` bundle that can be spread directly onto the component.
+
+This pattern is useful when you want filter controls without the `MarketOverlay` wrapper -- for example, in a custom page layout or alongside your own list rendering.
+
+```tsx
+import { useMarketFilters } from '@functionspace/react';
+import { MarketFilterBar, MarketList } from '@functionspace/ui';
+
+function CustomMarketBrowser() {
+  const { markets, loading, error, filterBarProps } = useMarketFilters({
+    state: 'open',
+    featuredCategories: ['sports', 'crypto', 'politics'],
+    pollInterval: 10000,
+  });
+
+  return (
+    <div>
+      <MarketFilterBar {...filterBarProps} searchPlaceholder="Find a market..." />
+      <MarketList
+        markets={markets}
+        loading={loading}
+        error={error}
+        onSelect={(id) => console.log('Selected:', id)}
+      />
+    </div>
+  );
+}
+```
+
+The hook also exposes individual filter actions (`setSearchText`, `toggleCategory`, `setSortField`, etc.) for building fully custom filter UIs without `MarketFilterBar`. See [useMarketFilters](../react/markets/usemarketfilters) and [MarketFilterBar](./markets/marketfilterbar) for full API reference.
+
 #### Three-Phase Trade Pattern
 
 Every trading widget follows the same execution pattern:
