@@ -137,6 +137,7 @@ The following capabilities are fully implemented and production-ready:
 - **Complete position management.** `PositionTable` with tabbed views (open orders, trade history, market positions), sell actions, pagination, and P&L display.
 - **Query cache with request deduplication.** All data-fetching hooks share a `QueryCache` owned by the Provider. Same cache key from multiple components produces one API request. Cache supports staleness, garbage collection, and targeted/global invalidation.
 - **System-wide polling.** All data-fetching hooks accept `pollInterval` via `QueryOptions`. Polling is visibility-aware (pauses when tab is hidden) and deduplicated (per cache key, not per hook instance).
+- **Configurable retry with backoff.** Data-fetching hooks retry transient errors (5xx, network) with exponential backoff. Configure globally via `cache={{ defaultRetry: 3 }}` on the Provider, or per-hook via `options.retry`. Mutation hooks (buy/sell) never retry. 4xx errors fail immediately.
 - **Stale-while-revalidate.** Background refetches return cached data with `isFetching: true` -- no loading spinners during polling or invalidation. `loading` is true only on the first fetch.
 - **Focus and reconnect revalidation.** Cache entries automatically revalidate when the tab regains focus or network reconnects. Configurable via `CacheConfig`.
 - **Six distinct trading interfaces.** `TradePanel` (Gaussian/range), `ShapeCutter` (8 preset shapes), `BinaryPanel` (yes/no), `BucketRangeSelector` (click-to-select buckets), `BucketTradePanel` (composed chart + bucket selector), and `CustomShapeEditor` (drag-to-draw).
@@ -340,7 +341,8 @@ The `FunctionSpaceProvider` component also accepts these optional props:
 |------|------|----------|-------------|
 | `config` | `FSConfig` | Yes | Configuration object (see table above) |
 | `theme` | `FSThemeInput` | No | Theme preset string or custom theme object |
-| `cache` | `CacheConfig` | No | Cache configuration: `{ staleTime?, gcTime?, defaultPollInterval?, revalidateOnFocus?, revalidateOnReconnect? }` |
+| `cache` | `CacheConfig` | No | Cache configuration: `{ staleTime?, gcTime?, defaultPollInterval?, revalidateOnFocus?, revalidateOnReconnect?, defaultRetry?, defaultRetryDelay? }`. `defaultRetry` (number, default 0) sets retry count for transient errors (5xx, network). `defaultRetryDelay` (number or `(attempt) => number`, default exponential backoff capped at 30s) controls delay between retries. |
+| `portalSupport` | `boolean` | No | When `true`, injects theme CSS variables into `document.head` via a scoped class. Enables portaled components to inherit theming. Use `useThemeClass()` to retrieve the class name. Default: `false`. |
 | `storedUsername` | `string \| null` | No | Previously stored username for silent re-authentication on mount |
 
 ### 4.2 Theming
@@ -1832,7 +1834,8 @@ The `FunctionSpaceProvider` component also accepts these optional props (outside
 
 | Prop | Type | Required | Description |
 |------|------|----------|-------------|
-| `cache` | `CacheConfig` | No | Cache configuration: `{ staleTime?, gcTime?, defaultPollInterval?, revalidateOnFocus?, revalidateOnReconnect? }` |
+| `cache` | `CacheConfig` | No | Cache configuration: `{ staleTime?, gcTime?, defaultPollInterval?, revalidateOnFocus?, revalidateOnReconnect?, defaultRetry?, defaultRetryDelay? }`. `defaultRetry` (number, default 0) sets retry count for transient errors (5xx, network). `defaultRetryDelay` (number or `(attempt) => number`, default exponential backoff capped at 30s) controls delay between retries. |
+| `portalSupport` | `boolean` | No | When `true`, injects theme CSS variables into `document.head` via a scoped class. Enables portaled components to inherit theming. Use `useThemeClass()` to retrieve the class name. Default: `false`. |
 | `storedUsername` | `string \| null` | No | Previously stored username for silent re-authentication on mount |
 
 #### Import Map
@@ -1935,7 +1938,7 @@ const config = {
 
 ### 5.2 Data Hooks Reference
 
-All data-fetching hooks follow a consistent contract. Each returns an object with a named data property, plus `loading`, `isFetching`, `error`, and `refetch`. All data hooks subscribe to the query cache and automatically refetch when `ctx.invalidate(marketId)` is called. All data hooks accept optional `QueryOptions` (`pollInterval`, `enabled`) for cache-based polling and conditional fetching.
+All data-fetching hooks follow a consistent contract. Each returns an object with a named data property, plus `loading`, `isFetching`, `error`, and `refetch`. All data hooks subscribe to the query cache and automatically refetch when `ctx.invalidate(marketId)` is called. All data hooks accept optional `QueryOptions` (`pollInterval`, `enabled`, `retry`, `retryDelay`) for cache-based polling, conditional fetching, and configurable retry with exponential backoff. `retry` sets the number of attempts (default: 0, inherited from `CacheConfig.defaultRetry`). `retryDelay` sets the delay in ms or a function `(attempt) => ms` (default: exponential backoff `min(1000 * 2^attempt, 30000)`). Only transient errors (5xx, network) are retried; 4xx errors fail immediately.
 
 **`loading` vs `isFetching`:** `loading` is `true` only on the first fetch (no cached data). On background refetches (polling, invalidation), `loading` stays `false` and `isFetching` is `true`. This prevents UI flicker during polling and background refetches.
 
@@ -1963,6 +1966,8 @@ function useMarket(
 | `marketId` | `string \| number` | The market identifier |
 | `options.pollInterval` | `number?` | Polling interval in ms. Default: `0` (no polling). |
 | `options.enabled` | `boolean?` | When `false`, suppresses fetching. Default: `true`. |
+| `options.retry` | `number?` | Number of retry attempts for transient errors. Default: `0`. |
+| `options.retryDelay` | `number \| RetryDelayFn?` | Retry delay in ms or function. Default: `min(1000 * 2^attempt, 30000)`. |
 
 **Return shape:**
 
@@ -2029,6 +2034,8 @@ function useMarkets(
 | `options.limit` | `number?` | Maximum number of results |
 | `options.pollInterval` | `number?` | Polling interval in ms. Default: `0` (no polling). |
 | `options.enabled` | `boolean?` | When `false`, suppresses fetching. Default: `true`. |
+| `options.retry` | `number?` | Number of retry attempts for transient errors. Default: `0`. |
+| `options.retryDelay` | `number \| RetryDelayFn?` | Retry delay in ms or function. Default: `min(1000 * 2^attempt, 30000)`. |
 
 **Return shape:**
 
@@ -2150,6 +2157,8 @@ function useConsensus(
 | `numPoints` | `number` | `200` | Number of sample points for the density curve |
 | `options.pollInterval` | `number?` | `0` | Polling interval in ms. |
 | `options.enabled` | `boolean?` | `true` | When `false`, suppresses fetching. |
+| `options.retry` | `number?` | `0` | Number of retry attempts for transient errors. |
+| `options.retryDelay` | `number \| RetryDelayFn?` | exponential | Retry delay in ms or function. Default: `min(1000 * 2^attempt, 30000)`. |
 
 **Return shape:**
 
@@ -2214,6 +2223,8 @@ function usePositions(
 | `username` | `string` | `undefined` | When provided, filters positions to this user only. When omitted, returns all market positions. |
 | `options.pollInterval` | `number?` | `0` | Polling interval in ms. |
 | `options.enabled` | `boolean?` | `true` | When `false`, suppresses fetching. |
+| `options.retry` | `number?` | `0` | Number of retry attempts for transient errors. |
+| `options.retryDelay` | `number \| RetryDelayFn?` | exponential | Retry delay in ms or function. Default: `min(1000 * 2^attempt, 30000)`. |
 
 **Return shape:**
 
@@ -2286,6 +2297,8 @@ function useTradeHistory(
 | `options.limit` | `number` | `100` | Maximum number of trade entries to return |
 | `options.pollInterval` | `number` | `0` | Polling interval in ms. Visibility-aware and deduplicated. |
 | `options.enabled` | `boolean?` | `true` | When `false`, suppresses fetching. |
+| `options.retry` | `number?` | `0` | Number of retry attempts for transient errors. |
+| `options.retryDelay` | `number \| RetryDelayFn?` | exponential | Retry delay in ms or function. Default: `min(1000 * 2^attempt, 30000)`. |
 
 **Return shape:**
 
@@ -2354,6 +2367,8 @@ function useMarketHistory(
 | `options.limit` | `number` | `undefined` | Maximum number of snapshots to return |
 | `options.pollInterval` | `number` | `0` | Polling interval in ms. Visibility-aware and deduplicated. |
 | `options.enabled` | `boolean?` | `true` | When `false`, suppresses fetching. |
+| `options.retry` | `number?` | `0` | Number of retry attempts for transient errors. |
+| `options.retryDelay` | `number \| RetryDelayFn?` | exponential | Retry delay in ms or function. Default: `min(1000 * 2^attempt, 30000)`. |
 
 **Return shape:**
 
@@ -3289,6 +3304,39 @@ function PositionValues({ marketId }: { marketId: string }) {
         );
       })}
     </ul>
+  );
+}
+```
+
+---
+
+### 5.6.5 Utility Hooks
+
+#### `useThemeClass()`
+
+Returns the scoped CSS class name for portal theme support.
+
+```typescript
+function useThemeClass(): string
+```
+
+Requires `portalSupport={true}` on `FunctionSpaceProvider`. Apply the returned class name to portal containers (e.g., modal roots, popover wrappers) so portaled SDK widgets inherit theme CSS variables.
+
+Throws if:
+- Called outside a `FunctionSpaceProvider`
+- Called when `portalSupport` is not enabled on the Provider
+
+**Example:**
+
+```tsx
+import { useThemeClass } from '@functionspace/react';
+import { createPortal } from 'react-dom';
+
+function Modal({ children }) {
+  const themeClass = useThemeClass();
+  return createPortal(
+    <div className={themeClass}>{children}</div>,
+    document.body
   );
 }
 ```

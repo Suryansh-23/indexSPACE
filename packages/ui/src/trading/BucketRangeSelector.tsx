@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useContext, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useContext, useCallback, useMemo, useId } from 'react';
 import {
   generateRange,
 } from '@functionspace/core';
@@ -28,6 +28,8 @@ export function BucketRangeSelector({
 }: BucketRangeSelectorProps) {
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('BucketRangeSelector must be used within FunctionSpaceProvider');
+
+  const amountId = useId();
 
   // Use shared state if provided, otherwise create own
   const ownState = useDistributionState(marketId, { defaultBucketCount });
@@ -341,9 +343,9 @@ export function BucketRangeSelector({
 
       <form className="fs-trade-form" onSubmit={handleSubmit}>
         <div className="fs-input-group">
-          <label htmlFor="fs-bucket-amount">Amount (USDC)</label>
+          <label htmlFor={amountId}>Amount (USDC)</label>
           <input
-            id="fs-bucket-amount"
+            id={amountId}
             type="number"
             step="0.01"
             min="1"

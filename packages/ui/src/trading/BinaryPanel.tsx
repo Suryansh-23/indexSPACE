@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useContext, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useContext, useMemo, useId } from 'react';
 import {
   generateRange,
   computeStatistics,
@@ -35,6 +35,7 @@ export function BinaryPanel({
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('BinaryPanel must be used within FunctionSpaceProvider');
 
+  const amountId = useId();
   const { market, loading, error: marketError } = useMarket(marketId);
   const { execute: submitBuy, loading: isSubmitting, error: buyError } = useBuy(marketId);
   const { execute: previewPayout } = usePreviewPayout(marketId);
@@ -313,9 +314,9 @@ export function BinaryPanel({
       {side && (
         <form className="fs-trade-form" onSubmit={handleSubmit}>
           <div className="fs-input-group">
-            <label htmlFor={`fs-binary-amount-${marketId}`}>Amount (USDC)</label>
+            <label htmlFor={amountId}>Amount (USDC)</label>
             <input
-              id={`fs-binary-amount-${marketId}`}
+              id={amountId}
               type="number"
               step="0.01"
               min="1"

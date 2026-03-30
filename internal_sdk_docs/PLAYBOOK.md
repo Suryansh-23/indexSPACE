@@ -350,7 +350,7 @@ export function MyChart({ data }: { data: any[] }) {
 | Hook | Returns | Use For |
 |------|---------|---------|
 | `useMarket(marketId, options?)` | `{ market, loading, isFetching, error, refetch }` | Market metadata, config, state. Accepts `QueryOptions` (`pollInterval`, `enabled`). |
-| `useConsensus(marketId, points?, options?)` | `{ consensus, loading, isFetching, error, refetch }` | Probability density curves. Accepts `QueryOptions`. |
+| `useConsensus(marketId, points?, options?)` | `{ consensus, loading, isFetching, error, refetch }` | Probability density curves. Derives from market cache via `select` transform (no separate API call). Accepts `QueryOptions`. |
 | `usePositions(marketId, username?, options?)` | `{ positions, loading, isFetching, error, refetch }` | Positions -- filtered by `username` when provided, all positions when omitted. Client-side filtering after cache. Accepts `QueryOptions`. |
 | `useMarketHistory(marketId, options?)` | `{ history, loading, isFetching, error, refetch }` | Alpha vector snapshots over time (timeline fan chart). Options include `limit`, `pollInterval`, `enabled`. |
 | `useTradeHistory(marketId, options?)` | `{ trades, loading, isFetching, error, refetch }` | Trade history entries. Options include `limit`, `pollInterval`, `enabled`. |
@@ -365,6 +365,7 @@ export function MyChart({ data }: { data: any[] }) {
 | `usePreviewSell(marketId)` | `{ execute, loading, error, reset }` | Preview hook -- wraps `previewSell()` from core. Accepts optional caller-provided `AbortSignal`. No auto-invalidation. |
 | `useMarkets(options?)` | `{ markets, loading, isFetching, error, refetch }` | Market listing with optional filtering/sorting. Options combine `MarketDiscoveryOptions` (state, titleContains, categories, filters, sortBy, sortOrder, limit) and `QueryOptions` (pollInterval, enabled). |
 | `useMarketFilters(config?)` | `{ markets, loading, isFetching, error, refetch, searchText, selectedCategories, activeSortField, sortOrder, resultCount, setSearchText, clearSearch, toggleCategory, setSortField, toggleSortOrder, resetFilters, availableCategories, sortOptions, filterBarProps, discoveryOptions }` | Search, category, and sort state on top of `useMarkets`. Config: `categories?`, `featuredCategories?`, `sortOptions?`, `defaultSortField?`, `defaultSortOrder?`, `pollInterval?`, `enabled?`, `state?`. Returns a memoized `filterBarProps` bundle for `MarketFilterBar`. |
+| `useThemeClass()` | `string` | Returns the scoped CSS class name for portal containers. Requires `portalSupport={true}` on the Provider. Throws if used outside Provider or without portal support enabled. |
 
 **useChartZoom invariants:** The hook cancels any pending `requestAnimationFrame` before applying a reset (via `resetTrigger` change, `fullXDomain` value change, `reset()`, or `onDoubleClick`). This prevents a race where a wheel event fired milliseconds before a reset would re-apply the zoomed domain one frame later. Pass a stable (memoized) `fullXDomain`  -- the hook resets zoom when its value changes. When the chart container has a second ref (Pattern B, e.g. `CustomShapeEditor`), create a callback ref that assigns to both refs and spread individual handlers from `containerProps` rather than using `{...containerProps}`.
 
@@ -808,7 +809,7 @@ When adding a new tabbed widget, follow this exact pattern  -- do not invent a d
 - [ ] Uses `FunctionSpaceContext` for client access
 - [ ] Uses `useCacheSubscription` for data fetching (subscribes to cache via `useSyncExternalStore`)
 - [ ] Returns `{ <named>, loading, isFetching, error, refetch }` pattern (named property matches hook purpose)
-- [ ] Accepts optional `QueryOptions` (`pollInterval`, `enabled`) for cache-based polling and conditional fetching.
+- [ ] Accepts optional `QueryOptions` (`pollInterval`, `enabled`, `retry`, `retryDelay`) for cache-based polling, conditional fetching, and configurable retry with exponential backoff.
 - [ ] `loading` is true only on first fetch (no cached data); `isFetching` is true whenever a request is in flight
 - [ ] Exported from `packages/react/src/index.ts`
 - [ ] **Add tests to `hooks.test.tsx` (context check, loading, success, error)**

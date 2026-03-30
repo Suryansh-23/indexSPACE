@@ -76,13 +76,16 @@ Every new function must be classifiable by both layer AND category. This keeps t
 | Widgets must check `FunctionSpaceContext` | Throws helpful error if provider missing |
 | Data-fetching hooks return `{ <named>, loading, isFetching, error, refetch }` | Named property matches hook purpose. `loading` is true only on first fetch (no cached data). `isFetching` is true whenever a request is in flight (first fetch or background refetch). State/action hooks (e.g. `useAuth`, `useCustomShape`) return context fields directly. |
 | Data-fetching hooks use `useCacheSubscription`, not local `useState` | Hooks subscribe to the query cache via `useSyncExternalStore`. No per-hook `useState` for data/loading/error. |
-| Data-fetching hooks accept optional `QueryOptions` (`pollInterval`, `enabled`). | All data-fetching hooks support cache-based polling and conditional fetching. |
+| Data-fetching hooks accept optional `QueryOptions` (`pollInterval`, `enabled`, `retry`, `retryDelay`). | All data-fetching hooks support cache-based polling, conditional fetching, and configurable retry with exponential backoff. |
 | Hooks must provide `getServerSnapshot` for SSR | `useCacheSubscription` provides a frozen idle snapshot for server-side rendering. |
 | Export types separately | `export type { Props }` for proper tree-shaking |
 | Chart content components can fetch their own data | TimelineChartContent calls `useMarketHistory` internally  -- avoids wasteful fetches when tab is hidden |
 | Docs `Root.tsx` SSR fallback must NOT wrap in `FunctionSpaceProvider` | `FunctionSpaceProvider` blocks rendering during SSR (`providerReady` depends on `useEffect`), producing empty HTML that breaks search indexing, SEO, and accessibility |
 | UI components must NOT import `buy`, `sell`, `previewPayoutCurve`, or `previewSell` from core | Use mutation hooks (`useBuy`, `useSell`, `usePreviewPayout`, `usePreviewSell`) from `@functionspace/react` instead. Direct core imports bypass state management and auto-invalidation. |
 | Mutation hooks return `{ execute, loading, error, reset }` | Distinct from data-fetching hooks which return `{ <named>, loading, isFetching, error, refetch }`. Mutation hooks use local `useState`, not `useCacheSubscription`. |
+| No hardcoded DOM `id` attributes in UI components | Use React's `useId()` for all `id`, `htmlFor`, SVG gradient ids. Prevents collisions when multiple instances mount. Architecture test enforces this. |
+| Portal support via `useThemeClass()` | When `portalSupport={true}` on Provider, theme CSS vars are injected into `document.head` via scoped class. `useThemeClass()` returns the class name for portal containers. |
+| Activity-proof subscriber tracking | QueryCache tracks subscriber activity via `subscriberActivity` Map. Poll timers pause when all subscribers are inactive (tab hidden). |
 
 ## File Locations
 
@@ -108,7 +111,7 @@ Every new function must be classifiable by both layer AND category. This keeps t
 | Edit docs search config | `packages/docs/docusaurus.config.js` (`themes` array, `@easyops-cn/docusaurus-search-local`) |
 | Edit docs SDK integration | `packages/docs/src/plugins/sdk-webpack-plugin.js`, `packages/docs/src/theme/Root.tsx` |
 | Update AI context files | `packages/docs/static/llms.txt`, `core.txt`, `react.txt`, `ui.txt` |
-| Exported types from react | `CacheConfig`, `QueryOptions`, `FSContext`, `FSThemeInput`, `ChartColors`, `FanBandColors`, `ThemePresetId`, `FSTheme`, `ResolvedFSTheme`, `DistributionState`, `DistributionStateConfig`, `ChartZoomOptions`, `ChartZoomResult`, `UseCustomShapeReturn`, `UseBuyReturn`, `UseSellReturn`, `UsePreviewPayoutReturn`, `UsePreviewSellReturn`, `FunctionSpaceProviderProps`, `PasswordlessLoginResult`, `MarketDiscoveryOptions`, `SortOption`, `UseMarketFiltersConfig`, `UseMarketFiltersReturn`, `MarketFilterBarProps` |
+| Exported types from react | `CacheConfig`, `QueryOptions`, `RetryDelayFn`, `FSContext`, `FSThemeInput`, `ChartColors`, `FanBandColors`, `ThemePresetId`, `FSTheme`, `ResolvedFSTheme`, `DistributionState`, `DistributionStateConfig`, `ChartZoomOptions`, `ChartZoomResult`, `UseCustomShapeReturn`, `UseBuyReturn`, `UseSellReturn`, `UsePreviewPayoutReturn`, `UsePreviewSellReturn`, `FunctionSpaceProviderProps`, `PasswordlessLoginResult`, `MarketDiscoveryOptions`, `SortOption`, `UseMarketFiltersConfig`, `UseMarketFiltersReturn`, `MarketFilterBarProps` |
 
 ## Testing Requirements
 

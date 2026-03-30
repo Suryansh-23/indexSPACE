@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useContext, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useContext, useCallback, useId } from 'react';
 import {
   generateGaussian,
   generateRange,
@@ -17,6 +17,7 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy, onE
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('TradePanel must be used within FunctionSpaceProvider');
 
+  const amountId = useId();
   const { market } = useMarket(marketId);
   const { execute: submitBuy, loading: isSubmitting, error: buyError } = useBuy(marketId);
   const { execute: previewPayout } = usePreviewPayout(marketId);
@@ -191,9 +192,9 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy, onE
 
       <form className="fs-trade-form" onSubmit={handleSubmit}>
         <div className="fs-input-group">
-          <label htmlFor="fs-amount">Amount (USDC)</label>
+          <label htmlFor={amountId}>Amount (USDC)</label>
           <input
-            id="fs-amount"
+            id={amountId}
             type="number"
             step="0.01"
             min="1"

@@ -231,6 +231,7 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('usePreviewPayout');
       expect(indexContent).toContain('usePreviewSell');
       expect(indexContent).toContain('useMarketFilters');
+      expect(indexContent).toContain('useThemeClass');
 
       // Return types
       expect(indexContent).toContain('UseBuyReturn');
@@ -486,6 +487,28 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('FilterAction');
       expect(indexContent).toContain('MarketFilter');
       expect(indexContent).toContain('MarketDiscoveryOptions');
+    });
+  });
+
+  describe('Instance Safety', () => {
+    it('no hardcoded string-literal id="fs" or id={`fs` in UI components', () => {
+      const uiDir = path.join(__dirname, '../packages/ui/src');
+      const tsxFiles = getFiles(uiDir, /\.tsx$/);
+      const violations: string[] = [];
+
+      for (const file of tsxFiles) {
+        const content = fs.readFileSync(file, 'utf-8');
+        // Match id="fs..." (string literal with fs prefix, with or without hyphen)
+        if (/\bid="fs/.test(content)) {
+          violations.push(`${path.relative(process.cwd(), file)}: contains hardcoded id="fs..."`);
+        }
+        // Match id={\`fs...\`} (template literal with fs prefix, with or without hyphen)
+        if (/\bid=\{`fs/.test(content)) {
+          violations.push(`${path.relative(process.cwd(), file)}: contains hardcoded id={\`fs...\`}`);
+        }
+      }
+
+      expect(violations).toEqual([]);
     });
   });
 

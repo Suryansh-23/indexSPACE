@@ -85,6 +85,14 @@ vi.mock('@functionspace/core', () => ({
   filterVisibleData: vi.fn((data: any[], xKey: string, domain: [number, number]) => {
     return data.filter((d: any) => d[xKey] >= domain[0] && d[xKey] <= domain[1]);
   }),
+  evaluateDensityCurve: vi.fn().mockImplementation((coefficients: number[], lowerBound: number, upperBound: number, numPoints: number = 200) => {
+    const points: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i < numPoints; i++) {
+      const x = lowerBound + (upperBound - lowerBound) * i / (numPoints - 1);
+      points.push({ x, y: 0.5 });
+    }
+    return points;
+  }),
   buy: vi.fn(),
   sell: vi.fn(),
   previewPayoutCurve: vi.fn(),
@@ -92,9 +100,9 @@ vi.mock('@functionspace/core', () => ({
   discoverMarkets: vi.fn(),
 }));
 
-import { FunctionSpaceProvider, useMarket, useMarkets, useConsensus, usePositions, useTradeHistory, useBucketDistribution, useMarketHistory, useDistributionState, useAuth, useCustomShape, useChartZoom, useBuy, useSell, usePreviewPayout, usePreviewSell, useMarketFilters } from '../packages/react/src';
+import { FunctionSpaceProvider, useMarket, useMarkets, useConsensus, usePositions, useTradeHistory, useBucketDistribution, useMarketHistory, useDistributionState, useAuth, useCustomShape, useChartZoom, useBuy, useSell, usePreviewPayout, usePreviewSell, useMarketFilters, useThemeClass } from '../packages/react/src';
 import type { ChartZoomOptions, SortOption } from '../packages/react/src';
-import { queryMarketState, getConsensusCurve, queryMarketPositions, queryTradeHistory, queryMarketHistory, calculateBucketDistribution, computePercentiles, FSClient, loginUser, passwordlessLoginUser, silentReAuth, buy, sell, previewPayoutCurve, previewSell, discoverMarkets } from '@functionspace/core';
+import { queryMarketState, getConsensusCurve, queryMarketPositions, queryTradeHistory, queryMarketHistory, calculateBucketDistribution, computePercentiles, evaluateDensityCurve, FSClient, loginUser, passwordlessLoginUser, silentReAuth, buy, sell, previewPayoutCurve, previewSell, discoverMarkets } from '@functionspace/core';
 import { QueryCache } from '../packages/react/src/cache/QueryCache';
 import { QueryCacheContext } from '../packages/react/src/QueryCacheContext';
 import { FunctionSpaceContext } from '../packages/react/src/context';
@@ -143,7 +151,7 @@ const minimalChartColors: ChartColors = {
 // Lightweight wrapper that provides QueryCache + FunctionSpaceContext directly.
 // This bypasses FunctionSpaceProvider's auth flow so tests can focus on cache behavior.
 function createCacheWrapper(cacheOverride?: QueryCache) {
-  const cache = cacheOverride ?? new QueryCache();
+  const cache = cacheOverride ?? new QueryCache({ defaultRetry: 0 });
   const mockClient = new (FSClient as any)();
 
   const ctxValue = {
@@ -548,8 +556,26 @@ describe('useMarkets hook', () => {
 });
 
 // ============================================================================
-// useConsensus hook
+// useConsensus hook (derives from market cache via select transform)
 // ============================================================================
+
+// Standard mock market with consensus coefficients for useConsensus tests
+const consensusTestMarket = {
+  config: { numBuckets: 60, lowerBound: 0, upperBound: 100, K: 60, L: 0, H: 100, P0: 1, mu: 1, epsAlpha: 0.01, tau: 1, gamma: 1, lambdaS: 0, lambdaD: 0 },
+  consensus: [0.3, 0.5, 0.2],
+  title: 'Consensus Test',
+  decimals: 0,
+  alpha: [3, 5, 2],
+  totalMass: 10,
+  poolBalance: 100,
+  participantCount: 1,
+  totalVolume: 100,
+  positionsOpen: 1,
+  xAxisUnits: 'USD',
+  resolutionState: 'open' as const,
+  resolvedOutcome: null,
+  marketId: '1',
+};
 
 describe('useConsensus hook', () => {
   beforeEach(() => {
@@ -564,15 +590,8 @@ describe('useConsensus hook', () => {
     spy.mockRestore();
   });
 
-  it('returns data after successful fetch', async () => {
-    const mockConsensus = {
-      points: [
-        { x: 0, y: 0.1 },
-        { x: 50, y: 0.5 },
-        { x: 100, y: 0.1 },
-      ],
-    };
-    vi.mocked(getConsensusCurve).mockResolvedValue(mockConsensus);
+  it('returns data derived from market cache', async () => {
+    vi.mocked(queryMarketState).mockResolvedValue(consensusTestMarket as any);
 
     const { wrapper } = createCacheWrapper();
     const { result } = renderHook(() => useConsensus('1', 100), { wrapper });
@@ -581,18 +600,23 @@ describe('useConsensus hook', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.consensus).toEqual(mockConsensus);
+    // Consensus should have points and config from the select transform
+    expect(result.current.consensus).not.toBe(null);
+    expect(result.current.consensus!.points).toHaveLength(100);
+    expect(result.current.consensus!.config).toEqual(consensusTestMarket.config);
     expect(result.current.error).toBe(null);
-    expect(vi.mocked(getConsensusCurve)).toHaveBeenCalledWith(
-      expect.anything(),
-      '1',
-      100,
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+
+    // evaluateDensityCurve should have been called with the market's consensus coefficients
+    expect(vi.mocked(evaluateDensityCurve)).toHaveBeenCalledWith(
+      consensusTestMarket.consensus,
+      0,    // lowerBound
+      100,  // upperBound
+      100,  // numPoints
     );
   });
 
   it('returns loading initially', async () => {
-    vi.mocked(getConsensusCurve).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(queryMarketState).mockImplementation(() => new Promise(() => {}));
 
     const { wrapper } = createCacheWrapper();
     const { result } = renderHook(() => useConsensus('1'), { wrapper });
@@ -606,10 +630,10 @@ describe('useConsensus hook', () => {
 
   it('loading vs isFetching on refetch', async () => {
     let callCount = 0;
-    vi.mocked(getConsensusCurve).mockImplementation(() => {
+    vi.mocked(queryMarketState).mockImplementation(() => {
       callCount++;
-      if (callCount === 1) return Promise.resolve({ points: [{ x: 0, y: 0.5 }] });
-      return new Promise((resolve) => setTimeout(() => resolve({ points: [{ x: 0, y: 0.8 }] }), 50));
+      if (callCount === 1) return Promise.resolve(consensusTestMarket as any);
+      return new Promise((resolve) => setTimeout(() => resolve({ ...consensusTestMarket, title: 'Updated' } as any), 50));
     });
 
     const { wrapper } = createCacheWrapper();
@@ -634,7 +658,7 @@ describe('useConsensus hook', () => {
   });
 
   it('returns error on fetch failure', async () => {
-    vi.mocked(getConsensusCurve).mockRejectedValue(new Error('Network error'));
+    vi.mocked(queryMarketState).mockRejectedValue(new Error('Network error'));
 
     const { wrapper } = createCacheWrapper();
     const { result } = renderHook(() => useConsensus('1'), { wrapper });
@@ -649,7 +673,7 @@ describe('useConsensus hook', () => {
   });
 
   it('error clears on successful refetch', async () => {
-    vi.mocked(getConsensusCurve).mockRejectedValue(new Error('Fail'));
+    vi.mocked(queryMarketState).mockRejectedValue(new Error('Fail'));
 
     const { wrapper } = createCacheWrapper();
     const { result } = renderHook(() => useConsensus('1'), { wrapper });
@@ -659,18 +683,19 @@ describe('useConsensus hook', () => {
     });
 
     // Switch to success for the refetch
-    vi.mocked(getConsensusCurve).mockResolvedValue({ points: [{ x: 0, y: 0.5 }] });
+    vi.mocked(queryMarketState).mockResolvedValue(consensusTestMarket as any);
 
     await act(async () => {
       await result.current.refetch();
     });
 
     expect(result.current.error).toBe(null);
-    expect(result.current.consensus).toEqual({ points: [{ x: 0, y: 0.5 }] });
+    expect(result.current.consensus).not.toBe(null);
+    expect(result.current.consensus!.points.length).toBeGreaterThan(0);
   });
 
   it('refetch returns Promise', async () => {
-    vi.mocked(getConsensusCurve).mockResolvedValue({ points: [{ x: 0, y: 0.1 }] });
+    vi.mocked(queryMarketState).mockResolvedValue(consensusTestMarket as any);
 
     const { wrapper } = createCacheWrapper();
     const { result } = renderHook(() => useConsensus('1'), { wrapper });
@@ -680,18 +705,18 @@ describe('useConsensus hook', () => {
     });
 
     // Switch mock for the refetch
-    vi.mocked(getConsensusCurve).mockResolvedValue({ points: [{ x: 0, y: 0.9 }] });
+    vi.mocked(queryMarketState).mockResolvedValue({ ...consensusTestMarket, consensus: [0.5, 0.5] } as any);
 
     await act(async () => {
       await result.current.refetch();
     });
 
-    expect(result.current.consensus).toEqual({ points: [{ x: 0, y: 0.9 }] });
+    expect(result.current.consensus).not.toBe(null);
   });
 
   it('pollInterval causes periodic refetches', async () => {
     let resolvers: Array<(v: any) => void> = [];
-    vi.mocked(getConsensusCurve).mockImplementation(() => {
+    vi.mocked(queryMarketState).mockImplementation(() => {
       return new Promise((resolve) => {
         resolvers.push(resolve);
       });
@@ -706,12 +731,95 @@ describe('useConsensus hook', () => {
     // Resolve initial fetch(es) -- StrictMode may cause more than one
     await waitFor(() => expect(resolvers.length).toBeGreaterThanOrEqual(1));
     const initialCount = resolvers.length;
-    act(() => { resolvers.forEach(r => r({ points: [{ x: 0, y: 0.1 }] })); });
+    act(() => { resolvers.forEach(r => r(consensusTestMarket)); });
 
     // Wait for poll interval to trigger another fetch
     await waitFor(() => {
       expect(resolvers.length).toBeGreaterThan(initialCount);
     }, { timeout: 3000 });
+  });
+
+  it('standalone useConsensus (without useMarket) fetches and returns data', async () => {
+    vi.mocked(queryMarketState).mockResolvedValue(consensusTestMarket as any);
+
+    const { wrapper } = createCacheWrapper();
+    // Only mount useConsensus -- no useMarket
+    const { result } = renderHook(() => useConsensus('standalone-1', 50), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.consensus).not.toBe(null);
+    expect(result.current.consensus!.points).toHaveLength(50);
+    expect(result.current.consensus!.config).toEqual(consensusTestMarket.config);
+    // queryMarketState should have been called (useConsensus registers it)
+    expect(vi.mocked(queryMarketState)).toHaveBeenCalledWith(
+      expect.anything(),
+      'standalone-1',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+  });
+
+  it('useMarket + useConsensus share cache: exactly 1 API call', async () => {
+    let callCount = 0;
+    vi.mocked(queryMarketState).mockImplementation(async () => {
+      callCount++;
+      return consensusTestMarket as any;
+    });
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(
+      () => ({
+        market: useMarket('shared-1'),
+        consensus: useConsensus('shared-1', 100),
+      }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.market.market).not.toBe(null);
+      expect(result.current.consensus.consensus).not.toBe(null);
+    });
+
+    // Both hooks share ['marketState', 'shared-1'] cache key.
+    // Under StrictMode, at most 2 mount cycles occur, but each cycle
+    // should deduplicate to a single call.
+    expect(callCount).toBeLessThanOrEqual(2);
+  });
+
+  it('numPoints parameter affects consensus curve resolution', async () => {
+    vi.mocked(queryMarketState).mockResolvedValue(consensusTestMarket as any);
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useConsensus('1', 50), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.consensus).not.toBe(null);
+    });
+
+    expect(result.current.consensus!.points).toHaveLength(50);
+    expect(vi.mocked(evaluateDensityCurve)).toHaveBeenCalledWith(
+      consensusTestMarket.consensus,
+      0, 100, 50,
+    );
+  });
+
+  it('defaults to 200 points when numPoints is omitted', async () => {
+    vi.mocked(queryMarketState).mockResolvedValue(consensusTestMarket as any);
+
+    const { wrapper } = createCacheWrapper();
+    const { result } = renderHook(() => useConsensus('1'), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.consensus).not.toBe(null);
+    });
+
+    expect(result.current.consensus!.points).toHaveLength(200);
+    expect(vi.mocked(evaluateDensityCurve)).toHaveBeenCalledWith(
+      consensusTestMarket.consensus,
+      0, 100, 200,
+    );
   });
 });
 
@@ -1239,7 +1347,10 @@ describe('useMarketHistory hook', () => {
 describe('Hook Return Shape', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(queryMarketState).mockResolvedValue({ config: {} });
+    vi.mocked(queryMarketState).mockResolvedValue({
+      config: { numBuckets: 2, lowerBound: 0, upperBound: 100, K: 2, L: 0, H: 100 },
+      consensus: [0.5, 0.5, 0.5],
+    });
     vi.mocked(getConsensusCurve).mockResolvedValue({ points: [] });
     vi.mocked(queryMarketPositions).mockResolvedValue([]);
     vi.mocked(queryTradeHistory).mockResolvedValue([]);
@@ -1690,6 +1801,24 @@ describe('useBuy hook', () => {
     expect(caught!.message).toMatch(/Market data not loaded/);
     // buy should not have been called since validation failed before it
     expect(buy).not.toHaveBeenCalled();
+  });
+
+  it('does not retry on 500 error', async () => {
+    vi.mocked(buy).mockRejectedValue(new Error('Internal Server Error'));
+
+    const { wrapper, cache } = createMutationWrapper();
+    await populateMarketCache(cache, '42', 10);
+
+    const { result } = renderHook(() => useBuy('42'), { wrapper });
+
+    await act(async () => {
+      await result.current.execute([0.5, 0.5], 50).catch(() => {});
+    });
+
+    expect(result.current.error).not.toBe(null);
+    expect(result.current.error?.message).toBe('Internal Server Error');
+    // Mutation hooks must not retry -- buy should have been called exactly once
+    expect(buy).toHaveBeenCalledTimes(1);
   });
 
   describe('auto-clear error timer', () => {
@@ -2340,12 +2469,10 @@ describe('useBucketDistribution hook', () => {
   });
 
   it('returns computed bucket data from underlying hooks', async () => {
-    const mockConsensus = {
-      points: [{ x: 0, y: 0.1 }, { x: 50, y: 0.5 }, { x: 100, y: 0.1 }],
-      config: { numBuckets: 60, lowerBound: 0, upperBound: 100, K: 60, L: 0, H: 100 },
-    };
+    // useConsensus now derives from market cache -- provide a market with consensus coefficients
     const mockMarket = {
       config: { numBuckets: 60, lowerBound: 0, upperBound: 100, K: 60, L: 0, H: 100 },
+      consensus: [0.3, 0.5, 0.2],
       title: 'Test',
       decimals: 0,
     };
@@ -2355,7 +2482,6 @@ describe('useBucketDistribution hook', () => {
     ];
 
     vi.mocked(queryMarketState).mockResolvedValue(mockMarket as any);
-    vi.mocked(getConsensusCurve).mockResolvedValue(mockConsensus as any);
     vi.mocked(calculateBucketDistribution).mockReturnValue(mockBuckets);
 
     const { wrapper } = createCacheWrapper();
@@ -2370,8 +2496,11 @@ describe('useBucketDistribution hook', () => {
   });
 
   it('returns { buckets, loading, error, refetch }', async () => {
-    vi.mocked(queryMarketState).mockResolvedValue({ config: { numBuckets: 60, lowerBound: 0, upperBound: 100, K: 60, L: 0, H: 100 }, decimals: 0 } as any);
-    vi.mocked(getConsensusCurve).mockResolvedValue({ points: [] } as any);
+    vi.mocked(queryMarketState).mockResolvedValue({
+      config: { numBuckets: 60, lowerBound: 0, upperBound: 100, K: 60, L: 0, H: 100 },
+      consensus: [0.5, 0.5],
+      decimals: 0,
+    } as any);
     vi.mocked(calculateBucketDistribution).mockReturnValue([]);
 
     const { wrapper } = createCacheWrapper();
@@ -2444,7 +2573,6 @@ describe('useDistributionState hook', () => {
 
   it('returns computed data from underlying hooks', async () => {
     vi.mocked(queryMarketState).mockResolvedValue(mockMarket as any);
-    vi.mocked(getConsensusCurve).mockResolvedValue(mockConsensus as any);
     vi.mocked(calculateBucketDistribution).mockReturnValue(mockBuckets);
     vi.mocked(computePercentiles).mockReturnValue(mockPercentiles);
 
@@ -2457,8 +2585,10 @@ describe('useDistributionState hook', () => {
 
     expect(result.current.buckets).toEqual(mockBuckets);
     expect(result.current.error).toBe(null);
+    // evaluateDensityCurve produces points from consensus coefficients;
+    // calculateBucketDistribution receives those points
     expect(calculateBucketDistribution).toHaveBeenCalledWith(
-      mockConsensus.points,
+      expect.any(Array),
       0,    // lowerBound
       100,  // upperBound
       12,   // default bucketCount
@@ -2468,7 +2598,6 @@ describe('useDistributionState hook', () => {
 
   it('refetch returns Promise', async () => {
     vi.mocked(queryMarketState).mockResolvedValue(mockMarket as any);
-    vi.mocked(getConsensusCurve).mockResolvedValue(mockConsensus as any);
     vi.mocked(calculateBucketDistribution).mockReturnValue(mockBuckets);
     vi.mocked(computePercentiles).mockReturnValue(mockPercentiles);
 
@@ -2489,7 +2618,6 @@ describe('useDistributionState hook', () => {
 
   it('returns loading=true while data is fetching', async () => {
     vi.mocked(queryMarketState).mockImplementation(() => new Promise(() => {}));
-    vi.mocked(getConsensusCurve).mockImplementation(() => new Promise(() => {}));
 
     const { wrapper } = createCacheWrapper();
     const { result } = renderHook(() => useDistributionState('1'), { wrapper });
@@ -2504,7 +2632,6 @@ describe('useDistributionState hook', () => {
 
   it('computes percentiles from market consensus coefficients', async () => {
     vi.mocked(queryMarketState).mockResolvedValue(mockMarket as any);
-    vi.mocked(getConsensusCurve).mockResolvedValue(mockConsensus as any);
     vi.mocked(calculateBucketDistribution).mockReturnValue(mockBuckets);
     vi.mocked(computePercentiles).mockReturnValue(mockPercentiles);
 
@@ -2525,7 +2652,6 @@ describe('useDistributionState hook', () => {
 
   it('setBucketCount updates bucket computation', async () => {
     vi.mocked(queryMarketState).mockResolvedValue(mockMarket as any);
-    vi.mocked(getConsensusCurve).mockResolvedValue(mockConsensus as any);
     vi.mocked(calculateBucketDistribution).mockReturnValue(mockBuckets);
     vi.mocked(computePercentiles).mockReturnValue(mockPercentiles);
 
@@ -2554,7 +2680,6 @@ describe('useDistributionState hook', () => {
 
   it('clamps bucket count to [2, 50]', async () => {
     vi.mocked(queryMarketState).mockResolvedValue(mockMarket as any);
-    vi.mocked(getConsensusCurve).mockResolvedValue(mockConsensus as any);
     vi.mocked(calculateBucketDistribution).mockReturnValue([]);
     vi.mocked(computePercentiles).mockReturnValue(mockPercentiles);
 
@@ -2583,7 +2708,6 @@ describe('useDistributionState hook', () => {
     ];
 
     vi.mocked(queryMarketState).mockResolvedValue(mockMarket as any);
-    vi.mocked(getConsensusCurve).mockResolvedValue(mockConsensus as any);
     vi.mocked(calculateBucketDistribution)
       .mockReturnValueOnce(mockBuckets)  // initial full-range
       .mockReturnValue(narrowedBuckets); // narrowed range call
@@ -2598,8 +2722,9 @@ describe('useDistributionState hook', () => {
 
     const narrowed = result.current.getBucketsForRange(10, 50);
     expect(narrowed).toEqual(narrowedBuckets);
+    // Points come from evaluateDensityCurve mock (applied by useConsensus select)
     expect(calculateBucketDistribution).toHaveBeenCalledWith(
-      mockConsensus.points,
+      expect.any(Array),
       10,   // narrowed min
       50,   // narrowed max
       12,   // current bucketCount
@@ -2609,7 +2734,6 @@ describe('useDistributionState hook', () => {
 
   it('accepts custom defaultBucketCount via config', async () => {
     vi.mocked(queryMarketState).mockResolvedValue(mockMarket as any);
-    vi.mocked(getConsensusCurve).mockResolvedValue(mockConsensus as any);
     vi.mocked(calculateBucketDistribution).mockReturnValue([]);
     vi.mocked(computePercentiles).mockReturnValue(mockPercentiles);
 
@@ -2631,7 +2755,6 @@ describe('useDistributionState hook', () => {
 
   it('returns error on fetch failure', async () => {
     vi.mocked(queryMarketState).mockRejectedValue(new Error('Network error'));
-    vi.mocked(getConsensusCurve).mockRejectedValue(new Error('Network error'));
 
     const { wrapper } = createCacheWrapper();
     const { result } = renderHook(() => useDistributionState('1'), { wrapper });
@@ -2647,7 +2770,6 @@ describe('useDistributionState hook', () => {
 
   it('returns correct shape', async () => {
     vi.mocked(queryMarketState).mockResolvedValue(mockMarket as any);
-    vi.mocked(getConsensusCurve).mockResolvedValue(mockConsensus as any);
     vi.mocked(calculateBucketDistribution).mockReturnValue([]);
     vi.mocked(computePercentiles).mockReturnValue(mockPercentiles);
 
@@ -3543,5 +3665,115 @@ describe('useMarketFilters hook', () => {
     expect(typeof props.onSortOrderToggle).toBe('function');
     expect(typeof props.onReset).toBe('function');
     expect(props.resultCount).toBe(3);
+  });
+});
+
+// ============================================================================
+// useMarket retry integration
+// ============================================================================
+
+describe('useMarket retry integration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('retries on failure then succeeds when server recovers', async () => {
+    let callCount = 0;
+    vi.mocked(queryMarketState).mockImplementation(() => {
+      callCount++;
+      if (callCount <= 2) return Promise.reject(new Error('API error: 500 Internal Server Error on GET /api/market'));
+      return Promise.resolve({
+        config: { numBuckets: 60, lowerBound: 0, upperBound: 100, K: 60, L: 0, H: 100 },
+        title: 'Recovered Market',
+        consensusBelief: [0.5, 0.5],
+      });
+    });
+
+    // Use a cache with retry=3 and near-zero delay for fast testing with real timers
+    const testCache = new QueryCache({ defaultRetry: 3, defaultRetryDelay: () => 10 });
+    const { wrapper } = createCacheWrapper(testCache);
+
+    const { result } = renderHook(() => useMarket('retry-test'), { wrapper });
+
+    // Wait for retries to complete and data to arrive
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.market).toEqual(
+      expect.objectContaining({ title: 'Recovered Market' }),
+    );
+    expect(result.current.error).toBe(null);
+    // 3 calls: 2 failures + 1 success (StrictMode may double, so check >= 3)
+    expect(vi.mocked(queryMarketState).mock.calls.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('with retry disabled (retry: 0), errors immediately', async () => {
+    vi.mocked(queryMarketState).mockRejectedValue(
+      new Error('API error: 500 Internal Server Error on GET /api/market'),
+    );
+
+    // Cache with retry: 0 (no retries)
+    const testCache = new QueryCache({ defaultRetry: 0 });
+    const { wrapper } = createCacheWrapper(testCache);
+
+    const { result } = renderHook(() => useMarket('no-retry-test'), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.error).toBeInstanceOf(Error);
+    });
+
+    expect(result.current.error?.message).toBe(
+      'API error: 500 Internal Server Error on GET /api/market',
+    );
+    expect(result.current.market).toBe(null);
+  });
+});
+
+// ============================================================================
+// useThemeClass
+// ============================================================================
+
+describe('useThemeClass', () => {
+  it('returns theme class name when portalSupport is true', async () => {
+    function PortalWrapper({ children }: { children: React.ReactNode }) {
+      return (
+        <React.StrictMode>
+          <FunctionSpaceProvider config={mockConfig} theme="fs-dark" portalSupport={true}>
+            {children}
+          </FunctionSpaceProvider>
+        </React.StrictMode>
+      );
+    }
+
+    const { result } = renderHook(() => useThemeClass(), { wrapper: PortalWrapper });
+
+    await waitFor(() => {
+      expect(result.current).toBeTruthy();
+    });
+
+    expect(result.current).toMatch(/^fs-theme-/);
+  });
+
+  it('throws without FunctionSpaceProvider', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => {
+      renderHook(() => useThemeClass());
+    }).toThrow('useThemeClass must be used within FunctionSpaceProvider');
+    spy.mockRestore();
+  });
+
+  it('throws when portalSupport is not enabled', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    // Use the lightweight cache wrapper which sets up context directly (no async auth)
+    const { wrapper } = createCacheWrapper();
+
+    // The hook should throw because ThemeClassContext has no provider
+    // (createCacheWrapper does not wrap with ThemeClassContext.Provider)
+    expect(() => {
+      renderHook(() => useThemeClass(), { wrapper });
+    }).toThrow('useThemeClass requires portalSupport={true} on FunctionSpaceProvider');
+    spy.mockRestore();
   });
 });

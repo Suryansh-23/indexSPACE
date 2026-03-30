@@ -1,6 +1,6 @@
 export { FunctionSpaceContext } from './context.js';
 export type { FSContext } from './context.js';
-export { FunctionSpaceProvider, resolveTheme } from './FunctionSpaceProvider.js';
+export { FunctionSpaceProvider, resolveTheme, useThemeClass } from './FunctionSpaceProvider.js';
 export type { FunctionSpaceProviderProps, FSThemeInput, FSTheme, ResolvedFSTheme } from './FunctionSpaceProvider.js';
 export { FS_DARK, FS_LIGHT, NATIVE_DARK, NATIVE_LIGHT, THEME_PRESETS } from './themes.js';
 export type { ThemePresetId, ChartColors, FanBandColors } from './themes.js';
@@ -22,7 +22,7 @@ export type { UseCustomShapeReturn } from './useCustomShape.js';
 export { useChartZoom } from './useChartZoom.js';
 export type { ChartZoomOptions, ChartZoomResult } from './useChartZoom.js';
 export { rechartsPlotArea } from './rechartsHelpers.js';
-export type { CacheConfig, QueryOptions } from './cache/index.js';
+export type { CacheConfig, QueryOptions, RetryDelayFn } from './cache/index.js';
 export { useBuy } from './useBuy.js';
 export type { UseBuyReturn } from './useBuy.js';
 export { useSell } from './useSell.js';

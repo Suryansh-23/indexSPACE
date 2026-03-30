@@ -371,7 +371,7 @@ describe('QueryCache', () => {
   // 12. Error handling
   // ---------------------------------------------------------------------------
   it('12. fetch failure sets error state, preserves stale data, polling continues', async () => {
-    cache = new QueryCache({ defaultPollInterval: 2000 });
+    cache = new QueryCache({ defaultPollInterval: 2000, defaultRetry: 0 });
     const key: CacheKey = ['market', '1'];
     let callCount = 0;
     const queryFn = vi.fn((_signal: AbortSignal) => {
@@ -803,7 +803,8 @@ describe('QueryCache', () => {
     });
 
     it('error is cleared when transitioning to fetching status', async () => {
-      cache = new QueryCache();
+      // Disable retry so the error happens immediately on first failure
+      cache = new QueryCache({ defaultRetry: 0 });
       const key: CacheKey = ['market', '1'];
       let callCount = 0;
       const queryFn = vi.fn((_signal: AbortSignal) => {
@@ -841,6 +842,415 @@ describe('QueryCache', () => {
       expect(finalSnap.status).toBe('fresh');
       expect(finalSnap.data).toBe('recovered');
       expect(finalSnap.error).toBe(null);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Retry with backoff
+  // ---------------------------------------------------------------------------
+  describe('retry with backoff', () => {
+    it('retries failed fetch 3 times with exponential backoff before erroring', async () => {
+      cache = new QueryCache({ defaultRetry: 3 });
+      const key: CacheKey = ['market', '1'];
+      const queryFn = vi.fn((_signal: AbortSignal) =>
+        Promise.reject(new Error('network failure')),
+      );
+
+      cache.registerQueryFn(key, queryFn);
+      cache.subscribe(key, () => {});
+      cache.ensureFetching(key);
+
+      // Initial attempt (attempt 0)
+      await flushMicrotasks();
+      expect(queryFn).toHaveBeenCalledTimes(1);
+
+      // Status should still be fetching (retrying)
+      expect(cache.getSnapshot(key).status).toBe('fetching');
+
+      // Advance past first retry delay: 1000ms (1000 * 2^0)
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(queryFn).toHaveBeenCalledTimes(2);
+
+      // Advance past second retry delay: 2000ms (1000 * 2^1)
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(queryFn).toHaveBeenCalledTimes(3);
+
+      // Advance past third retry delay: 4000ms (1000 * 2^2)
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(queryFn).toHaveBeenCalledTimes(4);
+
+      // All attempts exhausted -- should be in error state
+      const snap = cache.getSnapshot(key);
+      expect(snap.status).toBe('error');
+      expect(snap.error).toBeInstanceOf(Error);
+      expect(snap.error?.message).toBe('network failure');
+    });
+
+    it('does not retry 4xx errors (immediate error state)', async () => {
+      cache = new QueryCache({ defaultRetry: 3 });
+      const key: CacheKey = ['market', '1'];
+      const queryFn = vi.fn((_signal: AbortSignal) =>
+        Promise.reject(new Error('API error: 404 Not Found on GET /api/market')),
+      );
+
+      cache.registerQueryFn(key, queryFn);
+      cache.subscribe(key, () => {});
+      cache.ensureFetching(key);
+      await flushMicrotasks();
+
+      // Only 1 attempt -- no retries for 4xx
+      expect(queryFn).toHaveBeenCalledTimes(1);
+      const snap = cache.getSnapshot(key);
+      expect(snap.status).toBe('error');
+      expect(snap.error?.message).toBe('API error: 404 Not Found on GET /api/market');
+    });
+
+    it('does not retry 400 Bad Request', async () => {
+      cache = new QueryCache({ defaultRetry: 3 });
+      const key: CacheKey = ['market', '1'];
+      const queryFn = vi.fn((_signal: AbortSignal) =>
+        Promise.reject(new Error('API error: 400 Bad Request on POST /api/trade')),
+      );
+
+      cache.registerQueryFn(key, queryFn);
+      cache.subscribe(key, () => {});
+      cache.ensureFetching(key);
+      await flushMicrotasks();
+
+      expect(queryFn).toHaveBeenCalledTimes(1);
+      expect(cache.getSnapshot(key).status).toBe('error');
+    });
+
+    it('retries 5xx server errors', async () => {
+      cache = new QueryCache({ defaultRetry: 1 });
+      const key: CacheKey = ['market', '1'];
+      let callCount = 0;
+      const queryFn = vi.fn((_signal: AbortSignal) => {
+        callCount++;
+        if (callCount <= 1) return Promise.reject(new Error('API error: 500 Internal Server Error on GET /api/market'));
+        return Promise.resolve('recovered');
+      });
+
+      cache.registerQueryFn(key, queryFn);
+      cache.subscribe(key, () => {});
+      cache.ensureFetching(key);
+      await flushMicrotasks();
+
+      // First attempt failed with 500
+      expect(queryFn).toHaveBeenCalledTimes(1);
+      expect(cache.getSnapshot(key).status).toBe('fetching');
+
+      // Advance past retry delay: 1000ms
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(queryFn).toHaveBeenCalledTimes(2);
+
+      // Second attempt succeeded
+      const snap = cache.getSnapshot<string>(key);
+      expect(snap.status).toBe('fresh');
+      expect(snap.data).toBe('recovered');
+      expect(snap.error).toBe(null);
+    });
+
+    it('retries network errors (TypeError from fetch)', async () => {
+      cache = new QueryCache({ defaultRetry: 1 });
+      const key: CacheKey = ['market', '1'];
+      let callCount = 0;
+      const queryFn = vi.fn((_signal: AbortSignal) => {
+        callCount++;
+        if (callCount <= 1) return Promise.reject(new TypeError('Failed to fetch'));
+        return Promise.resolve('recovered');
+      });
+
+      cache.registerQueryFn(key, queryFn);
+      cache.subscribe(key, () => {});
+      cache.ensureFetching(key);
+      await flushMicrotasks();
+
+      expect(queryFn).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(queryFn).toHaveBeenCalledTimes(2);
+
+      const snap = cache.getSnapshot<string>(key);
+      expect(snap.status).toBe('fresh');
+      expect(snap.data).toBe('recovered');
+    });
+
+    it('abort during retry delay cancels the retry', async () => {
+      cache = new QueryCache({ defaultRetry: 3 });
+      const key: CacheKey = ['market', '1'];
+      const queryFn = vi.fn((_signal: AbortSignal) =>
+        Promise.reject(new Error('network failure')),
+      );
+
+      cache.registerQueryFn(key, queryFn);
+      const unsub = cache.subscribe(key, () => {});
+      cache.ensureFetching(key);
+      await flushMicrotasks();
+
+      // First attempt failed, now waiting for retry delay
+      expect(queryFn).toHaveBeenCalledTimes(1);
+
+      // Advance partway through first retry delay (500ms of 1000ms)
+      vi.advanceTimersByTime(500);
+
+      // Unsubscribe aborts the controller
+      unsub();
+
+      // Advance past what would have been the full delay
+      await vi.advanceTimersByTimeAsync(2000);
+
+      // No more attempts should have been made
+      expect(queryFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('custom retry count of 0 means no retries', async () => {
+      cache = new QueryCache({ defaultRetry: 0 });
+      const key: CacheKey = ['market', '1'];
+      const queryFn = vi.fn((_signal: AbortSignal) =>
+        Promise.reject(new Error('network failure')),
+      );
+
+      cache.registerQueryFn(key, queryFn);
+      cache.subscribe(key, () => {});
+      cache.ensureFetching(key);
+      await flushMicrotasks();
+
+      // Only 1 attempt, no retries
+      expect(queryFn).toHaveBeenCalledTimes(1);
+      expect(cache.getSnapshot(key).status).toBe('error');
+      expect(cache.getSnapshot(key).error?.message).toBe('network failure');
+    });
+
+    it('custom retry delay function is used', async () => {
+      const customDelay = vi.fn((_attempt: number) => 100); // always 100ms
+      cache = new QueryCache({ defaultRetry: 2, defaultRetryDelay: customDelay });
+      const key: CacheKey = ['market', '1'];
+      const queryFn = vi.fn((_signal: AbortSignal) =>
+        Promise.reject(new Error('network failure')),
+      );
+
+      cache.registerQueryFn(key, queryFn);
+      cache.subscribe(key, () => {});
+      cache.ensureFetching(key);
+      await flushMicrotasks();
+
+      expect(queryFn).toHaveBeenCalledTimes(1);
+      // customDelay was called for attempt 0
+      expect(customDelay).toHaveBeenCalledWith(0);
+
+      await vi.advanceTimersByTimeAsync(100);
+      expect(queryFn).toHaveBeenCalledTimes(2);
+      // customDelay was called for attempt 1
+      expect(customDelay).toHaveBeenCalledWith(1);
+
+      await vi.advanceTimersByTimeAsync(100);
+      expect(queryFn).toHaveBeenCalledTimes(3);
+
+      // All 3 attempts (1 initial + 2 retries) exhausted
+      expect(cache.getSnapshot(key).status).toBe('error');
+    });
+
+    it('per-entry retry config overrides global defaults', async () => {
+      cache = new QueryCache({ defaultRetry: 3 }); // global: 3 retries
+      const key: CacheKey = ['market', '1'];
+      const queryFn = vi.fn((_signal: AbortSignal) =>
+        Promise.reject(new Error('network failure')),
+      );
+
+      cache.registerQueryFn(key, queryFn);
+      cache.registerRetryConfig(key, 0); // per-entry: 0 retries
+      cache.subscribe(key, () => {});
+      cache.ensureFetching(key);
+      await flushMicrotasks();
+
+      // Only 1 attempt -- per-entry override of 0 retries
+      expect(queryFn).toHaveBeenCalledTimes(1);
+      expect(cache.getSnapshot(key).status).toBe('error');
+    });
+
+    it('loading stays true during retries on initial fetch', async () => {
+      cache = new QueryCache({ defaultRetry: 2 });
+      const key: CacheKey = ['market', '1'];
+      const queryFn = vi.fn((_signal: AbortSignal) =>
+        Promise.reject(new Error('network failure')),
+      );
+
+      cache.registerQueryFn(key, queryFn);
+      cache.subscribe(key, () => {});
+      cache.ensureFetching(key);
+      await flushMicrotasks();
+
+      // After first attempt fails, status should be 'fetching' (not 'error' yet)
+      // because retries are pending
+      let snap = cache.getSnapshot(key);
+      expect(snap.status).toBe('fetching');
+      expect(snap.data).toBe(null); // no cached data = loading is true
+      expect(snap.error).toBe(null);
+
+      // During first retry delay -- still fetching
+      vi.advanceTimersByTime(500);
+      snap = cache.getSnapshot(key);
+      expect(snap.status).toBe('fetching');
+      expect(snap.data).toBe(null);
+    });
+
+    it('isFetching stays true during retries on background refetch', async () => {
+      cache = new QueryCache({ defaultRetry: 1 });
+      const key: CacheKey = ['market', '1'];
+      let callCount = 0;
+      const queryFn = vi.fn((_signal: AbortSignal) => {
+        callCount++;
+        if (callCount === 1) return Promise.resolve('initial-data');
+        return Promise.reject(new Error('network failure'));
+      });
+
+      cache.registerQueryFn(key, queryFn);
+      cache.subscribe(key, () => {});
+      cache.ensureFetching(key);
+      await flushMicrotasks();
+
+      // First fetch succeeds
+      expect(cache.getSnapshot<string>(key).data).toBe('initial-data');
+      expect(cache.getSnapshot(key).status).toBe('fresh');
+
+      // Refetch triggers a background fetch that fails
+      cache.refetch(key);
+      await flushMicrotasks();
+
+      // Status should be 'fetching' (retrying in background)
+      let snap = cache.getSnapshot<string>(key);
+      expect(snap.status).toBe('fetching');
+      expect(snap.data).toBe('initial-data'); // preserved
+
+      // Advance through retry delay
+      await vi.advanceTimersByTimeAsync(1000);
+
+      // After retry exhausted, should be error with preserved data
+      snap = cache.getSnapshot<string>(key);
+      expect(snap.status).toBe('error');
+      expect(snap.data).toBe('initial-data'); // data preserved
+      expect(snap.error?.message).toBe('network failure');
+    });
+
+    it('retry count resets on success after retry', async () => {
+      cache = new QueryCache({ defaultRetry: 1 });
+      const key: CacheKey = ['market', '1'];
+      let callCount = 0;
+      const queryFn = vi.fn((_signal: AbortSignal) => {
+        callCount++;
+        // First call fails, second succeeds, third fails, fourth succeeds
+        if (callCount % 2 === 1) return Promise.reject(new Error('intermittent'));
+        return Promise.resolve(`data-${callCount}`);
+      });
+
+      cache.registerQueryFn(key, queryFn);
+      cache.subscribe(key, () => {});
+
+      // First executeFetch: attempt 1 fails, retry succeeds
+      cache.ensureFetching(key);
+      await flushMicrotasks();
+      expect(queryFn).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(queryFn).toHaveBeenCalledTimes(2);
+      expect(cache.getSnapshot<string>(key).data).toBe('data-2');
+      expect(cache.getSnapshot(key).status).toBe('fresh');
+
+      // Second executeFetch (via refetch): don't await -- advance timers instead
+      // This proves the retry count resets per executeFetch call
+      const refetchPromise = cache.refetch(key);
+      await flushMicrotasks();
+      expect(queryFn).toHaveBeenCalledTimes(3);
+
+      await vi.advanceTimersByTimeAsync(1000);
+      await refetchPromise;
+      expect(queryFn).toHaveBeenCalledTimes(4);
+      expect(cache.getSnapshot<string>(key).data).toBe('data-4');
+      expect(cache.getSnapshot(key).status).toBe('fresh');
+    });
+
+    it('fixed retry delay (number) is used consistently', async () => {
+      cache = new QueryCache({ defaultRetry: 2, defaultRetryDelay: 500 });
+      const key: CacheKey = ['market', '1'];
+      const queryFn = vi.fn((_signal: AbortSignal) =>
+        Promise.reject(new Error('network failure')),
+      );
+
+      cache.registerQueryFn(key, queryFn);
+      cache.subscribe(key, () => {});
+      cache.ensureFetching(key);
+      await flushMicrotasks();
+
+      expect(queryFn).toHaveBeenCalledTimes(1);
+
+      // First retry at 500ms
+      await vi.advanceTimersByTimeAsync(500);
+      expect(queryFn).toHaveBeenCalledTimes(2);
+
+      // Second retry at 500ms (same delay, not exponential)
+      await vi.advanceTimersByTimeAsync(500);
+      expect(queryFn).toHaveBeenCalledTimes(3);
+
+      expect(cache.getSnapshot(key).status).toBe('error');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Activity-proof: subscriber activity tracking
+  // ---------------------------------------------------------------------------
+  describe('Activity-proof', () => {
+    it('all subscribers inactive pauses poll timer (no network traffic)', async () => {
+      cache = new QueryCache({ defaultPollInterval: 2000 });
+      const key: CacheKey = ['market', '1'];
+      const queryFn = createQueryFn('data');
+
+      cache.registerQueryFn(key, queryFn);
+      const cb = vi.fn();
+      cache.subscribe(key, cb);
+      cache.ensureFetching(key);
+      await flushMicrotasks();
+
+      expect(queryFn).toHaveBeenCalledTimes(1);
+
+      // Poll fires while active (default active=true on subscribe)
+      vi.advanceTimersByTime(2000);
+      await flushMicrotasks();
+      expect(queryFn).toHaveBeenCalledTimes(2);
+
+      // Mark subscriber inactive
+      cache.setSubscriberActive(key, cb, false);
+
+      // Poll should NOT fire while all subscribers inactive
+      vi.advanceTimersByTime(4000);
+      await flushMicrotasks();
+      expect(queryFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('subscriber becomes active resumes poll timer', async () => {
+      cache = new QueryCache({ defaultPollInterval: 2000 });
+      const key: CacheKey = ['market', '1'];
+      const queryFn = createQueryFn('data');
+
+      cache.registerQueryFn(key, queryFn);
+      const cb = vi.fn();
+      cache.subscribe(key, cb);
+      cache.ensureFetching(key);
+      await flushMicrotasks();
+
+      expect(queryFn).toHaveBeenCalledTimes(1);
+
+      // Mark inactive -- pauses poll
+      cache.setSubscriberActive(key, cb, false);
+      vi.advanceTimersByTime(4000);
+      await flushMicrotasks();
+      expect(queryFn).toHaveBeenCalledTimes(1);
+
+      // Mark active again -- resumes poll
+      cache.setSubscriberActive(key, cb, true);
+      vi.advanceTimersByTime(2000);
+      await flushMicrotasks();
+      expect(queryFn).toHaveBeenCalledTimes(2);
     });
   });
 });

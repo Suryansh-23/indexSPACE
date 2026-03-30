@@ -2762,3 +2762,148 @@ describe('MarketFilterBar', () => {
     expect(moreChip).toBeNull();
   });
 });
+
+// ============================================================================
+// Instance-Proof: no duplicate DOM ids when rendering two instances side by side
+// ============================================================================
+
+describe('Instance-Proof: no duplicate DOM ids', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    cleanup();
+    setupMocksForData();
+  });
+
+  function getDuplicateIds(container: HTMLElement): string[] {
+    const ids = Array.from(container.querySelectorAll('[id]')).map(el => el.id);
+    return ids.filter((id, i) => ids.indexOf(id) !== i);
+  }
+
+  it('TradePanel: no duplicate ids with two instances', async () => {
+    const wrapper = createWrapper();
+    const { container } = render(
+      <>
+        <TradePanel marketId="1" />
+        <TradePanel marketId="1" />
+      </>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-trade-panel')).toBeTruthy();
+    });
+    const duplicates = getDuplicateIds(container);
+    expect(duplicates).toEqual([]);
+  });
+
+  it('BucketRangeSelector: no duplicate ids with two instances', async () => {
+    const wrapper = createWrapper();
+    const { container } = render(
+      <>
+        <BucketRangeSelector marketId="1" />
+        <BucketRangeSelector marketId="1" />
+      </>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-bucket-range')).toBeTruthy();
+    });
+    const duplicates = getDuplicateIds(container);
+    expect(duplicates).toEqual([]);
+  });
+
+  it('ShapeCutter: no duplicate ids with two instances', async () => {
+    const wrapper = createWrapper();
+    const { container } = render(
+      <>
+        <ShapeCutter marketId="1" />
+        <ShapeCutter marketId="1" />
+      </>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-shape-cutter')).toBeTruthy();
+    });
+    const duplicates = getDuplicateIds(container);
+    expect(duplicates).toEqual([]);
+  });
+
+  it('ConsensusChart: no duplicate ids with two instances', async () => {
+    const wrapper = createWrapper();
+    const { container } = render(
+      <>
+        <ConsensusChart marketId="1" />
+        <ConsensusChart marketId="1" />
+      </>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-chart-container')).toBeTruthy();
+    });
+    const duplicates = getDuplicateIds(container);
+    expect(duplicates).toEqual([]);
+  });
+
+  it('CustomShapeEditor: no duplicate ids with two instances', async () => {
+    const wrapper = createWrapper();
+    const { container } = render(
+      <>
+        <CustomShapeEditor marketId="1" />
+        <CustomShapeEditor marketId="1" />
+      </>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-custom-shape')).toBeTruthy();
+    });
+    const duplicates = getDuplicateIds(container);
+    expect(duplicates).toEqual([]);
+  });
+
+  it('BinaryPanel: no duplicate ids with two instances', async () => {
+    const wrapper = createWrapper();
+    const { container } = render(
+      <>
+        <BinaryPanel marketId="1" />
+        <BinaryPanel marketId="1" />
+      </>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-binary-panel')).toBeTruthy();
+    });
+    const duplicates = getDuplicateIds(container);
+    expect(duplicates).toEqual([]);
+  });
+});
+
+// ============================================================================
+// Portal-Proof: portalSupport adds theme class
+// ============================================================================
+
+describe('Portal-Proof', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    cleanup();
+    setupMocksForData();
+  });
+
+  it('portalSupport={true} applies theme class to wrapper div', async () => {
+    const { container } = render(
+      <React.StrictMode>
+        <FunctionSpaceProvider config={mockConfig} theme="fs-dark" portalSupport={true}>
+          <div data-testid="child">Hello</div>
+        </FunctionSpaceProvider>
+      </React.StrictMode>,
+    );
+
+    await waitFor(() => {
+      expect(container.querySelector('[data-testid="child"]')).toBeTruthy();
+    });
+
+    // The wrapper div should have a class starting with fs-theme-
+    const wrapperDiv = container.querySelector('[data-testid="child"]')?.parentElement;
+    expect(wrapperDiv).toBeTruthy();
+    const className = wrapperDiv?.className || '';
+    expect(className).toMatch(/fs-theme-/);
+  });
+});
