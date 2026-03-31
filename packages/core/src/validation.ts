@@ -3,15 +3,15 @@
  * Throws a descriptive SDK-side error on invalid input.
  *
  * Checks (in order):
- * 1. Length matches numBuckets+1 (market's num_buckets + 1)
+ * 1. Length matches numBuckets+2 (market's num_buckets + 2)
  * 2. All elements are finite (no NaN or Infinity)
  * 3. All elements non-negative
- * 4. Elements sum to 1.0 within tolerance (1e-6)
+ * 4. Elements sum to numBuckets+2 within proportional tolerance
  */
 export function validateBeliefVector(vector: number[], numBuckets: number): void {
-  if (vector.length !== numBuckets + 1) {
+  if (vector.length !== numBuckets + 2) {
     throw new Error(
-      `Belief vector length ${vector.length} does not match expected numBuckets+1 = ${numBuckets + 1}`,
+      `Belief vector length ${vector.length} does not match expected numBuckets+2 = ${numBuckets + 2}`,
     );
   }
 
@@ -24,7 +24,7 @@ export function validateBeliefVector(vector: number[], numBuckets: number): void
   }
 
   const sum = vector.reduce((a, b) => a + b, 0);
-  if (Math.abs(sum - 1.0) >= 1e-6) {
-    throw new Error(`Belief vector does not sum to 1.0 (sum = ${sum})`);
+  if (Math.abs(sum / (numBuckets + 2) - 1) >= 1e-6) {
+    throw new Error(`Belief vector does not sum to ${numBuckets + 2} (sum = ${sum})`);
   }
 }

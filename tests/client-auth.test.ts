@@ -191,9 +191,9 @@ describe('calculateBucketDistribution', () => {
 
 describe('computePercentiles', () => {
   it('returns evenly spaced percentiles for uniform coefficients', () => {
-    // Uniform: all coefficients equal → flat density
+    // Uniform: all coefficients equal -> flat density (K+2 elements, sum=1 consensus-like)
     const numBuckets = 60;
-    const uniform = new Array(numBuckets + 1).fill(1 / (numBuckets + 1));
+    const uniform = new Array(numBuckets + 2).fill(1 / (numBuckets + 2));
     const p = computePercentiles(uniform, 0, 100);
     // p50 should be near 50
     expect(p.p50).toBeCloseTo(50, 0);
@@ -204,11 +204,11 @@ describe('computePercentiles', () => {
   });
 
   it('returns tight inner bands for peaked distribution', () => {
-    // Peaked at center: Gaussian-like
+    // Peaked at center: Gaussian-like (K+2 elements)
     const numBuckets = 60;
-    const peaked = new Array(numBuckets + 1).fill(0);
-    for (let i = 0; i <= numBuckets; i++) {
-      const u = i / numBuckets;
+    const peaked = new Array(numBuckets + 2).fill(0);
+    for (let i = 0; i <= numBuckets + 1; i++) {
+      const u = i / (numBuckets + 1);
       peaked[i] = Math.exp(-Math.pow((u - 0.5) * 10, 2));
     }
     const sum = peaked.reduce((a: number, b: number) => a + b, 0);
@@ -222,7 +222,7 @@ describe('computePercentiles', () => {
 
   it('produces monotonically ordered percentiles', () => {
     const numBuckets = 60;
-    const uniform = new Array(numBuckets + 1).fill(1 / (numBuckets + 1));
+    const uniform = new Array(numBuckets + 2).fill(1 / (numBuckets + 2));
     const p = computePercentiles(uniform, 0, 100);
     expect(p.p2_5).toBeLessThanOrEqual(p.p12_5);
     expect(p.p12_5).toBeLessThanOrEqual(p.p25);
@@ -236,7 +236,7 @@ describe('computePercentiles', () => {
 
   it('all values within [lowerBound, upperBound]', () => {
     const numBuckets = 60;
-    const uniform = new Array(numBuckets + 1).fill(1 / (numBuckets + 1));
+    const uniform = new Array(numBuckets + 2).fill(1 / (numBuckets + 2));
     const p = computePercentiles(uniform, 10, 90);
     const values = [p.p2_5, p.p12_5, p.p25, p.p37_5, p.p50, p.p62_5, p.p75, p.p87_5, p.p97_5];
     for (const v of values) {
@@ -253,7 +253,7 @@ describe('transformHistoryToFanChart', () => {
       tradeId: 1,
       side: 'buy',
       positionId: '1',
-      alphaVector: new Array(61).fill(1),
+      alphaVector: new Array(62).fill(1),
       totalDeposits: 10,
       totalWithdrawals: 0,
       totalVolume: 10,
@@ -318,9 +318,9 @@ describe('transformHistoryToFanChart', () => {
 
   it('filters out snapshots with all-zero alpha', () => {
     const snaps = [
-      makeSnapshot({ snapshotId: 1, alphaVector: new Array(61).fill(1) }),
-      makeSnapshot({ snapshotId: 2, alphaVector: new Array(61).fill(0) }), // bad
-      makeSnapshot({ snapshotId: 3, alphaVector: new Array(61).fill(2) }),
+      makeSnapshot({ snapshotId: 1, alphaVector: new Array(62).fill(1) }),
+      makeSnapshot({ snapshotId: 2, alphaVector: new Array(62).fill(0) }), // bad
+      makeSnapshot({ snapshotId: 3, alphaVector: new Array(62).fill(2) }),
     ];
     const result = transformHistoryToFanChart(snaps, 0, 100);
     expect(result).toHaveLength(2);

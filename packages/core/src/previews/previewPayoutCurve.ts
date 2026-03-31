@@ -9,9 +9,9 @@ import { validateBeliefVector } from '../validation.js';
  *
  * @param client - The FSClient instance for API communication
  * @param marketId - The market identifier
- * @param belief - Probability distribution across buckets (length numBuckets+1)
+ * @param belief - Probability distribution across buckets (length numBuckets+2)
  * @param collateral - Amount of collateral to use for the hypothetical position
- * @param numBuckets - The market's num_buckets; belief vector must have length numBuckets+1
+ * @param numBuckets - The market's num_buckets; belief vector must have length numBuckets+2
  * @param numOutcomes - Optional number of outcome points to compute in the payout curve
  * @param options - Optional request options (e.g. AbortSignal)
  */

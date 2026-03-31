@@ -33,10 +33,10 @@ export interface SplineRegion {
 function normalize(raw: number[]): BeliefVector {
   const sum = raw.reduce((a, b) => a + b, 0);
   if (sum <= 0) {
-    const len = raw.length;
-    return raw.map(() => 1 / len);
+    return raw.map(() => 1);
   }
-  return raw.map((v) => v / sum);
+  const target = raw.length;
+  return raw.map((v) => v * target / sum);
 }
 
 function pointKernel(
@@ -47,10 +47,10 @@ function pointKernel(
 ): number[] {
   const uCenter = (region.center - lowerBound) / (upperBound - lowerBound);
   const uSpread = region.spread / (upperBound - lowerBound);
-  const raw = new Array<number>(numBuckets + 1);
+  const raw = new Array<number>(numBuckets + 2);
 
-  for (let k = 0; k <= numBuckets; k++) {
-    const u = k / numBuckets;
+  for (let k = 0; k <= numBuckets + 1; k++) {
+    const u = k / (numBuckets + 1);
 
     // Skew: use different effective spread on each side of center
     // |skew| controls intensity (0=symmetric, 1=full asymmetry)
@@ -96,9 +96,9 @@ function rangeKernel(
   // Interpolate taper width: 2/numBuckets (smooth) → 0 (sharp)
   const taperWidth = (2 / numBuckets) * (1 - sharpness);
 
-  const raw = new Array<number>(numBuckets + 1);
-  for (let k = 0; k <= numBuckets; k++) {
-    const u = k / numBuckets;
+  const raw = new Array<number>(numBuckets + 2);
+  for (let k = 0; k <= numBuckets + 1; k++) {
+    const u = k / (numBuckets + 1);
     if (u >= uLow && u <= uHigh) {
       raw[k] = 1.0;
     } else if (taperWidth > 0 && u < uLow && u >= uLow - taperWidth) {
@@ -132,7 +132,7 @@ function splineKernel(
   // Degenerate: single point or empty -- flat
   if (n <= 1) {
     const val = n === 1 ? Math.max(0, controlY[0]) : 0;
-    return new Array<number>(numBuckets + 1).fill(val);
+    return new Array<number>(numBuckets + 2).fill(val);
   }
 
   // Normalize control X positions to [0, 1]
@@ -146,10 +146,10 @@ function splineKernel(
   const N = n - 1; // number of cells in control point space
   const h = 1 / N; // uniform knot spacing in control point space
 
-  // Evaluate at numBuckets+1 uniformly spaced output points
-  const raw = new Array<number>(numBuckets + 1);
-  for (let i = 0; i <= numBuckets; i++) {
-    const u = i / numBuckets; // output position in [0, 1]
+  // Evaluate at numBuckets+2 uniformly spaced output points
+  const raw = new Array<number>(numBuckets + 2);
+  for (let i = 0; i <= numBuckets + 1; i++) {
+    const u = i / (numBuckets + 1); // output position in [0, 1]
 
     // Flat extension outside control point range
     // At boundaries, B-spline evaluates to c * 0.5 for the edge control point
@@ -198,7 +198,7 @@ export function generateBelief(
   lowerBound: number,
   upperBound: number,
 ): BeliefVector {
-  const combined = new Array<number>(numBuckets + 1).fill(0);
+  const combined = new Array<number>(numBuckets + 2).fill(0);
 
   for (const region of regions) {
     const weight = region.weight ?? 1;
@@ -207,7 +207,7 @@ export function generateBelief(
     else if (region.type === 'range') raw = rangeKernel(region, numBuckets, lowerBound, upperBound);
     else raw = splineKernel(region, numBuckets, lowerBound, upperBound);
 
-    for (let k = 0; k <= numBuckets; k++) {
+    for (let k = 0; k <= numBuckets + 1; k++) {
       combined[k] += raw[k] * weight;
     }
   }

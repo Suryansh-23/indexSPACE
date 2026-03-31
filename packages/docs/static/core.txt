@@ -289,7 +289,7 @@ console.log(`Account created: ${user.username}`);
 
 ### Validating Belief Vectors
 
-**`validateBeliefVector(vector, numBuckets)`** -- Pure client-side validation (no network call). Throws a descriptive error if the belief vector is invalid. Checks: length matches numBuckets+1, all elements finite, all elements non-negative, elements sum to 1.0 within tolerance (1e-6).
+**`validateBeliefVector(vector, numBuckets)`** -- Pure client-side validation (no network call). Throws a descriptive error if the belief vector is invalid. Checks: length matches numBuckets+2, all elements finite, all elements non-negative, elements sum to numBuckets+2 within proportional tolerance.
 
 ```typescript
 import { validateBeliefVector } from '@functionspace/core';
@@ -536,7 +536,7 @@ const { numBuckets, lowerBound, upperBound } = market.config;
 
 ### Step 2: Build a Belief
 
-Use any generator function to construct a normalized `BeliefVector` (a `number[]` of length `numBuckets + 1` that sums to 1).
+Use any generator function to construct a normalized `BeliefVector` (a `number[]` of length `numBuckets + 2` that sums to `numBuckets + 2`).
 
 ```typescript
 import { generateGaussian, generateRange, generateBelief, generateDip } from '@functionspace/core';
@@ -580,7 +580,7 @@ Parameters:
 | `marketId` | `string \| number` | Target market. |
 | `belief` | `BeliefVector` | Normalized probability vector from any generator. |
 | `collateral` | `number` | Amount of currency to commit. |
-| `numBuckets` | `number` | Number of outcome buckets (from `market.config.numBuckets`). Must equal `belief.length - 1`. |
+| `numBuckets` | `number` | Number of outcome buckets (from `market.config.numBuckets`). Must equal `belief.length - 2`. |
 | `options.prediction` | `number?` | Optional center-of-mass hint. Accepted for backward compatibility but no longer sent to the server. |
 
 **`sell(client, positionId, marketId)`** -- Closes an open position. Returns `SellResult`.
@@ -874,7 +874,7 @@ Flat alphabetical listing of every public type in the `@functionspace/core` pack
 type BeliefVector = number[];
 ```
 
-**Invariants:** A valid belief vector has length `numBuckets + 1`, where `numBuckets` is from `market.config.numBuckets`. All elements are non-negative. The elements sum to exactly 1 (normalized probability distribution). These invariants are enforced by the `generate*` builder functions and can be checked explicitly with `validateBeliefVector(vector, numBuckets)`.
+**Invariants:** A valid belief vector has length `numBuckets + 2`, where `numBuckets` is from `market.config.numBuckets`. All elements are non-negative. The elements sum to `numBuckets + 2`. These invariants are enforced by the `generate*` builder functions and can be checked explicitly with `validateBeliefVector(vector, numBuckets)`.
 
 **Usage:** Passed to `buy()` as the trader's belief about outcome probabilities.
 
@@ -988,7 +988,7 @@ type BeliefVector = number[];
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `numBuckets` | `number` | Number of outcome buckets (belief vector length is `numBuckets + 1`) |
+| `numBuckets` | `number` | Number of outcome buckets (belief vector length is `numBuckets + 2`) |
 | `lowerBound` | `number` | Lower bound of the outcome space |
 | `upperBound` | `number` | Upper bound of the outcome space |
 | `P0` | `number` | Initial pool endowment |

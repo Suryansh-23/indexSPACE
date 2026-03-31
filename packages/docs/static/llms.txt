@@ -2723,7 +2723,7 @@ function useDistributionState(
 
 ### 5.4 Building Beliefs
 
-A belief vector is a `number[]` of length `numBuckets + 1` that sums to 1. It expresses a trader's probability distribution over possible outcomes. Every trade in the SDK starts with constructing a belief.
+A belief vector is a `number[]` of length `numBuckets + 2` that sums to `numBuckets + 2`. It expresses a trader's probability distribution over possible outcomes. Every trade in the SDK starts with constructing a belief.
 
 The three parameters `numBuckets`, `lowerBound`, and `upperBound` always come from the market configuration. Never hardcode them.
 
@@ -2745,7 +2745,7 @@ function generateBelief(
   numBuckets: number,
   lowerBound: number,
   upperBound: number,
-): BeliefVector  // number[] of length numBuckets+1, sums to 1
+): BeliefVector  // number[] of length numBuckets+2, sums to numBuckets+2
 ```
 
 **Parameters:**
@@ -2753,7 +2753,7 @@ function generateBelief(
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `regions` | `Region[]` | One or more region objects describing where probability mass should concentrate. Regions are additive -- their weighted kernels are summed before normalization. |
-| `numBuckets` | `number` | Number of outcome buckets. The output vector has `numBuckets + 1` elements. From `market.config.numBuckets`. |
+| `numBuckets` | `number` | Number of outcome buckets. The output vector has `numBuckets + 2` elements. From `market.config.numBuckets`. |
 | `lowerBound` | `number` | Lower bound of the outcome space. From `market.config.lowerBound`. |
 | `upperBound` | `number` | Upper bound of the outcome space. From `market.config.upperBound`. |
 
@@ -2791,14 +2791,14 @@ function generateBelief(
 
 #### How Composition Works
 
-When you pass multiple regions, `generateBelief` processes each into a raw kernel array, scales by `weight`, sums them element-wise, then normalizes the combined array to sum to 1:
+When you pass multiple regions, `generateBelief` processes each into a raw kernel array, scales by `weight`, sums them element-wise, then normalizes the combined array to sum to numBuckets+2:
 
 ```
 for each region:
     kernel = computeKernel(region, numBuckets, lowerBound, upperBound)
     combined[k] += kernel[k] * region.weight
 
-return normalize(combined)  // sums to 1; returns uniform if sum <= 0
+return normalize(combined)  // sums to numBuckets+2; returns uniform if sum <= 0
 ```
 
 Regions are additive, not multiplicative. Two peaks at different locations create a bimodal distribution. A peak with `weight: 2` gets twice the probability mass of a peak with `weight: 1` before normalization.
@@ -2986,7 +2986,7 @@ async function buy(
 | `marketId` | `string \| number` | The market to trade in |
 | `belief` | `BeliefVector` | The probability distribution to trade on |
 | `collateral` | `number` | Amount of currency to put up (minimum is typically 1) |
-| `numBuckets` | `number` | Number of outcome buckets (from `market.config.numBuckets`). Must equal `belief.length - 1`. |
+| `numBuckets` | `number` | Number of outcome buckets (from `market.config.numBuckets`). Must equal `belief.length - 2`. |
 | `options.prediction` | `number` | Optional center-of-mass hint. Accepted for backward compatibility but no longer sent to the server. |
 
 **Returns `BuyResult`:**
@@ -3621,7 +3621,7 @@ console.log(`Account created: ${user.username}`);
 
 #### Validating Belief Vectors
 
-**`validateBeliefVector(vector, numBuckets)`** -- Pure client-side validation (no network call). Throws a descriptive error if the belief vector is invalid. Checks length matches numBuckets+1, all elements are finite, all elements are non-negative, and elements sum to 1.0 within tolerance (1e-6).
+**`validateBeliefVector(vector, numBuckets)`** -- Pure client-side validation (no network call). Throws a descriptive error if the belief vector is invalid. Checks length matches numBuckets+2, all elements are finite, all elements are non-negative, and elements sum to numBuckets+2 within proportional tolerance.
 
 ```typescript
 import { validateBeliefVector } from '@functionspace/core';
@@ -3878,7 +3878,7 @@ const { numBuckets, lowerBound, upperBound } = market.config;
 
 #### Step 2: Build a Belief
 
-Use any generator function to construct a normalized `BeliefVector` (a `number[]` of length `numBuckets + 1` that sums to 1).
+Use any generator function to construct a normalized `BeliefVector` (a `number[]` of length `numBuckets + 2` that sums to `numBuckets + 2`).
 
 ```typescript
 import { generateGaussian, generateRange, generateBelief, generateDip } from '@functionspace/core';
@@ -3925,7 +3925,7 @@ Parameters:
 | `marketId` | `string \| number` | Target market. |
 | `belief` | `BeliefVector` | Normalized probability vector from any generator. |
 | `collateral` | `number` | Amount of currency to commit. |
-| `numBuckets` | `number` | Number of outcome buckets (from `market.config.numBuckets`). Must equal `belief.length - 1`. |
+| `numBuckets` | `number` | Number of outcome buckets (from `market.config.numBuckets`). Must equal `belief.length - 2`. |
 | `options.prediction` | `number?` | Optional center-of-mass hint. Accepted for backward compatibility but no longer sent to the server. |
 
 **`sell(client, positionId, marketId)`** -- Closes an open position. Returns `SellResult`.
@@ -4747,7 +4747,7 @@ Flat alphabetical listing of every public type across the three SDK packages. Ea
 type BeliefVector = number[];
 ```
 
-**Invariants:** A valid belief vector has length `numBuckets + 1`, where `numBuckets` is from `market.config.numBuckets`. All elements are non-negative. The elements sum to exactly 1 (normalized probability distribution). These invariants are enforced by the `generate*` builder functions.
+**Invariants:** A valid belief vector has length `numBuckets + 2`, where `numBuckets` is from `market.config.numBuckets`. All elements are non-negative. The elements sum to `numBuckets + 2`. These invariants are enforced by the `generate*` builder functions.
 
 **Usage:** Passed to `buy()` as the trader's belief about outcome probabilities. Passed to `ctx.setPreviewBelief()` for chart overlays.
 
@@ -4861,7 +4861,7 @@ type BeliefVector = number[];
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `numBuckets` | `number` | Number of outcome buckets (belief vector length is `numBuckets + 1`) |
+| `numBuckets` | `number` | Number of outcome buckets (belief vector length is `numBuckets + 2`) |
 | `lowerBound` | `number` | Lower bound of the outcome space |
 | `upperBound` | `number` | Upper bound of the outcome space |
 | `P0` | `number` | Initial pool endowment |

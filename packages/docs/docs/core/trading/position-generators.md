@@ -16,7 +16,7 @@ function generateBelief(
   numBuckets: number,
   lowerBound: number,
   upperBound: number,
-): BeliefVector  // number[] that sums to 1, length numBuckets+1
+): BeliefVector  // number[] of length numBuckets+2, sums to numBuckets+2
 ```
 
 **Parameters:**
@@ -24,7 +24,7 @@ function generateBelief(
 | Parameter    | Type       | Description                                                                                                                                                                                                                                  |
 | ------------ | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `regions`    | `Region[]` | One or more regions describing where probability mass should be concentrated. Regions are **additive**: their weighted kernels are summed before normalization. Can mix any combination of `PointRegion`, `RangeRegion`, and `SplineRegion`. |
-| `numBuckets`  | `number`   | Number of outcome buckets (the vector will have `numBuckets + 1` elements). From `market.config.numBuckets`.                                                                                                                                  |
+| `numBuckets`  | `number`   | Number of outcome buckets (the vector will have `numBuckets + 2` elements). From `market.config.numBuckets`.                                                                                                                                  |
 | `lowerBound`  | `number`   | Lower bound of the outcome space. From `market.config.lowerBound`.                                                                                                                                                                           |
 | `upperBound`  | `number`   | Upper bound of the outcome space. From `market.config.upperBound`.                                                                                                                                                                           |
 
@@ -34,9 +34,9 @@ function generateBelief(
 const { numBuckets, lowerBound, upperBound } = market.config;
 ```
 
-For example, a market asking "What will the temperature be?" might have `numBuckets = 100`, `lowerBound = 50`, `upperBound = 120`, meaning 101 buckets spanning 50°F to 120°F.
+For example, a market asking "What will the temperature be?" might have `numBuckets = 100`, `lowerBound = 50`, `upperBound = 120`, meaning 102 coefficients spanning 50°F to 120°F.
 
-**Return value:** A `BeliefVector` (`number[]`) of length `numBuckets + 1` where every element is ≥ 0 and the array sums to exactly 1. Each element represents the probability mass assigned to one outcome bucket. Element `[0]` corresponds to outcome `lowerBound`, element `[numBuckets]` corresponds to outcome `upperBound`, with linear interpolation between.
+**Return value:** A `BeliefVector` (`number[]`) of length `numBuckets + 2` where every element is >= 0 and the array sums to `numBuckets + 2`. Each element is a B-spline coefficient. Element `[0]` corresponds to the boundary before `lowerBound`, element `[numBuckets + 1]` corresponds to the boundary after `upperBound`, with the interior coefficients spanning the outcome range.
 
 **Region Types**
 
@@ -99,14 +99,14 @@ Used by the `generateRange(ranges[], numBuckets, lowerBound, upperBound)` overlo
 
 **How Composition Works**
 
-When you pass multiple regions, `generateBelief` processes each into a raw kernel array, scales by `weight`, sums them element-wise, then normalizes the combined array to sum to 1:
+When you pass multiple regions, `generateBelief` processes each into a raw kernel array, scales by `weight`, sums them element-wise, then normalizes the combined array to sum to numBuckets+2:
 
 ```
 for each region:
     kernel = computeKernel(region, numBuckets, lowerBound, upperBound)
     combined[k] += kernel[k] * region.weight
 
-return normalize(combined)  // divide by sum → sums to 1 (if sum ≤ 0, returns uniform distribution)
+return normalize(combined)  // scales so sum = numBuckets+2 (if sum <= 0, returns uniform distribution)
 ```
 
 Regions are **additive, not multiplicative**. Two peaks at different locations create a bimodal distribution. A peak with `weight: 2` gets twice the probability mass of a peak with `weight: 1` (before normalization).

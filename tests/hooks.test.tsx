@@ -24,8 +24,8 @@ vi.mock('@functionspace/core', () => ({
   calculateBucketDistribution: vi.fn(),
   computePercentiles: vi.fn(),
   generateCustomShape: vi.fn().mockImplementation((controlValues: number[], numBuckets: number) => {
-    const len = numBuckets + 1;
-    return new Array(len).fill(1 / len);
+    const len = numBuckets + 2;
+    return new Array(len).fill(1);
   }),
   generateBellShape: vi.fn().mockImplementation((n: number) => new Array(n).fill(0.5)),
   computeStatistics: vi.fn().mockReturnValue({ mode: 100, mean: 100, median: 100, variance: 25, stdDev: 5 }),
@@ -1617,7 +1617,7 @@ async function populateMarketCache(cache: QueryCache, marketId: string, numBucke
   cache.registerQueryFn(['marketState', marketId], async () => ({
     config: { numBuckets, lowerBound: 0, upperBound: 100, K: numBuckets, L: 0, H: 100 },
     title: 'Test Market',
-    consensusBelief: new Array(numBuckets + 1).fill(1 / (numBuckets + 1)),
+    consensusBelief: new Array(numBuckets + 2).fill(1 / (numBuckets + 2)),
   }));
   cache.ensureFetching(['marketState', marketId]);
   // Wait for the async fetch to complete
@@ -2960,8 +2960,8 @@ describe('useAuth hook', () => {
 
 const mockCustomShapeMarket = {
   config: { numBuckets: 50, lowerBound: 50, upperBound: 150, K: 50, L: 50, H: 150 },
-  consensus: new Array(51).fill(1 / 51),
-  alpha: new Array(51).fill(1),
+  consensus: new Array(52).fill(1 / 52),
+  alpha: new Array(52).fill(1),
 } as any;
 
 describe('useCustomShape hook', () => {
@@ -3107,7 +3107,7 @@ describe('useCustomShape hook', () => {
     });
     await waitFor(() => expect(result.current).not.toBeNull());
     expect(result.current.pVector).not.toBe(null);
-    expect(result.current.pVector).toHaveLength(51);
+    expect(result.current.pVector).toHaveLength(52);
   });
 
   it('drag lifecycle works correctly', async () => {
