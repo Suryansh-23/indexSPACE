@@ -69,60 +69,58 @@ FunctionSpaceProvider
 **Distribution Trading: Synced chart + bucket selector**
 
 ```tsx
-function DistRangeLayout({ marketId }) {
+function DistRangeContent({ marketId }) {
   const distState = useDistributionState(marketId);
   return (
-    <FunctionSpaceProvider config={config} theme="fs-dark">
+    <>
       <MarketCharts marketId={marketId} views={['consensus', 'distribution']} distributionState={distState} />
       <BucketRangeSelector marketId={marketId} distributionState={distState} />
-    </FunctionSpaceProvider>
+    </>
   );
 }
+
+// useDistributionState requires provider context -- wrap above
+<FunctionSpaceProvider config={config} theme="fs-dark">
+  <DistRangeContent marketId={1} />
+</FunctionSpaceProvider>
 ```
 
 #### Market Discovery Patterns
 
-`MarketCard` and `MarketCardGrid` are presentational components -- they receive `MarketState` data and fire an `onSelect(marketId)` callback. The consumer decides what happens on selection. Two patterns exist depending on your app architecture.
+All three discovery patterns use `MarketExplorer` for browsing markets. They differ in what happens when the user selects a market: a state-driven page swap, route-based navigation, or an overlay panel that keeps the browse page visible.
 
 **Pattern 1: State-Driven Navigation (no router)**
 
-Use this when building single-page apps, embedded widgets, or when the host app already has a router. This pattern is also the starting point for overlay/modal market selectors.
+Use this when building single-page apps, embedded widgets, or when the host app already has a router.
 
 ```tsx
 import { useState } from 'react';
-import { FunctionSpaceProvider, useMarkets } from '@functionspace/react';
-import { MarketCardGrid, MarketCharts, TradePanel, PositionTable } from '@functionspace/ui';
+import { FunctionSpaceProvider } from '@functionspace/react';
+import { MarketExplorer, MarketCharts, TradePanel, PositionTable } from '@functionspace/ui';
 
 const config = { apiBase: 'https://api.example.com' };
 
-function MarketDiscoveryLayout() {
-  const [selectedMarketId, setSelectedMarketId] = useState<number | null>(null);
-  const { markets, loading, error } = useMarkets({ state: 'open', sortBy: 'totalVolume' });
-
-  if (selectedMarketId !== null) {
-    return (
-      <>
-        <button onClick={() => setSelectedMarketId(null)}>Back to Markets</button>
-        <MarketCharts marketId={selectedMarketId} />
-        <TradePanel marketId={selectedMarketId} />
-        <PositionTable marketId={selectedMarketId} />
-      </>
-    );
-  }
-
-  return <MarketCardGrid markets={markets} loading={loading} error={error} onSelect={setSelectedMarketId} />;
-}
-
 export default function App() {
+  const [selectedMarketId, setSelectedMarketId] = useState<number | null>(null);
+
   return (
     <FunctionSpaceProvider config={config} theme="fs-dark">
-      <MarketDiscoveryLayout />
+      {selectedMarketId !== null ? (
+        <>
+          <button onClick={() => setSelectedMarketId(null)}>Back to Markets</button>
+          <MarketCharts marketId={selectedMarketId} />
+          <TradePanel marketId={selectedMarketId} />
+          <PositionTable marketId={selectedMarketId} />
+        </>
+      ) : (
+        <MarketExplorer state="open" onSelect={setSelectedMarketId} />
+      )}
     </FunctionSpaceProvider>
   );
 }
 ```
 
-- **Pros:** Zero extra dependencies, simpler, embeddable in existing apps, no URL conflicts, ready for overlay/modal variant.
+- **Pros:** Zero extra dependencies, simpler, embeddable in existing apps, no URL conflicts.
 - **Cons:** No shareable URLs, no browser back/forward, no bookmarking.
 
 **Pattern 2: Route-Driven Navigation (React Router)**
@@ -131,15 +129,14 @@ Use this for standalone multi-page apps where you need shareable/bookmarkable UR
 
 ```tsx
 import { BrowserRouter, Routes, Route, useParams, useNavigate } from 'react-router-dom';
-import { FunctionSpaceProvider, useMarkets } from '@functionspace/react';
-import { MarketCardGrid, MarketCharts, TradePanel, PositionTable } from '@functionspace/ui';
+import { FunctionSpaceProvider } from '@functionspace/react';
+import { MarketExplorer, MarketCharts, TradePanel, PositionTable } from '@functionspace/ui';
 
 const config = { apiBase: 'https://api.example.com' };
 
 function MarketBrowsePage() {
   const navigate = useNavigate();
-  const { markets, loading, error } = useMarkets({ state: 'open', sortBy: 'totalVolume' });
-  return <MarketCardGrid markets={markets} loading={loading} error={error} onSelect={(id) => navigate(`/trade/${id}`)} />;
+  return <MarketExplorer state="open" onSelect={(id) => navigate(`/trade/${id}`)} />;
 }
 
 function TradingPage() {
@@ -175,33 +172,7 @@ export default function App() {
 - **Pros:** Shareable URLs, browser back/forward navigation, bookmarkable.
 - **Cons:** Requires `react-router-dom`, can conflict with host router, more setup.
 
-**Trade-off comparison**
-
-| Consideration | State-Driven | Route-Driven |
-|---|---|---|
-| Shareable URLs | No | Yes |
-| Browser back/forward | No | Yes |
-| Bookmarking | No | Yes |
-| Extra dependencies | None | react-router-dom |
-| Embeddable in existing apps | Yes -- no router conflicts | May conflict with host router |
-| Overlay/modal ready | Yes -- swap view toggle for modal | Less applicable |
-
-**Provider Placement Rule**
-
-`FunctionSpaceProvider` MUST wrap above the navigation boundary -- above the router or above the `useState`. This ensures auth, cache, and theme persist across navigation.
-
-```tsx
-// Correct: provider outside navigation
-<FunctionSpaceProvider config={config} theme="fs-dark">
-  {/* State-driven or Router-driven navigation inside */}
-</FunctionSpaceProvider>
-```
-
-Never create a second provider for nested routes.
-
-See [MarketCard](./markets/marketcard) and [MarketCardGrid](./markets/marketcardgrid) for props reference.
-
-#### Embedded Market Discovery
+**Pattern 3: Embedded Discovery (Overlay)**
 
 `MarketExplorer` provides a self-contained browse-and-trade flow with multiple view modes and an optional overlay panel. It manages search, category, and sort state internally via `useMarketFilters`, renders a `MarketFilterBar` and the active view, and opens a slide-over panel when a card is clicked (when a `children` render prop is provided). You supply the trading UI via a render prop:
 
@@ -218,7 +189,35 @@ See [MarketCard](./markets/marketcard) and [MarketCardGrid](./markets/marketcard
 </FunctionSpaceProvider>
 ```
 
-If you need full-page navigation instead of an overlay, use the state-driven or route-driven patterns above with `MarketCardGrid` directly.
+- **Pros:** User stays on the browse page, zero extra dependencies, self-contained.
+- **Cons:** No shareable URLs, no browser back/forward.
+
+**Trade-off comparison**
+
+| Consideration | State-Driven | Route-Driven | Overlay |
+|---|---|---|---|
+| Shareable URLs | No | Yes | No |
+| Browser back/forward | No | Yes | No |
+| User stays on browse page | No | No | Yes |
+| Extra dependencies | None | react-router-dom | None |
+| Embeddable in existing apps | Yes -- no router conflicts | May conflict with host router | Yes |
+
+**Provider Placement Rule**
+
+`FunctionSpaceProvider` MUST wrap above the navigation boundary -- above the router or above the `useState`. This ensures auth, cache, and theme persist across navigation.
+
+```tsx
+// Correct: provider outside navigation
+<FunctionSpaceProvider config={config} theme="fs-dark">
+  {/* State-driven or Router-driven navigation inside */}
+</FunctionSpaceProvider>
+```
+
+Never create a second provider for nested routes.
+
+See [MarketCard](./markets/marketcard) and [MarketCardGrid](./markets/marketcardgrid) for props reference.
+
+All three patterns use `MarketExplorer` for browsing. For fully custom browse UIs without `MarketExplorer`, use `useMarketFilters` + `MarketFilterBar` + `MarketCardGrid` directly -- see the individual component docs.
 
 See [MarketExplorer](./markets/marketexplorer) for props reference.
 

@@ -1,10 +1,18 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, useParams, useNavigate } from 'react-router-dom';
 import { FunctionSpaceProvider } from '@functionspace/react';
-import { MarketExplorer, TradePanel, MarketStats, ConsensusChart } from '@functionspace/ui';
+import { MarketExplorer } from '@functionspace/ui';
 import { config, widgetTheme } from './App';
 
-// ── Market Explorer Page ──
+// -- Swap trading layout by changing this import --
+import { BasicTradingLayout as TradingLayout } from './App_BasicTradingLayout';
+// import { ShapeCutterTradingLayout as TradingLayout } from './App_ShapeCutterTradingLayout';
+// import { DistRangeLayout as TradingLayout } from './App_DistRange';
+// import { BinaryPanelLayout as TradingLayout } from './App_BinaryPanel';
+// import { CustomShapeLayout as TradingLayout } from './App_CustomShapeLayout';
+// import { TimelineBinaryLayout as TradingLayout } from './App_TimelineBinaryTradingLayout';
+
+// -- Market Explorer Page --
 
 function MarketExplorerPage() {
   const navigate = useNavigate();
@@ -22,7 +30,7 @@ function MarketExplorerPage() {
   );
 }
 
-// ── Trading Page ──
+// -- Trading Page --
 
 function TradingPage() {
   const { marketId } = useParams<{ marketId: string }>();
@@ -66,14 +74,12 @@ function TradingPage() {
       >
         &larr; Back to Markets
       </button>
-      <MarketStats marketId={numericId} />
-      <ConsensusChart marketId={numericId} height={350} zoomable />
-      <TradePanel marketId={numericId} modes={['gaussian', 'range']} />
+      <TradingLayout marketId={numericId} />
     </div>
   );
 }
 
-// ── Default Export (provider wraps outside router so hooks work on all routes) ──
+// -- Default Export (provider wraps outside router so hooks work on all routes) --
 
 export default function App_MarketDiscoveryRouted() {
   return (
