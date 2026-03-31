@@ -1,4 +1,4 @@
-import React, { useContext, useMemo } from 'react';
+import React, { useContext, useMemo, useId } from 'react';
 import {
   ComposedChart,
   Area,
@@ -42,6 +42,11 @@ export function ConsensusChartContent({
 }: ConsensusChartContentProps) {
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('ConsensusChartContent must be used within FunctionSpaceProvider');
+
+  const uniqueId = useId();
+  const consensusGradId = `${uniqueId}-consensus-grad`;
+  const previewGradId = `${uniqueId}-preview-grad`;
+  const selectedGradId = `${uniqueId}-selected-grad`;
 
   // Build chart data merging consensus, preview belief, payout, and overlays
   const chartData = useMemo<ChartPoint[]>(() => {
@@ -209,21 +214,21 @@ export function ConsensusChartContent({
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={chartData} margin={{ top: 25, right: 15, left: 10, bottom: 30 }}>
           <defs>
-            <linearGradient id="fsConsensusGrad" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={consensusGradId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={ctx.chartColors.consensus} stopOpacity={0.4} />
               <stop offset="95%" stopColor={ctx.chartColors.consensus} stopOpacity={0.05} />
             </linearGradient>
-            <linearGradient id="fsPreviewGrad" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={previewGradId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={ctx.chartColors.previewLine} stopOpacity={0.3} />
               <stop offset="95%" stopColor={ctx.chartColors.previewLine} stopOpacity={0.0} />
             </linearGradient>
-            <linearGradient id="fsSelectedGrad" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={selectedGradId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={ctx.chartColors.positions[0]} stopOpacity={0.3} />
               <stop offset="95%" stopColor={ctx.chartColors.positions[0]} stopOpacity={0.0} />
             </linearGradient>
             {/* Dynamic gradients for overlay curves */}
             {overlayCurves?.map((overlay) => (
-              <linearGradient key={`grad-${overlay.id}`} id={`fsOverlayGrad-${overlay.id}`} x1="0" y1="0" x2="0" y2="1">
+              <linearGradient key={`grad-${overlay.id}`} id={`${uniqueId}-overlay-grad-${overlay.id}`} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor={overlay.color || ctx.chartColors.payout} stopOpacity={0.3} />
                 <stop offset="95%" stopColor={overlay.color || ctx.chartColors.payout} stopOpacity={0.0} />
               </linearGradient>
@@ -297,7 +302,7 @@ export function ConsensusChartContent({
             stroke={ctx.chartColors.consensus}
             strokeWidth={2}
             fillOpacity={1}
-            fill="url(#fsConsensusGrad)"
+            fill={`url(#${consensusGradId})`}
             name="consensus"
             isAnimationActive={false}
           />
@@ -312,7 +317,7 @@ export function ConsensusChartContent({
               strokeWidth={2}
               strokeDasharray="5 5"
               fillOpacity={1}
-              fill="url(#fsPreviewGrad)"
+              fill={`url(#${previewGradId})`}
               name="preview"
               animationDuration={300}
             />
@@ -327,7 +332,7 @@ export function ConsensusChartContent({
               stroke={ctx.chartColors.positions[0]}
               strokeWidth={2}
               fillOpacity={1}
-              fill="url(#fsSelectedGrad)"
+              fill={`url(#${selectedGradId})`}
               name="selected"
               animationDuration={300}
             />
@@ -358,7 +363,7 @@ export function ConsensusChartContent({
               stroke={overlay.color || ctx.chartColors.payout}
               strokeWidth={2}
               fillOpacity={1}
-              fill={`url(#fsOverlayGrad-${overlay.id})`}
+              fill={`url(#${uniqueId}-overlay-grad-${overlay.id})`}
               name={overlay.id}
               animationDuration={300}
             />

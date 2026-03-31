@@ -42,7 +42,8 @@ All hooks in `@functionspace/react` require a `FunctionSpaceProvider` ancestor. 
 | `config.password`         | `string?`       | Password for auto-authentication on mount                                                                                                                                                                |
 | `config.autoAuthenticate` | `boolean?`      | Controls auto-login behavior. Auto-auth fires when this is not explicitly `false` AND both `username` and `password` are truthy. Set to `false` to suppress auto-auth even when credentials are present. |
 | `theme`                   | `FSThemeInput?` | Preset name (`"fs-dark"`, `"fs-light"`, `"native-dark"`, `"native-light"`), partial theme object with optional `preset` base, or full `FSTheme`. Defaults to `"fs-dark"`. See Theme System.              |
-| `cache`                   | `CacheConfig?`  | Cache configuration. Accepts `staleTime` (ms before data is considered stale), `gcTime` (ms before unused entries are garbage collected), `defaultPollInterval` (ms), `revalidateOnFocus` (default: true), `revalidateOnReconnect` (default: true). |
+| `cache`                   | `CacheConfig?`  | Cache configuration. Accepts `staleTime` (ms before data is considered stale), `gcTime` (ms before unused entries are garbage collected), `defaultPollInterval` (ms), `revalidateOnFocus` (default: true), `revalidateOnReconnect` (default: true), `defaultRetry` (number of retry attempts for transient errors, default: 0), `defaultRetryDelay` (retry delay in ms or function, default: exponential backoff capped at 30s). |
+| `portalSupport`           | `boolean?`      | When `true`, injects theme CSS variables into a `<style>` tag on `document.head` via a scoped class, enabling portaled components to inherit theming. Default: `false`. Use `useThemeClass()` to get the class name for portal containers. |
 | `storedUsername`          | `string \| null?` | Previously authenticated username. When provided, the Provider attempts silent re-auth on mount via `silentReAuth`. If the account requires a password, sets `showAdminLogin: true` on context. |
 | `children`                | `ReactNode`     | Child component tree                                                                                                                                                                                     |
 
@@ -172,20 +173,21 @@ All data-fetching hooks share a common pattern:
 * Accept `marketId` as the first argument
 * Return `{ data, loading, isFetching, error, refetch }` (where `data` is the hook-specific field name like `market`, `consensus`, etc.)
 * `loading` is `true` only on the first fetch (no cached data). On background refetches, `loading` stays `false` and `isFetching` is `true`.
-* Primary data-fetching hooks accept optional `QueryOptions` (`pollInterval`, `enabled`). Composite hooks do not accept `QueryOptions` directly -- they inherit polling behavior from their inner hooks.
+* Primary data-fetching hooks accept optional `QueryOptions` (`pollInterval`, `enabled`, `retry`, `retryDelay`). Composite hooks do not accept `QueryOptions` directly -- they inherit polling/retry behavior from their inner hooks.
 * Automatically re-fetch when `ctx.invalidate(marketId)` is called or when the cache entry is otherwise invalidated
 * Throw if called outside a `FunctionSpaceProvider`
 * `refetch()` returns `Promise<void>` and triggers a background refetch
 
 #### Hooks Overview
 
-All 14 hooks provided by `@functionspace/react`, grouped by category.
+All 15 hooks provided by `@functionspace/react`, grouped by category.
 
 **Data Hooks**
 
 | Hook | Description | Docs |
 |------|-------------|------|
 | `useMarket` | Market metadata, config, state | [Details](./markets/usemarket) |
+| `useMarkets` | Market discovery with filtering, sorting, limiting | [Details](./markets/usemarkets) |
 | `useConsensus` | Probability density curves | [Details](./markets/useconsensus) |
 | `usePositions` | User and market positions | [Details](./positions/usepositions) |
 | `useMarketHistory` | Alpha vector snapshots over time | [Details](./markets/usemarkethistory) |
@@ -214,3 +216,4 @@ All 14 hooks provided by `@functionspace/react`, grouped by category.
 | Hook | Description | Docs |
 |------|-------------|------|
 | `useChartZoom` | Chart zoom/pan state | [Details](./chart-utilities/usechartzoom) |
+| `useThemeClass` | Returns the scoped CSS class name for theme variables. Requires `portalSupport={true}` on `FunctionSpaceProvider`. Apply this class to portal containers so portaled widgets inherit theme CSS variables. Throws if called outside the Provider or without portal support enabled. | [Details](./markets/usethemeclass) |

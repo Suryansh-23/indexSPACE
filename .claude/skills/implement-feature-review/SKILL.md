@@ -9,6 +9,8 @@ argument-hint: <handoff-doc-path>
 
 You are the orchestrator for a multi-agent adversarial code review. Your job is to read the context, locate all implementation artifacts, identify what changed, dispatch focused review agents in parallel, then consolidate their findings into a single actionable report.
 
+**NEVER SKIP ANY STEP.** Every step (1 through 6) must be executed in order. Do not skip reading prerequisites, do not skip locating artifacts, do not skip dispatching all 8 agents, do not skip consolidation, do not skip evidence verification. Each step exists because skipping it produced incomplete or incorrect reviews.
+
 ## STEP 1 -- Read Prerequisites
 
 Read these files completely before doing anything else:
@@ -210,4 +212,4 @@ Before presenting the summary, verify the consolidation report contains:
    - Any coverage blind spots (files reviewed by fewer than 2 agents)
    - Whether doc updates are recommended
    - The full path to the review file
-3. Tell the user: "The review is at `{OUTPUT_DIR}/review-{FEATURE_NAME}.md` -- this file can be handed to another agent with `/implement-feature` for remediation."
+3. Tell the user: "The review is at `{OUTPUT_DIR}/review-{FEATURE_NAME}.md` -- this file can be handed to another agent with `/implement-feature` for remediation. **DO NOT SKIP STEPS. Every phase (0 through 7) in implement-feature must be executed in order. No exceptions.**"

@@ -36,7 +36,7 @@ The SDK is organised around two orthogonal principles: **Layers** determine abst
 | Queries | Reads and interprets current server state | Read-only | `queryMarketState()`, `queryMarketPositions()` |
 | Previews | Computes hypothetical outcomes without modifying state | Read-only | `previewPayoutCurve()`, `previewSell()` |
 | Transactions | State-changing operations | Write | `buy()`, `sell()` |
-| Discovery | Find and filter markets or positions | Read-only | `discoverMarkets()` |
+| Discovery | Find and filter markets or positions | Read-only | `discoverMarkets()`, `filterMarkets()`, `discoverPopularMarkets()`, `discoverActiveMarkets()`, `discoverMarketsByCategory()` |
 | Validation | Input correctness checks before network calls | Read-only (no network) | `validateBeliefVector()` |
 
 ### Layer × Category Rule
@@ -76,13 +76,16 @@ Every new function must be classifiable by both layer AND category. This keeps t
 | Widgets must check `FunctionSpaceContext` | Throws helpful error if provider missing |
 | Data-fetching hooks return `{ <named>, loading, isFetching, error, refetch }` | Named property matches hook purpose. `loading` is true only on first fetch (no cached data). `isFetching` is true whenever a request is in flight (first fetch or background refetch). State/action hooks (e.g. `useAuth`, `useCustomShape`) return context fields directly. |
 | Data-fetching hooks use `useCacheSubscription`, not local `useState` | Hooks subscribe to the query cache via `useSyncExternalStore`. No per-hook `useState` for data/loading/error. |
-| Data-fetching hooks accept optional `QueryOptions` (`pollInterval`, `enabled`). | All data-fetching hooks support cache-based polling and conditional fetching. |
+| Data-fetching hooks accept optional `QueryOptions` (`pollInterval`, `enabled`, `retry`, `retryDelay`). | All data-fetching hooks support cache-based polling, conditional fetching, and configurable retry with exponential backoff. |
 | Hooks must provide `getServerSnapshot` for SSR | `useCacheSubscription` provides a frozen idle snapshot for server-side rendering. |
 | Export types separately | `export type { Props }` for proper tree-shaking |
 | Chart content components can fetch their own data | TimelineChartContent calls `useMarketHistory` internally  -- avoids wasteful fetches when tab is hidden |
 | Docs `Root.tsx` SSR fallback must NOT wrap in `FunctionSpaceProvider` | `FunctionSpaceProvider` blocks rendering during SSR (`providerReady` depends on `useEffect`), producing empty HTML that breaks search indexing, SEO, and accessibility |
 | UI components must NOT import `buy`, `sell`, `previewPayoutCurve`, or `previewSell` from core | Use mutation hooks (`useBuy`, `useSell`, `usePreviewPayout`, `usePreviewSell`) from `@functionspace/react` instead. Direct core imports bypass state management and auto-invalidation. |
 | Mutation hooks return `{ execute, loading, error, reset }` | Distinct from data-fetching hooks which return `{ <named>, loading, isFetching, error, refetch }`. Mutation hooks use local `useState`, not `useCacheSubscription`. |
+| No hardcoded DOM `id` attributes in UI components | Use React's `useId()` for all `id`, `htmlFor`, SVG gradient ids. Prevents collisions when multiple instances mount. Architecture test enforces this. |
+| Portal support via `useThemeClass()` | When `portalSupport={true}` on Provider, theme CSS vars are injected into `document.head` via scoped class. `useThemeClass()` returns the class name for portal containers. |
+| Activity-proof subscriber tracking | QueryCache tracks subscriber activity via `subscriberActivity` Map. Poll timers pause when all subscribers are inactive (tab hidden). |
 
 ## File Locations
 
@@ -100,6 +103,8 @@ Every new function must be classifiable by both layer AND category. This keeps t
 | Add/modify cache context | `packages/react/src/QueryCacheContext.ts` |
 | Add auth functions | `packages/core/src/auth/auth.ts` |
 | Add auth widgets | `packages/ui/src/auth/` (AuthWidget, PasswordlessAuthWidget) |
+| Add discovery math (treemap) | `packages/core/src/discovery/treemap.ts` |
+| Add market explorer views | `packages/ui/src/market/views/` (PulseCard, CompactCard, GaugeCard, SplitCard, TableView, HeatmapView, ChartsView) |
 | Add chart zoom/pan math | `packages/core/src/chart/zoom.ts` |
 | Add internal UI primitives | `packages/ui/src/components/` (not exported from package root) |
 | Edit documentation content | `packages/docs/docs/` (Markdown/MDX files) |
@@ -108,7 +113,9 @@ Every new function must be classifiable by both layer AND category. This keeps t
 | Edit docs search config | `packages/docs/docusaurus.config.js` (`themes` array, `@easyops-cn/docusaurus-search-local`) |
 | Edit docs SDK integration | `packages/docs/src/plugins/sdk-webpack-plugin.js`, `packages/docs/src/theme/Root.tsx` |
 | Update AI context files | `packages/docs/static/llms.txt`, `core.txt`, `react.txt`, `ui.txt` |
-| Exported types from react | `CacheConfig`, `QueryOptions`, `FSContext`, `FSThemeInput`, `ChartColors`, `FanBandColors`, `ThemePresetId`, `FSTheme`, `ResolvedFSTheme`, `DistributionState`, `DistributionStateConfig`, `ChartZoomOptions`, `ChartZoomResult`, `UseCustomShapeReturn`, `UseBuyReturn`, `UseSellReturn`, `UsePreviewPayoutReturn`, `UsePreviewSellReturn`, `FunctionSpaceProviderProps`, `PasswordlessLoginResult` |
+| Exported types from react | `CacheConfig`, `QueryOptions`, `RetryDelayFn`, `FSContext`, `FSThemeInput`, `ChartColors`, `CategoryColors`, `FanBandColors`, `ThemePresetId`, `FSTheme`, `ResolvedFSTheme`, `DistributionState`, `DistributionStateConfig`, `ChartZoomOptions`, `ChartZoomResult`, `UseCustomShapeReturn`, `UseBuyReturn`, `UseSellReturn`, `UsePreviewPayoutReturn`, `UsePreviewSellReturn`, `FunctionSpaceProviderProps`, `PasswordlessLoginResult`, `MarketDiscoveryOptions`, `SortOption`, `UseMarketFiltersConfig`, `UseMarketFiltersReturn`, `MarketFilterBarProps` |
+| Exported types from ui | `MarketStatsProps`, `MarketCardProps`, `MarketCardGridProps`, `MarketListProps`, `MarketExplorerProps`, `MarketExplorerView`, `PositionTableProps`, `PositionTabId`, `TimeSalesProps`, `TradeInputBaseProps`, `XPointMode`, `ChartView`, `DistributionState`, `DistributionStateConfig` |
+| Exported constants from react | `DEFAULT_CATEGORY_COLORS`, `FALLBACK_CATEGORY_COLOR` |
 
 ## Testing Requirements
 
@@ -134,6 +141,7 @@ cd packages/docs && npx docusaurus build  # Docs site build verification (requir
 | `tests/client-signal.test.ts` | FSClient signal forwarding and request() refactor | Changing FSClient.get(), FSClient.post(), or request() method |
 | `tests/mappings.test.ts` | Mocked-fetch mapping contract tests (raw API shape to SDK type, POST body assertions) | Changing any mapping function, API endpoint shapes, or POST request bodies |
 | `tests/validation.test.ts` | Belief vector and username validation (validateBeliefVector, validateUsername) | Changing validation logic or adding new validation functions |
+| `tests/discovery.test.ts` | filterMarkets unit tests, L2 convenience function tests | Adding or modifying discovery/filter functions |
 | `tests/components.test.tsx` | Widget smoke tests, interaction tests, and accessibility audit -- all UI components | Adding or modifying UI widgets -- see [Widget Component Testing Guide](../Docs/widget-component-testing-guide.md) |
 | `tests/density-stats.test.ts` | L0 math functions (evaluateDensityCurve, evaluateDensityPiecewise, computeStatistics) | Changing density curve evaluation, B-spline evaluation, or statistics computation |
 
@@ -238,6 +246,7 @@ Multi-agent adversarial review of recent implementation work. Invoked manually w
 ## Deferred Work
 
 - **Prediction field cleanup.** `Position.prediction` and `TradeEntry.prediction` remain on the types. `buy()` still accepts `options.prediction` (deprecated, not sent to server). `useBuy` does not forward it. Removal was deferred -- when picked up, remove fields from both types, remove the option from `buy()`, remove Prediction columns from PositionTable/TimeSales, and update consumer docs.
+- **Context-level marketId.** MarketExplorer uses render props and `onSelect` callbacks for market selection. A context-level `marketId` on `FunctionSpaceContext` was not needed for this pattern. Remains deferred as a potential future enhancement if multiple independent widgets need to react to market selection changes simultaneously across the widget tree.
 
 ## Commit Style
 

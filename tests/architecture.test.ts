@@ -122,7 +122,7 @@ describe('SDK Architecture', () => {
       // State/action hooks and internal helpers don't follow the data-fetching pattern
       const nonDataHooks = ['useAuth', 'useCustomShape', 'useChartZoom', 'useCacheSubscription'];
       // Derived hooks compose other hooks, they don't subscribe to cache directly
-      const derivedHooks = ['useBucketDistribution', 'useDistributionState'];
+      const derivedHooks = ['useBucketDistribution', 'useDistributionState', 'useMarketFilters'];
       // Mutation/preview hooks use useState, not useCacheSubscription
       const mutationHooks = ['useBuy', 'useSell', 'usePreviewPayout', 'usePreviewSell'];
       const excludeHooks = [...nonDataHooks, ...derivedHooks, ...mutationHooks];
@@ -216,6 +216,7 @@ describe('SDK Architecture', () => {
 
       // Check key hooks
       expect(indexContent).toContain('useMarket');
+      expect(indexContent).toContain('useMarkets');
       expect(indexContent).toContain('useConsensus');
       expect(indexContent).toContain('usePositions');
       expect(indexContent).toContain('useTradeHistory');
@@ -229,12 +230,17 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('useSell');
       expect(indexContent).toContain('usePreviewPayout');
       expect(indexContent).toContain('usePreviewSell');
+      expect(indexContent).toContain('useMarketFilters');
+      expect(indexContent).toContain('useThemeClass');
 
       // Return types
       expect(indexContent).toContain('UseBuyReturn');
       expect(indexContent).toContain('UseSellReturn');
       expect(indexContent).toContain('UsePreviewPayoutReturn');
       expect(indexContent).toContain('UsePreviewSellReturn');
+      expect(indexContent).toContain('UseMarketFiltersReturn');
+      expect(indexContent).toContain('MarketFilterBarProps');
+      expect(indexContent).toContain('SortOption');
     });
 
     it('chart zoom types and helper are exported from react package', () => {
@@ -315,6 +321,13 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('BucketRangeSelector');
       expect(indexContent).toContain('BucketTradePanel');
       expect(indexContent).toContain('CustomShapeEditor');
+      expect(indexContent).toContain('MarketCard');
+      expect(indexContent).toContain('MarketCardGrid');
+      expect(indexContent).toContain('MarketList'); // deprecated re-export
+      expect(indexContent).toContain('MarketFilterBar');
+      expect(indexContent).toContain('MarketCardProps');
+      expect(indexContent).toContain('MarketCardGridProps');
+      expect(indexContent).toContain('MarketListProps'); // deprecated re-export
     });
 
     it('AuthWidget is exported from ui package', () => {
@@ -457,6 +470,81 @@ describe('SDK Architecture', () => {
         'utf-8'
       );
       expect(coreIndex).toContain('validateBeliefVector');
+    });
+
+    it('discovery functions and types are exported from core', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/core/src/index.ts'),
+        'utf-8'
+      );
+
+      expect(indexContent).toContain('filterMarkets');
+      // Explicit check for discoverMarkets as a standalone export (not just substring of discoverMarketsByCategory)
+      expect(indexContent).toMatch(/\bdiscoverMarkets\b[^B]/);
+      expect(indexContent).toContain('discoverPopularMarkets');
+      expect(indexContent).toContain('discoverActiveMarkets');
+      expect(indexContent).toContain('discoverMarketsByCategory');
+      expect(indexContent).toContain('FilterAction');
+      expect(indexContent).toContain('MarketFilter');
+      expect(indexContent).toContain('MarketDiscoveryOptions');
+    });
+
+    it('MarketExplorer, MarketExplorerProps, and MarketExplorerView are exported from ui package', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/ui/src/index.ts'),
+        'utf-8'
+      );
+
+      expect(indexContent).toContain('MarketExplorer');
+      expect(indexContent).toContain('MarketExplorerProps');
+      expect(indexContent).toContain('MarketExplorerView');
+    });
+
+    it('treemapLayout and types are exported from core', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/core/src/index.ts'),
+        'utf-8'
+      );
+
+      expect(indexContent).toContain('treemapLayout');
+      expect(indexContent).toContain('TreemapItem');
+      expect(indexContent).toContain('TreemapRect');
+    });
+
+    it('category color types are exported from react package', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/react/src/index.ts'),
+        'utf-8'
+      );
+
+      // DEFAULT_CATEGORY_COLORS constant exported
+      expect(indexContent).toContain('DEFAULT_CATEGORY_COLORS');
+      // ChartColors type includes categoryColors field
+      expect(indexContent).toContain('ChartColors');
+      // CategoryColors type exported for consumers to type category color maps
+      expect(indexContent).toContain('CategoryColors');
+    });
+  });
+
+  describe('Instance Safety', () => {
+    it('no hardcoded string-literal id="fs" or id={`fs` in UI components', () => {
+      const uiDir = path.join(__dirname, '../packages/ui/src');
+      const tsxFiles = getFiles(uiDir, /\.tsx$/);
+      const violations: string[] = [];
+
+      for (const file of tsxFiles) {
+        const content = fs.readFileSync(file, 'utf-8');
+        // Match id="fs..." (string literal with fs prefix, with or without hyphen)
+        if (/\bid="fs/.test(content)) {
+          violations.push(`${path.relative(process.cwd(), file)}: contains hardcoded id="fs..."`);
+        }
+        // Match id={\`fs...\`} (template literal with fs prefix, with or without hyphen)
+        if (/\bid=\{`fs/.test(content)) {
+          violations.push(`${path.relative(process.cwd(), file)}: contains hardcoded id={\`fs...\`}`);
+        }
+      }
+
+      expect(violations).toEqual([]);
     });
   });
 

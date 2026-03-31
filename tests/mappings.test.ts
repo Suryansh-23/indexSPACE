@@ -86,7 +86,7 @@ const expectedMarketState = {
   totalMass: 100,
   poolBalance: 500.0,
   participantCount: 12,
-  totalVolume: 1500.0,
+  totalVolume: 1200.0,
   positionsOpen: 5,
   config: {
     numBuckets: 6,
@@ -108,6 +108,14 @@ const expectedMarketState = {
   decimals: 2,
   resolutionState: 'open',
   resolvedOutcome: null,
+  marketId: 1,
+  createdAt: null,
+  expiresAt: null,
+  resolvedAt: null,
+  marketType: 'standard',
+  marketSubtype: null,
+  metadata: mockMarketStateRaw.metadata,
+  consensusMean: 46.00000000000001,
 };
 
 const mockPositionsRaw = {
@@ -449,6 +457,14 @@ const expectedDiscoverMarkets = [
     decimals: 2,
     resolutionState: 'open',
     resolvedOutcome: null,
+    marketId: 1,
+    createdAt: '2026-03-13T13:48:25.106364',
+    expiresAt: null,
+    resolvedAt: null,
+    marketType: 'standard',
+    marketSubtype: null,
+    metadata: mockDiscoverMarketsRaw.markets[0].metadata,
+    consensusMean: 46.00000000000001,
   },
   {
     alpha: [5, 5],
@@ -468,6 +484,14 @@ const expectedDiscoverMarkets = [
     decimals: 0,
     resolutionState: 'resolved',
     resolvedOutcome: 0,
+    marketId: 2,
+    createdAt: '2026-03-13T13:48:25.106364',
+    expiresAt: null,
+    resolvedAt: null,
+    marketType: 'standard',
+    marketSubtype: null,
+    metadata: mockDiscoverMarketsRaw.markets[1].metadata,
+    consensusMean: 0.5,
   },
 ];
 
@@ -660,11 +684,11 @@ describe('queryMarketState', () => {
     );
   });
 
-  it('defaults totalVolume to 0 when total_volume is missing', async () => {
-    const rawWithoutTotalVolume = { ...mockMarketStateRaw, total_volume: undefined };
+  it('defaults totalVolume to 0 when total_deposited and total_withdrawn are missing', async () => {
+    const rawWithoutVolume = { ...mockMarketStateRaw, total_deposited: undefined, total_withdrawn: undefined };
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(rawWithoutTotalVolume),
+      json: () => Promise.resolve(rawWithoutVolume),
     });
 
     const client = makeMockClient();
@@ -1711,16 +1735,17 @@ describe('discoverMarkets', () => {
     );
   });
 
-  it('defaults totalVolume to 0 when total_volume is missing from list item', async () => {
-    const rawWithoutTotalVolume = {
+  it('defaults totalVolume to 0 when total_deposited and total_withdrawn are missing from list item', async () => {
+    const rawWithoutVolume = {
       markets: [{
         ...mockDiscoverMarketsRaw.markets[0],
-        total_volume: undefined,
+        total_deposited: undefined,
+        total_withdrawn: undefined,
       }],
     };
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(rawWithoutTotalVolume),
+      json: () => Promise.resolve(rawWithoutVolume),
     });
 
     const client = makeMockClient();

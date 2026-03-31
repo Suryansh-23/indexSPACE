@@ -23,7 +23,7 @@ The React layer currently passes data through. Its job is to become the **value 
 | Invalidation | Targeted -- `ctx.invalidate(marketId)` marks only that market's cache entries as stale; `ctx.invalidateAll()` for global refresh |
 | Stale-while-revalidate | Implemented -- `loading` true only on first fetch; background refetches return cached data with `isFetching: true` |
 | Request cancellation | Implemented -- `AbortController` per in-flight request; aborts on re-fetch, parameter change, or cleanup |
-| Retry logic | None -- single attempt, fail immediately |
+| Retry logic | Implemented -- exponential backoff with configurable retry count and delay; error classification (4xx no retry, 5xx/network retry); abort-aware delays |
 
 ---
 
@@ -307,9 +307,9 @@ This means one API call serves both `useMarket` and `useConsensus`. Any other ho
 
 **Checklist:**
 
-- [ ] `useConsensus` reads from market cache entry + client-side transform
-- [ ] Mounting `useMarket` + `useConsensus` for the same market produces one API call, not two
-- [ ] Other derived hooks (`useBucketDistribution` already derives from `useMarket` + `useConsensus`) continue to work
+- [x] `useConsensus` reads from market cache entry + client-side transform
+- [x] Mounting `useMarket` + `useConsensus` for the same market produces one API call, not two
+- [x] Other derived hooks (`useBucketDistribution` already derives from `useMarket` + `useConsensus`) continue to work
 
 ---
 
@@ -338,11 +338,11 @@ This means one API call serves both `useMarket` and `useConsensus`. Any other ho
 
 **Checklist:**
 
-- [ ] Failed queries retry with exponential backoff (default: 3 retries)
-- [ ] Retry only on transient errors (network, 5xx), not on 4xx
-- [ ] Configurable at Provider level (`defaultRetryCount`, `defaultRetryDelay`) and per hook
-- [ ] Mutation hooks do NOT retry by default
-- [ ] Retry state is transparent  -- consumers see `loading`/`isFetching`, not individual retry attempts
+- [x] Failed queries retry with exponential backoff (default: 0 retries, opt-in via `cache={{ defaultRetry: 3 }}`)
+- [x] Retry only on transient errors (network, 5xx), not on 4xx
+- [x] Configurable at Provider level (`defaultRetry`, `defaultRetryDelay`) and per hook via `QueryOptions`
+- [x] Mutation hooks do NOT retry by default
+- [x] Retry state is transparent  -- consumers see `loading`/`isFetching`, not individual retry attempts
 
 ---
 
@@ -423,10 +423,10 @@ These are cross-cutting concerns that apply to all components regardless of tier
 
 **Checklist:**
 
-- [ ] No hardcoded `id` attributes in any component
-- [ ] `useId()` used for all DOM identifiers that need uniqueness
-- [ ] `htmlFor` / `aria-*` attributes reference the generated ID
-- [ ] Verified by mounting two instances of the same component
+- [x] No hardcoded `id` attributes in any component
+- [x] `useId()` used for all DOM identifiers that need uniqueness
+- [x] `htmlFor` / `aria-*` attributes reference the generated ID
+- [x] Verified by mounting two instances of the same component
 
 ---
 
@@ -442,9 +442,9 @@ These are cross-cutting concerns that apply to all components regardless of tier
 
 **Checklist:**
 
-- [ ] Poll timers pause when subscriber components are hidden
-- [ ] No network traffic for tabs/widgets not currently visible
-- [ ] CSS side effects (if any) are toggled on mount/unmount
+- [x] Poll timers pause when subscriber components are hidden
+- [x] No network traffic for tabs/widgets not currently visible
+- [x] CSS side effects (if any) are toggled on mount/unmount
 - [x] `document.visibilitychange` listener pauses all polling when tab is hidden
 
 ---
@@ -462,9 +462,9 @@ These are cross-cutting concerns that apply to all components regardless of tier
 
 **Checklist:**
 
-- [ ] Theme variables are accessible to portaled components
-- [ ] A utility or wrapper exists for portal use cases
-- [ ] Multiple Providers with different themes on one page do not conflict
+- [x] Theme variables are accessible to portaled components (via `portalSupport` prop + `useThemeClass()` hook)
+- [x] A utility or wrapper exists for portal use cases (`useThemeClass()` returns scoped class name)
+- [x] Multiple Providers with different themes on one page do not conflict (scoped class per instance)
 
 ---
 

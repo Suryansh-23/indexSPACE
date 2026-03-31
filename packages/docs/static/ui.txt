@@ -53,7 +53,7 @@ Description: A TypeScript SDK for embedding prediction market trading widgets in
 
 ### 1.2 What This Package Does
 
-The `@functionspace/ui` package provides pre-built React widgets for prediction market trading: chart components (ConsensusChart, DistributionChart, TimelineChart, MarketCharts), trading panels (TradePanel, ShapeCutter, BinaryPanel, BucketRangeSelector, BucketTradePanel, CustomShapeEditor), data display components (PositionTable, TimeSales, MarketStats), and auth widgets (AuthWidget, PasswordlessAuthWidget). All widgets are fully themed and self-contained.
+The `@functionspace/ui` package provides pre-built React widgets for prediction market trading: chart components (ConsensusChart, DistributionChart, TimelineChart, MarketCharts), trading panels (TradePanel, ShapeCutter, BinaryPanel, BucketRangeSelector, BucketTradePanel, CustomShapeEditor), data display components (PositionTable, TimeSales, MarketStats, MarketCard, MarketCardGrid, MarketFilterBar, MarketExplorer), and auth widgets (AuthWidget, PasswordlessAuthWidget). All widgets are fully themed and self-contained.
 
 ### 1.3 Package Dependency Chain
 
@@ -578,6 +578,76 @@ import { MarketStats } from '@functionspace/ui';
 
 Displays: Total Volume, Current Liquidity, Open Positions, Market Status.
 
+### `MarketCard`
+
+Presentational card displaying a single market summary. Receives `MarketState` as a prop -- does not fetch data internally.
+
+```tsx
+import { MarketCard } from '@functionspace/ui';
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `market` | `MarketState` | required | Market state object containing all display fields |
+| `onSelect` | `(marketId: number) => void` | -- | Called when the card or Trade button is clicked |
+
+Displays: Title, consensus mean with units, outcome range, volume, liquidity, traders, status badge, resolution date.
+
+### `MarketCardGrid`
+
+Responsive grid of MarketCard components with loading, error, and empty states. Presentational -- receives data as props. Replaces the previous `MarketList`.
+
+```tsx
+import { MarketCardGrid } from '@functionspace/ui';
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `markets` | `MarketState[]` | required | Array of market state objects |
+| `onSelect` | `(marketId: number) => void` | -- | Called when any card is clicked |
+| `loading` | `boolean` | `false` | Shows skeleton cards when true |
+| `error` | `Error \| null` | -- | Displays error message when provided |
+| `emptyMessage` | `string` | `'No markets found'` | Custom empty state text |
+
+Wire `onSelect` to state (`setSelectedMarketId`) for embedded widgets or to a router (`navigate`) for multi-page apps. See Market Discovery Navigation patterns below.
+
+### `MarketExplorer`
+
+Multi-view market discovery widget with tabbed view switching (cards, pulse, compact, gauge, split, table, heatmap, charts), integrated filter bar, and optional overlay panel for inline trading. Uses `useMarketFilters` internally. When `children` is provided, clicking a market opens an overlay; otherwise fires `onSelect`. Category colors are resolved from the theme via `ctx.chartColors.categoryColors`.
+
+```tsx
+import { MarketExplorer } from '@functionspace/ui';
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `views` | `MarketExplorerView[]` | `['cards']` | View tabs to show. Tab bar hidden when only one view. |
+| `children` | `(marketId: number) => React.ReactNode` | -- | Render prop for overlay panel content |
+| `onSelect` | `(marketId: number) => void` | -- | Called when a market is selected (when children is not provided) |
+| `state` | `string?` | -- | Filter by resolution state (e.g., `'open'`) |
+| `categories` | `string[]?` | -- | Fixed list of available categories |
+| `pollInterval` | `number?` | -- | Polling interval in ms for refreshing market data |
+| `emptyMessage` | `string` | `'No markets found'` | Custom empty state text |
+| `showFilterBar` | `boolean` | `true` | Show or hide the MarketFilterBar |
+| `featuredCategories` | `string[]?` | -- | Categories to display first in filter chips |
+| `sortOptions` | `SortOption[]?` | 5 defaults | Custom sort options |
+| `searchPlaceholder` | `string?` | `'Search markets...'` | Search input placeholder |
+| `filterBarMaxWidth` | `string?` | -- | CSS max-width for the filter bar |
+
+`MarketExplorerView`: `'cards' | 'pulse' | 'compact' | 'gauge' | 'split' | 'table' | 'heatmap' | 'charts'`
+
+If you need full-page navigation instead of an overlay, use `MarketCardGrid` directly with state-driven or route-driven patterns.
+
+### `MarketFilterBar`
+
+Presentational filter bar providing search input, category filter chips, sort dropdown, and result count. Driven by `useMarketFilters` -- spread the hook's `filterBarProps` directly.
+
+```tsx
+import { MarketFilterBar } from '@functionspace/ui';
+```
+
+Props: `searchText`, `onSearchChange`, `onSearchClear`, `searchPlaceholder?`, `availableCategories`, `selectedCategories`, `onToggleCategory`, `featuredCategories?`, `sortOptions`, `activeSortField`, `sortOrder`, `onSortFieldChange`, `onSortOrderToggle`, `resultCount`, `loading?`, `onReset`, `maxWidth?`. All required props are provided by `filterBarProps` from `useMarketFilters`.
+
 ### `AuthWidget`
 
 Self-contained authentication widget handling login, signup, and logout flows.
@@ -752,6 +822,12 @@ Layout notes:
 - `minWidth: 0` on flex children is mandatory. Without it, Recharts SVG elements overflow.
 - `ShapeCutter` and `MarketCharts` coordinate automatically through context.
 - `AuthWidget` takes no props -- it reads all auth state from context.
+
+### Browse-to-Trade
+
+**Browse-to-Trade:** Use `useMarkets` to fetch, `MarketCardGrid` to display, and `onSelect` to switch between grid and trading views. `FunctionSpaceProvider` wraps above the navigation boundary.
+
+Alternatively, use `MarketExplorer` for a self-contained browse-and-trade experience with multiple view modes and an optional overlay panel that handles market fetching, display, and overlay management internally.
 
 ---
 

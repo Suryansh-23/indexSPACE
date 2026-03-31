@@ -114,6 +114,8 @@ import { FunctionSpaceProvider } from '@functionspace/react';
 | `useAuth()` | `{ user, isAuthenticated, loading, error, login, signup, logout, refreshUser }` | Authentication state and actions |
 | `useChartZoom(options)` | `{ containerRef, xDomain, yDomain, isZoomed, isPanning, containerProps, reset }` | Zoom and pan interaction for charts |
 | `useCustomShape(market)` | `{ controlValues, pVector, prediction, setControlValue, toggleLock, ... }` | Custom shape editing with draggable control points |
+| `useMarkets(options?)` | `{ markets, loading, error, refetch }` | Market discovery with filtering, sorting, limiting |
+| `useMarketFilters(config?)` | `{ markets, loading, filterBarProps, ... }` | Search, category, sort state on top of useMarkets |
 
 **Theme System** -- Pass a preset string or a custom color scheme. The provider resolves 30 CSS tokens and chart-specific color values, making them available to all widgets automatically. See [Theming](#theming) for full documentation.
 
@@ -148,6 +150,10 @@ Pre-built React components organized by purpose. Each widget is self-contained -
 | `MarketStats` | `marketId` | Read-only statistics bar (mean, median, mode, pool, volume) |
 | `PositionTable` | `marketId`, `pageSize?`, `tabs?`, `onSell?` | Tabbed position/trade table with row selection and sell actions |
 | `TimeSales` | `marketId` | Real-time trade log |
+| `MarketCard` | `market`, `onSelect?` | Summary card for a single market (title, consensus mean, volume, liquidity, traders, status) |
+| `MarketCardGrid` | `markets`, `onSelect?`, `loading?` | Responsive grid of MarketCards for market discovery |
+| `MarketFilterBar` | `...filterBarProps` | Search, category chips, sort controls -- driven by `useMarketFilters` |
+| `MarketExplorer` | `views?`, `children?`, `onSelect?`, `state?`, `showFilterBar?`, ... | Multi-view market discovery with tabbed views (cards, pulse, compact, gauge, split, table, heatmap, charts), filter bar, and optional overlay panel |
 
 **Auth** (`auth/`)
 
@@ -192,6 +198,22 @@ function App() {
   );
 }
 ```
+
+### Market Discovery
+
+Browse and select markets, then trade on the selected one:
+
+```tsx
+import { FunctionSpaceProvider, useMarkets } from '@functionspace/react';
+import { MarketCardGrid, MarketCharts, TradePanel } from '@functionspace/ui';
+
+function App() {
+  const [marketId, setMarketId] = useState<number | null>(null);
+  // ... see composition guide for full pattern
+}
+```
+
+Two navigation patterns are available -- state-driven (no router, simpler) and route-driven (React Router, shareable URLs). See the documentation for complete examples and trade-offs.
 
 ## Theming
 
@@ -383,6 +405,6 @@ packages/
     ├── styles/base.css        All widget styles (CSS variables only)
     ├── charts/               ConsensusChart, DistributionChart, TimelineChart, MarketCharts
     ├── trading/              TradePanel, ShapeCutter, BinaryPanel, BucketRangeSelector, BucketTradePanel, CustomShapeEditor
-    ├── market/               MarketStats, PositionTable, TimeSales
+    ├── market/               MarketStats, MarketCardGrid, MarketExplorer, MarketFilterBar, PositionTable, TimeSales
     └── auth/                 AuthWidget
 ```

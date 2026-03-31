@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useContext, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useContext, useCallback, useMemo, useId } from 'react';
 import {
   ComposedChart,
   Area,
@@ -50,6 +50,11 @@ export function CustomShapeEditor({
 }: CustomShapeEditorProps) {
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('CustomShapeEditor must be used within FunctionSpaceProvider');
+
+  const uniqueId = useId();
+  const consensusGradId = `${uniqueId}-cs-consensus-grad`;
+  const beliefGradId = `${uniqueId}-cs-belief-grad`;
+  const selectedGradId = `${uniqueId}-cs-selected-grad`;
 
   const { market, loading: marketLoading, error: marketError } = useMarket(marketId);
   const { consensus } = useConsensus(marketId, 100);
@@ -442,15 +447,15 @@ export function CustomShapeEditor({
           <ResponsiveContainer width="100%" height={280}>
             <ComposedChart data={chartData} margin={{ top: 25, right: 15, left: 10, bottom: 30 }}>
               <defs>
-                <linearGradient id="fsCsConsensusGrad" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={consensusGradId} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={ctx.chartColors.consensus} stopOpacity={0.4} />
                   <stop offset="95%" stopColor={ctx.chartColors.consensus} stopOpacity={0.05} />
                 </linearGradient>
-                <linearGradient id="fsCsBeliefGrad" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={beliefGradId} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={ctx.chartColors.previewLine} stopOpacity={0.3} />
                   <stop offset="95%" stopColor={ctx.chartColors.previewLine} stopOpacity={0.0} />
                 </linearGradient>
-                <linearGradient id="fsCsSelectedGrad" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={selectedGradId} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={ctx.chartColors.positions[0]} stopOpacity={0.3} />
                   <stop offset="95%" stopColor={ctx.chartColors.positions[0]} stopOpacity={0.0} />
                 </linearGradient>
@@ -521,7 +526,7 @@ export function CustomShapeEditor({
                 stroke={ctx.chartColors.consensus}
                 strokeWidth={2}
                 fillOpacity={1}
-                fill="url(#fsCsConsensusGrad)"
+                fill={`url(#${consensusGradId})`}
                 name="consensus"
                 isAnimationActive={false}
               />
@@ -536,7 +541,7 @@ export function CustomShapeEditor({
                   strokeWidth={2}
                   strokeDasharray="5 5"
                   fillOpacity={1}
-                  fill="url(#fsCsBeliefGrad)"
+                  fill={`url(#${beliefGradId})`}
                   name="belief"
                   animationDuration={300}
                 />
@@ -551,7 +556,7 @@ export function CustomShapeEditor({
                   stroke={ctx.chartColors.positions[0]}
                   strokeWidth={2}
                   fillOpacity={1}
-                  fill="url(#fsCsSelectedGrad)"
+                  fill={`url(#${selectedGradId})`}
                   name="selected"
                   animationDuration={300}
                 />

@@ -51,7 +51,7 @@ Description: A TypeScript SDK for embedding prediction market trading widgets in
 
 ### 1.2 What This Package Does
 
-The `@functionspace/react` package provides the React integration layer for the FunctionSpace Trading SDK. It includes `FunctionSpaceProvider` (which manages auth, theming, and shared state), data-fetching hooks (`useMarket`, `useConsensus`, `usePositions`, etc.), mutation hooks (`useBuy`, `useSell`), preview hooks (`usePreviewPayout`, `usePreviewSell`), state hooks (`useAuth`, `useCustomShape`, `useChartZoom`), and the context API for cross-component coordination.
+The `@functionspace/react` package provides the React integration layer for the FunctionSpace Trading SDK. It includes `FunctionSpaceProvider` (which manages auth, theming, and shared state), data-fetching hooks (`useMarket`, `useMarkets`, `useMarketFilters`, `useConsensus`, `usePositions`, etc.), mutation hooks (`useBuy`, `useSell`), preview hooks (`usePreviewPayout`, `usePreviewSell`), state hooks (`useAuth`, `useCustomShape`, `useChartZoom`), and the context API for cross-component coordination.
 
 ### 1.3 Package Dependency Chain
 
@@ -87,7 +87,7 @@ This document covers `@functionspace/core` + `@functionspace/react` (headless cu
 | # | Limitation | Impact | Workaround |
 |---|-----------|--------|------------|
 | 2 | **No real-time transport (WebSocket/SSE).** The SDK has no push-based data delivery. All data freshness depends on polling or explicit refetch calls. Changes made by other users are not automatically visible without polling. | Market state, consensus curves, and position data go stale between refetches. In multi-user scenarios, the local view drifts from server state until the next poll or refetch. | Use `pollInterval` on any data hook to poll for updates (e.g., `useConsensus(marketId, 200, { pollInterval: 3000 })`). Call `ctx.invalidate(marketId)` after local trades for immediate refetch. |
-| 4 | **No market search or filtering.** `discoverMarkets()` returns all available markets as a flat `MarketState[]` array. The function accepts no search, filter, sort, or pagination parameters. | Applications that need to display a subset of markets must fetch the entire market list on every call. There is no server-side filtering. | Call `discoverMarkets(client)` and filter the returned array client-side using standard `Array.filter()`, `Array.sort()`, or `Array.find()` methods. |
+| 4 | **No server-side market filtering.** `discoverMarkets()` fetches all markets from the server and applies filtering client-side. There is no server-side search, filter, sort, or pagination. | The full market list is fetched on every call regardless of filter options. | Use `useMarkets(options)` with `MarketDiscoveryOptions` for client-side filtering, sorting, and limiting with automatic caching and polling support. |
 | 7 | **Settlement not yet implemented.** The `Position` type includes `settlementPayout` and `MarketState` includes `resolvedOutcome` fields, but no settlement functions exist in the SDK. | Positions in resolved markets cannot be settled through the SDK. The `settlementPayout` field is always `null` in current responses. | Monitor the `resolutionState` field on `MarketState` for `'resolved'` or `'voided'` status. Settlement processing must be handled outside the SDK until settlement functions are added. |
 
 ---
@@ -144,7 +144,8 @@ The `FunctionSpaceProvider` component also accepts these optional props:
 |------|------|----------|-------------|
 | `config` | `FSConfig` | Yes | Configuration object (see table above) |
 | `theme` | `FSThemeInput` | No | Theme preset string or custom theme object |
-| `cache` | `CacheConfig` | No | Cache configuration: `{ staleTime?, gcTime?, defaultPollInterval?, revalidateOnFocus?, revalidateOnReconnect? }` |
+| `cache` | `CacheConfig` | No | Cache configuration: `{ staleTime?, gcTime?, defaultPollInterval?, revalidateOnFocus?, revalidateOnReconnect?, defaultRetry?, defaultRetryDelay? }`. `defaultRetry` (number, default 0) sets the global retry count for transient errors. `defaultRetryDelay` (number or function, default exponential backoff capped at 30s) sets the delay between retries. |
+| `portalSupport` | `boolean` | No | When `true`, injects theme CSS variables into `document.head` via a scoped class. Use `useThemeClass()` to get the class name for portal containers. Default: `false`. |
 | `storedUsername` | `string \| null` | No | Previously stored username for silent re-authentication on mount |
 
 ### Import Map
@@ -205,6 +206,8 @@ import type { FSContext } from '@functionspace/react';
 // Data hooks
 import {
   useMarket,
+  useMarkets,
+  useMarketFilters,
   useConsensus,
   usePositions,
   useTradeHistory,
@@ -245,7 +248,7 @@ const config = {
 
 ## 4. Data Hooks Reference
 
-All data-fetching hooks follow a consistent contract. Each returns an object with a named data property, plus `loading`, `isFetching`, `error`, and `refetch`. All data hooks subscribe to the query cache and automatically refetch when `ctx.invalidate(marketId)` is called. All data hooks accept optional `QueryOptions` (`pollInterval`, `enabled`) for cache-based polling and conditional fetching.
+All data-fetching hooks follow a consistent contract. Each returns an object with a named data property, plus `loading`, `isFetching`, `error`, and `refetch`. All data hooks subscribe to the query cache and automatically refetch when `ctx.invalidate(marketId)` is called. All data hooks accept optional `QueryOptions` (`pollInterval`, `enabled`, `retry`, `retryDelay`) for cache-based polling, conditional fetching, and configurable retry with exponential backoff.
 
 **`loading` vs `isFetching`:** `loading` is `true` only on the first fetch (no cached data). On background refetches (polling, invalidation), `loading` stays `false` and `isFetching` is `true`. This prevents UI flicker during polling and background refetches.
 
@@ -273,6 +276,8 @@ function useMarket(
 | `marketId` | `string \| number` | The market identifier |
 | `options.pollInterval` | `number?` | Polling interval in ms. Default: `0` (no polling). |
 | `options.enabled` | `boolean?` | When `false`, suppresses fetching. Default: `true`. |
+| `options.retry` | `number?` | Number of retry attempts for transient errors. Default: `0`. |
+| `options.retryDelay` | `number \| RetryDelayFn?` | Retry delay in ms or function. Default: `min(1000 * 2^attempt, 30000)`. |
 
 **Return shape:**
 
@@ -284,7 +289,7 @@ function useMarket(
 | `error` | `Error \| null` | Fetch error, if any |
 | `refetch` | `() => Promise<void>` | Trigger a background refetch |
 
-The `MarketState` object contains the market configuration (`market.config` with `numBuckets`, `lowerBound`, `upperBound`, and other protocol parameters), the current consensus vector (`market.consensus`), pool statistics (`market.totalMass`, `market.poolBalance`, `market.totalVolume`), metadata (`market.title`, `market.xAxisUnits`, `market.decimals`), and resolution state (`market.resolutionState`).
+The `MarketState` object contains the market configuration (`market.config` with `numBuckets`, `lowerBound`, `upperBound`, and other protocol parameters), the current consensus vector (`market.consensus`), pool statistics (`market.totalMass`, `market.poolBalance`, `market.totalVolume`), metadata (`market.title`, `market.xAxisUnits`, `market.decimals`, `market.metadata`), identity and lifecycle fields (`market.marketId`, `market.createdAt`, `market.expiresAt`, `market.resolvedAt`), classification (`market.marketType`, `market.marketSubtype`), the consensus mean (`market.consensusMean`), and resolution state (`market.resolutionState`).
 
 **Example:**
 
@@ -305,6 +310,209 @@ function MarketHeader({ marketId }: { marketId: string }) {
       <p>Range: {market.config.lowerBound} - {market.config.upperBound} {market.xAxisUnits}</p>
       <p>Total volume: ${market.totalVolume.toFixed(2)}</p>
       <p>Open positions: {market.positionsOpen}</p>
+    </div>
+  );
+}
+```
+
+### `useMarkets(options?)`
+
+Fetches a list of markets with optional client-side filtering, sorting, limiting, and polling.
+
+```typescript
+function useMarkets(
+  options?: MarketDiscoveryOptions & QueryOptions,
+): {
+  markets: MarketState[];
+  loading: boolean;
+  isFetching: boolean;
+  error: Error | null;
+  refetch: () => Promise<void>;
+}
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `options.state` | `string?` | Filter by `resolutionState` (e.g., `'open'`). |
+| `options.titleContains` | `string?` | Case-insensitive substring match on market title. |
+| `options.categories` | `string[]?` | Filter by category overlap. |
+| `options.filters` | `MarketFilter[]?` | Custom field-level filters (AND logic). |
+| `options.sortBy` | `string?` | Field name to sort by (e.g., `'totalVolume'`). |
+| `options.sortOrder` | `'asc' \| 'desc'?` | Sort direction. Default: `'desc'`. |
+| `options.limit` | `number?` | Maximum number of results. |
+| `options.pollInterval` | `number?` | Polling interval in ms. Default: `0` (no polling). |
+| `options.enabled` | `boolean?` | When `false`, suppresses fetching. Default: `true`. |
+| `options.retry` | `number?` | Number of retry attempts for transient errors. Default: `0`. |
+| `options.retryDelay` | `number \| RetryDelayFn?` | Retry delay in ms or function. Default: `min(1000 * 2^attempt, 30000)`. |
+
+**Return shape:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `markets` | `MarketState[]` | Filtered/sorted market list, or `[]` while loading |
+| `loading` | `boolean` | `true` only on the first fetch (no cached data) |
+| `isFetching` | `boolean` | `true` whenever a request is in flight |
+| `error` | `Error \| null` | Fetch error, if any |
+| `refetch` | `() => Promise<void>` | Trigger a background refetch |
+
+The hook delegates to `discoverMarkets(client, options)` from core. Filtering, sorting, and limiting are all client-side -- the full market list is fetched from the server on every request. Cache keys are derived from the discovery options, so different option combinations use separate cache entries.
+
+**Example -- list all markets:**
+
+```tsx
+import { useMarkets } from '@functionspace/react';
+
+function MarketBrowseExample() {
+  const { markets, loading, error } = useMarkets();
+
+  if (loading) return <div>Loading markets...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+
+  return (
+    <ul>
+      {markets.map(m => (
+        <li key={m.marketId}>{m.title} -- {m.resolutionState}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+**Example -- filtered with polling:**
+
+```tsx
+import { useMarkets } from '@functionspace/react';
+
+function PopularMarkets() {
+  const { markets, loading, isFetching } = useMarkets({
+    state: 'open',
+    sortBy: 'totalVolume',
+    sortOrder: 'desc',
+    limit: 10,
+    pollInterval: 30000,
+  });
+
+  if (loading) return <div>Loading...</div>;
+
+  return (
+    <div>
+      {isFetching && <span>Refreshing...</span>}
+      <ul>
+        {markets.map(m => (
+          <li key={m.marketId}>{m.title} -- Volume: {m.totalVolume}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+**With MarketCardGrid component:**
+
+```tsx
+import { useMarkets } from '@functionspace/react';
+import { MarketCardGrid } from '@functionspace/ui';
+
+function MarketBrowser({ onSelect }: { onSelect: (id: number) => void }) {
+  const { markets, loading, error } = useMarkets({
+    state: 'open',
+    sortBy: 'totalVolume',
+    sortOrder: 'desc',
+    pollInterval: 5000,
+  });
+
+  return <MarketCardGrid markets={markets ?? []} loading={loading} error={error} onSelect={onSelect} />;
+}
+```
+
+### `useMarketFilters(config?)`
+
+Manages search, category filtering, and sorting state on top of `useMarkets`. Debounces search input (300ms), builds discovery options from combined filter state, and returns filtered markets plus a `filterBarProps` bundle for `MarketFilterBar`.
+
+```typescript
+function useMarketFilters(
+  config?: UseMarketFiltersConfig,
+): UseMarketFiltersReturn
+```
+
+**Config:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `categories` | `string[]?` | -- | Fixed list of categories (overrides metadata-derived) |
+| `featuredCategories` | `string[]?` | -- | Categories to display first |
+| `sortOptions` | `SortOption[]?` | 5 defaults | Custom sort options (`{ field, label, defaultOrder? }`) |
+| `defaultSortField` | `string?` | `'totalVolume'` | Initial sort field |
+| `defaultSortOrder` | `'asc' \| 'desc'?` | `'desc'` | Initial sort direction |
+| `pollInterval` | `number?` | -- | Polling interval in ms |
+| `enabled` | `boolean?` | `true` | When `false`, suppresses fetching |
+| `state` | `string?` | -- | Filter by resolution state |
+
+**Key return fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `markets` | `MarketState[]` | Filtered, sorted results |
+| `loading` / `isFetching` | `boolean` | Loading state from underlying `useMarkets` |
+| `error` | `Error \| null` | Fetch error, if any |
+| `filterBarProps` | `MarketFilterBarProps` | Pre-built props bundle -- spread onto `MarketFilterBar` |
+| `searchText`, `selectedCategories`, `activeSortField`, `sortOrder`, `resultCount` | mixed | Current filter state |
+| `setSearchText`, `clearSearch`, `toggleCategory`, `setSortField`, `toggleSortOrder`, `resetFilters` | functions | Filter actions |
+| `availableCategories` | `string[]` | Categories derived from config or market metadata |
+| `sortOptions` | `SortOption[]` | Active sort options |
+
+**Behavior:**
+- Composes `useMarkets` internally -- no need to call it separately.
+- Search is debounced at 300ms before being passed as `titleContains`.
+- `setSortField` resets sort order to the selected option's `defaultOrder`.
+- `filterBarProps` is memoized and contains all props needed by `MarketFilterBar`.
+
+**Example -- with MarketFilterBar:**
+
+```tsx
+import { useMarketFilters } from '@functionspace/react';
+import { MarketFilterBar, MarketCardGrid } from '@functionspace/ui';
+
+function MarketBrowser() {
+  const { markets, loading, error, filterBarProps } = useMarketFilters({
+    state: 'open',
+    featuredCategories: ['sports', 'crypto'],
+    pollInterval: 10000,
+  });
+
+  return (
+    <div>
+      <MarketFilterBar {...filterBarProps} />
+      <MarketCardGrid markets={markets} loading={loading} error={error} />
+    </div>
+  );
+}
+```
+
+**Example -- custom filter UI (no MarketFilterBar):**
+
+```tsx
+import { useMarketFilters } from '@functionspace/react';
+
+function CustomFilters() {
+  const {
+    markets, loading, searchText, setSearchText,
+    selectedCategories, toggleCategory, availableCategories,
+    activeSortField, setSortField, sortOrder, toggleSortOrder,
+    resetFilters, resultCount,
+  } = useMarketFilters({ state: 'open' });
+
+  return (
+    <div>
+      <input value={searchText} onChange={(e) => setSearchText(e.target.value)} />
+      {availableCategories.map(c => (
+        <button key={c} onClick={() => toggleCategory(c)}>{c}</button>
+      ))}
+      <button onClick={resetFilters}>Reset</button>
+      <p>{resultCount} markets</p>
+      {/* render markets... */}
     </div>
   );
 }
@@ -336,6 +544,8 @@ function useConsensus(
 | `numPoints` | `number` | `200` | Number of sample points for the density curve |
 | `options.pollInterval` | `number?` | `0` | Polling interval in ms. |
 | `options.enabled` | `boolean?` | `true` | When `false`, suppresses fetching. |
+| `options.retry` | `number?` | `0` | Number of retry attempts for transient errors. |
+| `options.retryDelay` | `number \| RetryDelayFn?` | exponential | Retry delay in ms or function. Default: `min(1000 * 2^attempt, 30000)`. |
 
 **Return shape:**
 
@@ -400,6 +610,8 @@ function usePositions(
 | `username` | `string` | `undefined` | When provided, filters positions to this user only. When omitted, returns all market positions. |
 | `options.pollInterval` | `number?` | `0` | Polling interval in ms. |
 | `options.enabled` | `boolean?` | `true` | When `false`, suppresses fetching. |
+| `options.retry` | `number?` | `0` | Number of retry attempts for transient errors. |
+| `options.retryDelay` | `number \| RetryDelayFn?` | exponential | Retry delay in ms or function. Default: `min(1000 * 2^attempt, 30000)`. |
 
 **Example:**
 
@@ -460,6 +672,8 @@ function useTradeHistory(
 | `options.limit` | `number` | `100` | Maximum number of trade entries to return |
 | `options.pollInterval` | `number` | `0` | Polling interval in milliseconds. Visibility-aware and deduplicated. |
 | `options.enabled` | `boolean?` | `true` | When `false`, suppresses fetching. |
+| `options.retry` | `number?` | `0` | Number of retry attempts for transient errors. |
+| `options.retryDelay` | `number \| RetryDelayFn?` | exponential | Retry delay in ms or function. Default: `min(1000 * 2^attempt, 30000)`. |
 
 **Example:**
 
@@ -498,7 +712,7 @@ Fetches historical market snapshots (alpha vector changes over time). Used to bu
 ```typescript
 function useMarketHistory(
   marketId: string | number,
-  options?: { limit?: number; pollInterval?: number; enabled?: boolean },
+  options?: { limit?: number; pollInterval?: number; enabled?: boolean; retry?: number; retryDelay?: number | RetryDelayFn },
 ): {
   history: MarketHistory | null;
   loading: boolean;
@@ -1135,6 +1349,39 @@ const sellPreview = await previewSell(ctx.client, positionId, marketId);
 
 ---
 
+## 8.5. Utility Hooks
+
+### `useThemeClass()`
+
+Returns the scoped CSS class name for portal theme support.
+
+```typescript
+function useThemeClass(): string
+```
+
+Requires `portalSupport={true}` on `FunctionSpaceProvider`. Apply the returned class name to portal containers (e.g., modal roots, popover wrappers) so portaled SDK widgets inherit theme CSS variables.
+
+Throws if:
+- Called outside a `FunctionSpaceProvider`
+- Called when `portalSupport` is not enabled on the Provider
+
+**Example:**
+
+```tsx
+import { useThemeClass } from '@functionspace/react';
+import { createPortal } from 'react-dom';
+
+function Modal({ children }) {
+  const themeClass = useThemeClass();
+  return createPortal(
+    <div className={themeClass}>{children}</div>,
+    document.body
+  );
+}
+```
+
+---
+
 ## 9. Context API Quick Reference
 
 The context is accessed via `useContext(FunctionSpaceContext)` from `@functionspace/react`. It is `null` outside the provider -- always check before using.
@@ -1202,7 +1449,7 @@ These rules prevent the most common integration mistakes. Each maps to a silent 
 
 See the complete core type reference in `core.txt`. Key types used in headless mode:
 
-- **`MarketState`** -- Returned by `useMarket()`. Contains `config` (with `numBuckets`, `lowerBound`, `upperBound`), `consensus`, `title`, `xAxisUnits`, `resolutionState`, and pool statistics.
+- **`MarketState`** -- Returned by `useMarket()`. Contains `config` (with `numBuckets`, `lowerBound`, `upperBound`), `consensus`, `title`, `xAxisUnits`, `resolutionState`, pool statistics, identity/lifecycle fields (`marketId`, `createdAt`, `expiresAt`, `resolvedAt`), classification (`marketType`, `marketSubtype`), `metadata`, and `consensusMean`.
 - **`ConsensusCurve`** -- Returned by `useConsensus()`. Contains `points: Array<{x, y}>` and `config`.
 - **`Position`** -- Returned by `usePositions()`. Contains `positionId`, `belief`, `collateral`, `claims`, `status`, `prediction`.
 - **`BuyResult`** -- Returned by `buy()`. Contains `positionId`, `belief`, `claims`, `collateral`, `positionType?`, `positionParams?`.
@@ -1216,9 +1463,12 @@ See the complete core type reference in `core.txt`. Key types used in headless m
 
 - **`FSContext`** -- The shape of the React context object. 19 fields (9 read, 10 write). Accessed via `useContext(FunctionSpaceContext)`.
 - **`FSThemeInput`** -- Accepted by the `theme` prop on `FunctionSpaceProvider`. Can be a preset string (`"fs-dark"`, `"fs-light"`, `"native-dark"`, `"native-light"`) or an object with overrides.
-- **`CacheConfig`** -- Accepted by the `cache` prop on `FunctionSpaceProvider`. Configures `staleTime`, `gcTime`, `defaultPollInterval`, `revalidateOnFocus`, `revalidateOnReconnect`.
-- **`QueryOptions`** -- Accepted by all data-fetching hooks. Configures `pollInterval`, `enabled`.
-- **`ChartColors`** -- Concrete hex values for Recharts SVG. Accessible via `ctx.chartColors`. Includes `grid`, `axisText`, `consensus`, `previewLine`, `payout`, `positions`, `fanBands`.
+- **`CacheConfig`** -- Accepted by the `cache` prop on `FunctionSpaceProvider`. Configures `staleTime`, `gcTime`, `defaultPollInterval`, `revalidateOnFocus`, `revalidateOnReconnect`, `defaultRetry`, `defaultRetryDelay`.
+- **`QueryOptions`** -- Accepted by all data-fetching hooks. Configures `pollInterval`, `enabled`, `retry`, `retryDelay`.
+- **`ChartColors`** -- Concrete hex values for Recharts SVG. Accessible via `ctx.chartColors`. Includes `grid`, `axisText`, `consensus`, `previewLine`, `payout`, `positions`, `fanBands`, `categoryColors`.
+- **`CategoryColors`** -- `Record<string, string>` mapping category names to hex color strings. Accessed via `ctx.chartColors.categoryColors`.
+- **`DEFAULT_CATEGORY_COLORS`** -- `{ dark: CategoryColors; light: CategoryColors }` -- default color maps for known categories (General, Sports, Crypto, Finance, Tech, Culture, Politics, Macro). Exported from `@functionspace/react`.
+- **`FALLBACK_CATEGORY_COLOR`** -- `{ dark: string; light: string }` -- fallback hex color for categories not in the default map. Exported from `@functionspace/react`.
 
 ### Theme Presets
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useContext, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useContext, useCallback, useId } from 'react';
 import {
   generateGaussian,
   generateRange,
@@ -32,6 +32,7 @@ export function ShapeCutter({
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('ShapeCutter must be used within FunctionSpaceProvider');
 
+  const amountId = useId();
   const { market } = useMarket(marketId);
   const { execute: submitBuy, loading: isSubmitting, error: buyError } = useBuy(marketId);
   const { execute: previewPayout } = usePreviewPayout(marketId);
@@ -428,7 +429,7 @@ export function ShapeCutter({
           <div className="fs-sc-amount-wrapper">
             <span className="fs-sc-amount-prefix">$</span>
             <input
-              id="fs-sc-amount"
+              id={amountId}
               type="number"
               step="0.01"
               min="1"

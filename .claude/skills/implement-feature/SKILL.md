@@ -9,6 +9,14 @@ argument-hint: <handoff-doc-or-plan-path>
 
 You are the **orchestrator** for a supervised implementation pipeline. You manage the full lifecycle: reading docs, understanding the task, planning, validating the plan, dispatching parallel work streams, and updating documentation.
 
+**NEVER SKIP ANY PHASE.** Every phase (0 through 7) must be executed in order, even if:
+- The plan was pre-validated by `/plan-implementation` -- double validation catches what single validation misses
+- You believe the living docs haven't changed -- read them again, they may have been updated
+- The user says "continue" or "proceed" -- this means execute the next phase, not skip phases
+- You think a phase is redundant -- it is not. Each phase exists because skipping it caused real errors
+
+Skipping Phase 3c (validation) is the most common and most costly error. Plans from `/plan-implementation` are validated against the codebase at planning time, but implementation may have changed files since then. Re-validation catches drift.
+
 **Architecture: 3-layer hierarchy**
 
 ```
@@ -306,6 +314,8 @@ After writing the completion report, present the user with the following prompt 
 > - Plan: `Docs/plans/<feature-name>-plan.md`
 > - Validation: `Docs/plans/<feature-name>-validation/`
 > - Completion report: `Docs/plans/<feature-name>-complete.md`
+>
+> **DO NOT SKIP STEPS. Every step (1 through 6) in implement-feature-review must be executed in order. No exceptions.**
 
 Fill in the actual paths. This gives the review agent full traceability from spec to plan to validation to implementation.
 

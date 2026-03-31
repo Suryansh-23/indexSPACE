@@ -33,6 +33,14 @@ export interface MarketState {
   decimals: number;
   resolutionState: 'open' | 'resolved' | 'voided';
   resolvedOutcome: number | null;
+  marketId: number;
+  createdAt: string | null;
+  expiresAt: string | null;
+  resolvedAt: string | null;
+  marketType: string;
+  marketSubtype: string | null;
+  metadata: Record<string, unknown>;
+  consensusMean: number;
 }
 
 export interface ConsensusSummary {
@@ -46,6 +54,36 @@ export interface ConsensusSummary {
 export interface ConsensusCurve {
   points: Array<{ x: number; y: number }>;
   config: MarketConfig;
+}
+
+// ── Filter & Discovery Types ──
+
+export type FilterAction =
+  | 'equals'
+  | 'notEquals'
+  | 'greaterThan'
+  | 'greaterThanOrEqual'
+  | 'lessThan'
+  | 'lessThanOrEqual'
+  | 'contains'
+  | 'in'
+  | 'between';
+
+export interface MarketFilter {
+  field: string;
+  value: unknown;
+  action: FilterAction;
+}
+
+export interface MarketDiscoveryOptions {
+  state?: string;
+  titleContains?: string;
+  categories?: string[];
+  filters?: MarketFilter[];
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  limit?: number;
+  signal?: AbortSignal;
 }
 
 // ── Position Types ──

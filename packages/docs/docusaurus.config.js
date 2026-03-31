@@ -1,5 +1,5 @@
 // @ts-check
-require('dotenv').config();
+require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 const { themes: prismThemes } = require('prism-react-renderer');
 
 /** @type {import('@docusaurus/types').Config} */

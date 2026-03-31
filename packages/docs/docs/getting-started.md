@@ -38,6 +38,27 @@ const stats = await queryConsensusSummary(client, 42);
 console.log(`Market expects: ${stats.mean} ± ${stats.stdDev}`);
 ```
 
+**Browse markets (React):**
+
+```tsx
+import { FunctionSpaceProvider, useMarkets } from '@functionspace/react';
+import { MarketCardGrid } from '@functionspace/ui';
+
+function MarketBrowser() {
+  const { markets, loading, error } = useMarkets({ state: 'open' });
+  return (
+    <MarketCardGrid
+      markets={markets}
+      loading={loading}
+      error={error}
+      onSelect={(id) => console.log('Selected market:', id)}
+    />
+  );
+}
+```
+
+To build a complete browse-to-trade app, see [Market Discovery Patterns](/ui/composition-and-usage#market-discovery-patterns).
+
 **Generate a belief shape:**
 
 ```typescript

@@ -97,6 +97,31 @@ Read the SDK Expansion Checklist in PLAYBOOK.md. For the type of change implemen
 - [ ] CLAUDE.md updated (test table, architecture -- as applicable)
 - [ ] Demo added to demo-app (if new widget/component)
 
+### 7. Consumer Integration Audit
+
+Sections 1-6 verify that documentation entries EXIST. This section verifies that the documentation is USEFUL -- that a developer reading only the docs could successfully integrate the feature into their app.
+
+**For each new public API (widget, hook, or function) added in this implementation, check ALL of these consumer-facing locations:**
+
+- `packages/docs/docs/` -- Docusaurus pages (the primary docs site)
+- `packages/docs/static/llms.txt` -- the AI agent integration guide (most AI consumers read ONLY this file)
+- `packages/docs/static/ui.txt`, `react.txt`, `core.txt` -- package-specific AI context files
+- `README.md` -- the first thing developers see when evaluating the SDK
+- `packages/docs/docs/getting-started.md` -- the onboarding page for new developers
+- `packages/docs/docs/ui/composition-and-usage.md` -- where multi-component workflows should be documented
+
+**For each location, apply these tests:**
+
+a. **The "what next" test:** Does every callback prop (`onSelect`, `onBuy`, `onError`, etc.) have a documented wiring example showing what the consumer should DO with it? If the example ends at `console.log(...)` or a placeholder comment, that is a MEDIUM finding -- the consumer does not know what to do next. Check this in EVERY file that shows the API -- Docusaurus pages, llms.txt, ui.txt, react.txt, and README examples.
+
+b. **The "end-to-end flow" test:** If the feature involves a multi-step workflow (e.g., browse markets -> select -> trade), is the complete workflow documented somewhere? Check `composition-and-usage.md` for composition patterns and `llms.txt` for the AI-facing equivalent. Both audiences (human developers reading Docusaurus AND AI agents reading llms.txt) need the full flow. If either is missing, that is a MEDIUM finding.
+
+c. **The "standalone developer" test:** Could a developer who has never seen the codebase, reading only the Docusaurus docs, build a working integration? Could an AI agent reading only llms.txt do the same? If they would get stuck at any point (e.g., "I have an onSelect callback but I don't know how to navigate to a trading page"), that is a finding. Apply this test separately for human readers (Docusaurus + README) and AI readers (llms.txt + package txt files).
+
+d. **Cross-package bridging:** If the feature spans packages (e.g., a core function consumed by a hook consumed by a widget), verify that at least one example in EACH consumer-facing file shows the full pipeline. Props tables for individual components are not sufficient if the consumer doesn't know how to connect them. Specifically check that llms.txt bridges packages (e.g., shows `useMarkets` from react feeding `MarketList` from ui) -- AI agents build from these examples directly.
+
+**This section catches a specific class of bug:** documentation that is technically complete (every table entry present, every prop documented) but practically useless (no developer can go from "I want to use this" to "it's working in my app" without guessing).
+
 ## Output
 
 Write your findings to `{OUTPUT_DIR}/08-docs-deferred.md` in this exact format:

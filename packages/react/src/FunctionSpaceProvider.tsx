@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, useId, useContext, createContext } from 'react';
 import { FSClient, loginUser, signupUser, fetchCurrentUser, passwordlessLoginUser, silentReAuth, PASSWORD_REQUIRED } from '@functionspace/core';
 import type { PayoutCurve, Position, UserProfile, SignupOptions, PasswordlessLoginResult } from '@functionspace/core';
 import { FunctionSpaceContext } from './context.js';
@@ -73,6 +73,25 @@ export function resolveTheme(input?: FSThemeInput): ResolvedFSTheme {
   return applyDefaults(overrides as FSTheme);
 }
 
+// ── Theme Class Context (portal support) ──
+
+const ThemeClassContext = createContext<string | null>(null);
+
+/**
+ * Returns the scoped CSS class name for the current FunctionSpaceProvider's theme.
+ * Only available when the provider has `portalSupport={true}`.
+ * Consumers rendering widgets inside portals (e.g., React portals outside the
+ * provider's DOM subtree) can apply this class to their portal container to
+ * inherit the SDK's CSS variable theming.
+ */
+export function useThemeClass(): string {
+  const ctx = useContext(FunctionSpaceContext);
+  if (!ctx) throw new Error('useThemeClass must be used within FunctionSpaceProvider');
+  const themeClass = useContext(ThemeClassContext);
+  if (!themeClass) throw new Error('useThemeClass requires portalSupport={true} on FunctionSpaceProvider');
+  return themeClass;
+}
+
 // ── Provider Props ──
 
 export interface FunctionSpaceProviderProps {
@@ -84,11 +103,12 @@ export interface FunctionSpaceProviderProps {
   };
   theme?: FSThemeInput;
   cache?: CacheConfig;
+  portalSupport?: boolean;
   storedUsername?: string | null;
   children: React.ReactNode;
 }
 
-export function FunctionSpaceProvider({ config, theme, cache, storedUsername, children }: FunctionSpaceProviderProps) {
+export function FunctionSpaceProvider({ config, theme, cache, portalSupport = false, storedUsername, children }: FunctionSpaceProviderProps) {
   const clientRef = useRef<FSClient | null>(null);
   const [providerReady, setProviderReady] = useState(false);
   const [authError, setAuthError] = useState<Error | null>(null);
@@ -286,38 +306,64 @@ export function FunctionSpaceProvider({ config, theme, cache, storedUsername, ch
   );
 
   // CSS custom properties (all 30 tokens)
-  const style = useMemo(() => ({
-    '--fs-primary':          resolvedTheme.primary,
-    '--fs-accent':           resolvedTheme.accent,
-    '--fs-positive':         resolvedTheme.positive,
-    '--fs-negative':         resolvedTheme.negative,
-    '--fs-background':       resolvedTheme.background,
-    '--fs-surface':          resolvedTheme.surface,
-    '--fs-text':             resolvedTheme.text,
-    '--fs-text-secondary':   resolvedTheme.textSecondary,
-    '--fs-border':           resolvedTheme.border,
-    '--fs-bg-secondary':     resolvedTheme.bgSecondary,
-    '--fs-surface-hover':    resolvedTheme.surfaceHover,
-    '--fs-border-subtle':    resolvedTheme.borderSubtle,
-    '--fs-text-muted':       resolvedTheme.textMuted,
-    '--fs-nav-from':         resolvedTheme.navFrom,
-    '--fs-nav-to':           resolvedTheme.navTo,
-    '--fs-overlay':          resolvedTheme.overlay,
-    '--fs-input-bg':         resolvedTheme.inputBg,
-    '--fs-code-bg':          resolvedTheme.codeBg,
-    '--fs-chart-bg':         resolvedTheme.chartBg,
-    '--fs-accent-glow':      resolvedTheme.accentGlow,
-    '--fs-badge-bg':         resolvedTheme.badgeBg,
-    '--fs-badge-border':     resolvedTheme.badgeBorder,
-    '--fs-badge-text':       resolvedTheme.badgeText,
-    '--fs-logo-filter':      resolvedTheme.logoFilter,
-    '--fs-font-family':      resolvedTheme.fontFamily,
-    '--fs-radius-sm':        resolvedTheme.radiusSm,
-    '--fs-radius-md':        resolvedTheme.radiusMd,
-    '--fs-radius-lg':        resolvedTheme.radiusLg,
-    '--fs-border-width':     resolvedTheme.borderWidth,
-    '--fs-transition-speed': resolvedTheme.transitionSpeed,
-  } as React.CSSProperties), [resolvedTheme]);
+  const cssVarEntries: [string, string][] = useMemo(() => [
+    ['--fs-primary',          resolvedTheme.primary],
+    ['--fs-accent',           resolvedTheme.accent],
+    ['--fs-positive',         resolvedTheme.positive],
+    ['--fs-negative',         resolvedTheme.negative],
+    ['--fs-background',       resolvedTheme.background],
+    ['--fs-surface',          resolvedTheme.surface],
+    ['--fs-text',             resolvedTheme.text],
+    ['--fs-text-secondary',   resolvedTheme.textSecondary],
+    ['--fs-border',           resolvedTheme.border],
+    ['--fs-bg-secondary',     resolvedTheme.bgSecondary],
+    ['--fs-surface-hover',    resolvedTheme.surfaceHover],
+    ['--fs-border-subtle',    resolvedTheme.borderSubtle],
+    ['--fs-text-muted',       resolvedTheme.textMuted],
+    ['--fs-nav-from',         resolvedTheme.navFrom],
+    ['--fs-nav-to',           resolvedTheme.navTo],
+    ['--fs-overlay',          resolvedTheme.overlay],
+    ['--fs-input-bg',         resolvedTheme.inputBg],
+    ['--fs-code-bg',          resolvedTheme.codeBg],
+    ['--fs-chart-bg',         resolvedTheme.chartBg],
+    ['--fs-accent-glow',      resolvedTheme.accentGlow],
+    ['--fs-badge-bg',         resolvedTheme.badgeBg],
+    ['--fs-badge-border',     resolvedTheme.badgeBorder],
+    ['--fs-badge-text',       resolvedTheme.badgeText],
+    ['--fs-logo-filter',      resolvedTheme.logoFilter],
+    ['--fs-font-family',      resolvedTheme.fontFamily],
+    ['--fs-radius-sm',        resolvedTheme.radiusSm],
+    ['--fs-radius-md',        resolvedTheme.radiusMd],
+    ['--fs-radius-lg',        resolvedTheme.radiusLg],
+    ['--fs-border-width',     resolvedTheme.borderWidth],
+    ['--fs-transition-speed', resolvedTheme.transitionSpeed],
+  ], [resolvedTheme]);
+
+  const style = useMemo(() => {
+    const obj: Record<string, string> = {};
+    for (const [key, value] of cssVarEntries) {
+      obj[key] = value;
+    }
+    return obj as React.CSSProperties;
+  }, [cssVarEntries]);
+
+  // Portal support: scoped class name + injected <style> tag
+  const instanceId = useId();
+  const themeClassName = portalSupport ? `fs-theme-${instanceId.replace(/:/g, '')}` : null;
+
+  useEffect(() => {
+    if (!portalSupport || !themeClassName || typeof document === 'undefined') return;
+
+    const styleEl = document.createElement('style');
+    styleEl.setAttribute('data-fs-theme', themeClassName);
+    const declarations = cssVarEntries.map(([k, v]) => `${k}: ${v};`).join(' ');
+    styleEl.textContent = `.${themeClassName} { ${declarations} }`;
+    document.head.appendChild(styleEl);
+
+    return () => {
+      styleEl.parentNode?.removeChild(styleEl);
+    };
+  }, [portalSupport, themeClassName, cssVarEntries]);
 
   const isAuthenticated = user !== null;
 
@@ -359,9 +405,11 @@ export function FunctionSpaceProvider({ config, theme, cache, storedUsername, ch
   return (
     <QueryCacheContext.Provider value={queryCache}>
       <FunctionSpaceContext.Provider value={contextValue}>
-        <div style={style}>
-          {children}
-        </div>
+        <ThemeClassContext.Provider value={themeClassName}>
+          <div style={style} className={themeClassName ?? undefined}>
+            {children}
+          </div>
+        </ThemeClassContext.Provider>
       </FunctionSpaceContext.Provider>
     </QueryCacheContext.Provider>
   );
