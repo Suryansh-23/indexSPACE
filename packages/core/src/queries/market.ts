@@ -16,8 +16,9 @@ export async function queryMarketState(
   if (data.alpha_vector == null) throw new Error('Missing alpha_vector in market response');
   const alphaVector: number[] = data.alpha_vector;
   const totalMass = alphaVector.reduce((a: number, b: number) => a + b, 0);
-  if (totalMass === 0) throw new Error('alpha_vector sums to zero in market response');
-  const consensus = alphaVector.map((a: number) => a / totalMass);
+  const consensus = totalMass > 0
+    ? alphaVector.map((a: number) => a / totalMass)
+    : alphaVector.map(() => 0);
   const mp = data.market_model_params;
   if (!mp) throw new Error('Missing market_model_params in market response');
 

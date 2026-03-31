@@ -671,7 +671,7 @@ describe('queryMarketState', () => {
     );
   });
 
-  it('throws when alpha_vector sums to zero', async () => {
+  it('returns all-zero consensus for zero-sum alpha (fresh market)', async () => {
     const rawZeroAlpha = { ...mockMarketStateRaw, alpha_vector: [0, 0, 0, 0, 0, 0, 0, 0] };
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -679,9 +679,10 @@ describe('queryMarketState', () => {
     });
 
     const client = makeMockClient();
-    await expect(queryMarketState(client, '123')).rejects.toThrow(
-      'alpha_vector sums to zero in market response',
-    );
+    const result = await queryMarketState(client, '123');
+    expect(result.consensus).toHaveLength(8);
+    expect(result.consensus.every(c => c === 0)).toBe(true);
+    expect(result.totalMass).toBe(0);
   });
 
   it('defaults totalVolume to 0 when total_deposited and total_withdrawn are missing', async () => {
@@ -1717,7 +1718,7 @@ describe('discoverMarkets', () => {
     );
   });
 
-  it('throws when alpha_vector sums to zero in list item', async () => {
+  it('returns all-zero consensus for zero-sum alpha in list item (fresh market)', async () => {
     const rawZeroAlpha = {
       markets: [{
         ...mockDiscoverMarketsRaw.markets[0],
@@ -1730,9 +1731,11 @@ describe('discoverMarkets', () => {
     });
 
     const client = makeMockClient();
-    await expect(discoverMarkets(client)).rejects.toThrow(
-      'alpha_vector sums to zero in market list item',
-    );
+    const result = await discoverMarkets(client);
+    expect(result).toHaveLength(1);
+    expect(result[0].consensus).toHaveLength(8);
+    expect(result[0].consensus.every(c => c === 0)).toBe(true);
+    expect(result[0].totalMass).toBe(0);
   });
 
   it('defaults totalVolume to 0 when total_deposited and total_withdrawn are missing from list item', async () => {
