@@ -1,32 +1,23 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, useParams, useNavigate } from 'react-router-dom';
-import { FunctionSpaceProvider, useMarketFilters } from '@functionspace/react';
-import { MarketList, MarketFilterBar } from '@functionspace/ui';
+import { FunctionSpaceProvider } from '@functionspace/react';
+import { MarketExplorer, TradePanel, MarketStats, ConsensusChart } from '@functionspace/ui';
 import { config, widgetTheme } from './App';
 
-// ── Swap trading layout by changing this import ──
-import { BasicTradingLayout as TradingLayout } from './App_BasicTradingLayout';
-// import { ShapeCutterTradingLayout as TradingLayout } from './App_ShapeCutterTradingLayout';
-// import { DistRangeLayout as TradingLayout } from './App_DistRange';
-// import { BinaryPanelLayout as TradingLayout } from './App_BinaryPanel';
-// import { CustomShapeLayout as TradingLayout } from './App_CustomShapeLayout';
-// import { TimelineBinaryLayout as TradingLayout } from './App_TimelineBinaryTradingLayout';
+// ── Market Explorer Page ──
 
-// ── Market List Page ──
-
-function MarketListPage() {
+function MarketExplorerPage() {
   const navigate = useNavigate();
-  const { markets, loading, error, filterBarProps } = useMarketFilters({
-    state: 'open',
-    pollInterval: 5000,
-  });
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
-      <h1 style={{ color: 'var(--fs-text)', marginBottom: '1.5rem', fontFamily: 'inherit' }}>Markets</h1>
-      <MarketFilterBar {...filterBarProps} maxWidth="1200px" />
-      <div style={{ marginTop: '1rem' }} />
-      <MarketList markets={markets} loading={loading} error={error} onSelect={(id) => navigate(`/trade/${id}`)} />
+      <h1 style={{ color: 'var(--fs-text)', marginBottom: '1.5rem', fontFamily: 'inherit' }}>Market Discovery (Routed)</h1>
+      <MarketExplorer
+        views={['cards', 'pulse', 'compact', 'gauge', 'split', 'table', 'heatmap', 'charts']}
+        state="open"
+        pollInterval={5000}
+        onSelect={(id) => navigate(`/trade/${id}`)}
+      />
     </div>
   );
 }
@@ -75,7 +66,9 @@ function TradingPage() {
       >
         &larr; Back to Markets
       </button>
-      <TradingLayout marketId={numericId} />
+      <MarketStats marketId={numericId} />
+      <ConsensusChart marketId={numericId} height={350} zoomable />
+      <TradePanel marketId={numericId} modes={['gaussian', 'range']} />
     </div>
   );
 }
@@ -87,7 +80,7 @@ export default function App_MarketDiscoveryRouted() {
     <FunctionSpaceProvider config={config} theme={widgetTheme}>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<MarketListPage />} />
+          <Route path="/" element={<MarketExplorerPage />} />
           <Route path="/trade/:marketId" element={<TradingPage />} />
         </Routes>
       </BrowserRouter>

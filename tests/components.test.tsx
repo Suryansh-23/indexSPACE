@@ -113,6 +113,17 @@ vi.mock('@functionspace/core', () => ({
   previewPayoutCurve: vi.fn().mockResolvedValue({ maxPayout: 200, previews: [] }),
   previewSell: vi.fn().mockResolvedValue({ collateralReturned: 95 }),
   discoverMarkets: vi.fn(),
+  treemapLayout: vi.fn().mockImplementation((items: any[], x: number, y: number, w: number, h: number) => {
+    // Return simple equally-sized rects for each item
+    const count = items.length || 1;
+    return items.map((item: any, i: number) => ({
+      item,
+      x: 0,
+      y: (i / count) * h + y,
+      w,
+      h: h / count,
+    }));
+  }),
 }));
 
 import { FunctionSpaceProvider } from '../packages/react/src';
@@ -120,9 +131,10 @@ import { PasswordlessAuthWidget } from '../packages/ui/src/auth/PasswordlessAuth
 import {
   MarketStats,
   MarketCard,
+  MarketCardGrid,
   MarketList,
-  MarketOverlay,
   MarketFilterBar,
+  MarketExplorer,
   TimeSales,
   ConsensusChart,
   DistributionChart,
@@ -138,6 +150,9 @@ import {
   AuthWidget,
 } from '../packages/ui/src';
 import { Overlay } from '../packages/ui/src/components/Overlay';
+import { PulseCard } from '../packages/ui/src/market/views/PulseCard';
+import { GaugeCard } from '../packages/ui/src/market/views/GaugeCard';
+import { HeatmapView } from '../packages/ui/src/market/views/HeatmapView';
 import {
   queryMarketState,
   getConsensusCurve,
@@ -1967,7 +1982,7 @@ describe('MarketCard', () => {
   });
 });
 
-describe('MarketList', () => {
+describe('MarketCardGrid', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     cleanup();
@@ -1976,32 +1991,32 @@ describe('MarketList', () => {
   it('throws when rendered without FunctionSpaceProvider', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(() => {
-      render(<MarketList markets={[]} />);
-    }).toThrow('MarketList must be used within FunctionSpaceProvider');
+      render(<MarketCardGrid markets={[]} />);
+    }).toThrow('MarketCardGrid must be used within FunctionSpaceProvider');
     spy.mockRestore();
   });
 
   it('renders loading state with skeleton cards', () => {
     const wrapper = createWrapper();
-    const { container } = render(<MarketList markets={[]} loading={true} />, { wrapper });
+    const { container } = render(<MarketCardGrid markets={[]} loading={true} />, { wrapper });
     expect(container.querySelector('.fs-skeleton')).toBeTruthy();
   });
 
   it('renders error state with error message', () => {
     const wrapper = createWrapper();
-    const { container } = render(<MarketList markets={[]} error={new Error('Network error')} />, { wrapper });
+    const { container } = render(<MarketCardGrid markets={[]} error={new Error('Network error')} />, { wrapper });
     expect(container.textContent).toContain('Network error');
   });
 
   it('renders default empty state', () => {
     const wrapper = createWrapper();
-    const { container } = render(<MarketList markets={[]} />, { wrapper });
+    const { container } = render(<MarketCardGrid markets={[]} />, { wrapper });
     expect(container.textContent).toContain('No markets found');
   });
 
   it('renders custom empty message', () => {
     const wrapper = createWrapper();
-    const { container } = render(<MarketList markets={[]} emptyMessage="Nothing here" />, { wrapper });
+    const { container } = render(<MarketCardGrid markets={[]} emptyMessage="Nothing here" />, { wrapper });
     expect(container.textContent).toContain('Nothing here');
   });
 
@@ -2012,7 +2027,7 @@ describe('MarketList', () => {
       { ...mockMarketForCard, marketId: 2, title: 'Market Two' },
       { ...mockMarketForCard, marketId: 3, title: 'Market Three' },
     ];
-    const { container } = render(<MarketList markets={threeMarkets as any} />, { wrapper });
+    const { container } = render(<MarketCardGrid markets={threeMarkets as any} />, { wrapper });
     const cards = container.querySelectorAll('.fs-market-card');
     expect(cards.length).toBe(3);
   });
@@ -2021,7 +2036,7 @@ describe('MarketList', () => {
     const wrapper = createWrapper();
     const onSelect = vi.fn();
     const markets = [{ ...mockMarketForCard, marketId: 7 }];
-    const { container } = render(<MarketList markets={markets as any} onSelect={onSelect} />, { wrapper });
+    const { container } = render(<MarketCardGrid markets={markets as any} onSelect={onSelect} />, { wrapper });
     const card = container.querySelector('.fs-market-card') as HTMLElement;
     fireEvent.click(card);
     expect(onSelect).toHaveBeenCalledWith(7);
@@ -2029,13 +2044,13 @@ describe('MarketList', () => {
 
   it('unmounts without errors', () => {
     const wrapper = createWrapper();
-    const { unmount } = render(<MarketList markets={[]} />, { wrapper });
+    const { unmount } = render(<MarketCardGrid markets={[]} />, { wrapper });
     expect(() => unmount()).not.toThrow();
   });
 
   it('accessibility audit', async () => {
     const wrapper = createWrapper();
-    const { container } = render(<MarketList markets={[mockMarketForCard] as any} />, { wrapper });
+    const { container } = render(<MarketCardGrid markets={[mockMarketForCard] as any} />, { wrapper });
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });
@@ -2196,295 +2211,6 @@ describe('Overlay', () => {
     fireEvent.keyDown(lastBtn, { key: 'Tab' });
     // Focus should have wrapped (the handler calls preventDefault and focuses first)
     expect(document.activeElement).toBe(closeBtn);
-  });
-});
-
-// ── MarketOverlay ──
-
-describe('MarketOverlay', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    cleanup();
-    document.body.style.overflow = '';
-  });
-
-  it('throws when rendered without FunctionSpaceProvider', () => {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    expect(() => {
-      render(<MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>);
-    }).toThrow('MarketOverlay must be used within FunctionSpaceProvider');
-    spy.mockRestore();
-  });
-
-  it('renders MarketList on mount', async () => {
-    setupMocksForData();
-    const wrapper = createWrapper();
-    const { container } = render(
-      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
-      { wrapper },
-    );
-    await waitFor(() => {
-      expect(container.querySelector('.fs-market-card')).not.toBeNull();
-    });
-  });
-
-  it('shows loading state', () => {
-    setupMocksForLoading();
-    const wrapper = createWrapper();
-    const { container } = render(
-      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
-      { wrapper },
-    );
-    expect(container.querySelector('.fs-skeleton')).not.toBeNull();
-  });
-
-  it('shows error state', async () => {
-    setupMocksForError();
-    const wrapper = createWrapper();
-    const { container } = render(
-      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
-      { wrapper },
-    );
-    await waitFor(() => {
-      expect(container.textContent).toContain('API Error');
-    });
-  });
-
-  it('shows default empty message', async () => {
-    vi.mocked(discoverMarkets).mockResolvedValue([]);
-    const wrapper = createWrapper();
-    const { container } = render(
-      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
-      { wrapper },
-    );
-    await waitFor(() => {
-      expect(container.textContent).toContain('No markets found');
-    });
-  });
-
-  it('shows custom empty message', async () => {
-    vi.mocked(discoverMarkets).mockResolvedValue([]);
-    const wrapper = createWrapper();
-    const { container } = render(
-      <MarketOverlay emptyMessage="Custom">{(id) => <div>Layout {id}</div>}</MarketOverlay>,
-      { wrapper },
-    );
-    await waitFor(() => {
-      expect(container.textContent).toContain('Custom');
-    });
-  });
-
-  it('opens overlay when card is clicked', async () => {
-    setupMocksForData();
-    const wrapper = createWrapper();
-    const { container } = render(
-      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
-      { wrapper },
-    );
-    await waitFor(() => {
-      expect(container.querySelector('.fs-market-card')).not.toBeNull();
-    });
-    const card = container.querySelector('.fs-market-card') as HTMLElement;
-    fireEvent.click(card);
-    await waitFor(() => {
-      expect(container.querySelector('.fs-overlay-backdrop')).not.toBeNull();
-    });
-  });
-
-  it('passes marketId to children render prop', async () => {
-    setupMocksForData();
-    const wrapper = createWrapper();
-    const childFn = vi.fn().mockReturnValue(<div>Layout</div>);
-    const { container } = render(
-      <MarketOverlay>{childFn}</MarketOverlay>,
-      { wrapper },
-    );
-    await waitFor(() => {
-      expect(container.querySelector('.fs-market-card')).not.toBeNull();
-    });
-    const card = container.querySelector('.fs-market-card') as HTMLElement;
-    fireEvent.click(card);
-    await waitFor(() => {
-      expect(childFn).toHaveBeenCalledWith(mockMarketForCard.marketId);
-    });
-  });
-
-  it('shows market title in overlay header', async () => {
-    setupMocksForData();
-    const wrapper = createWrapper();
-    const { container } = render(
-      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
-      { wrapper },
-    );
-    await waitFor(() => {
-      expect(container.querySelector('.fs-market-card')).not.toBeNull();
-    });
-    const card = container.querySelector('.fs-market-card') as HTMLElement;
-    fireEvent.click(card);
-    await waitFor(() => {
-      const heading = container.querySelector('h2');
-      expect(heading).not.toBeNull();
-      expect(heading!.textContent).toBe('Test Market');
-    });
-  });
-
-  it('closes overlay on backdrop click', async () => {
-    setupMocksForData();
-    const wrapper = createWrapper();
-    const { container } = render(
-      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
-      { wrapper },
-    );
-    await waitFor(() => {
-      expect(container.querySelector('.fs-market-card')).not.toBeNull();
-    });
-    fireEvent.click(container.querySelector('.fs-market-card') as HTMLElement);
-    await waitFor(() => {
-      expect(container.querySelector('.fs-overlay-backdrop')).not.toBeNull();
-    });
-    fireEvent.click(container.querySelector('.fs-overlay-backdrop') as HTMLElement);
-    await waitFor(() => {
-      expect(container.querySelector('.fs-overlay-backdrop')).toBeNull();
-    });
-  });
-
-  it('closes overlay on Escape key', async () => {
-    setupMocksForData();
-    const wrapper = createWrapper();
-    const { container } = render(
-      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
-      { wrapper },
-    );
-    await waitFor(() => {
-      expect(container.querySelector('.fs-market-card')).not.toBeNull();
-    });
-    fireEvent.click(container.querySelector('.fs-market-card') as HTMLElement);
-    await waitFor(() => {
-      expect(container.querySelector('.fs-overlay-backdrop')).not.toBeNull();
-    });
-    fireEvent.keyDown(document, { key: 'Escape' });
-    await waitFor(() => {
-      expect(container.querySelector('.fs-overlay-backdrop')).toBeNull();
-    });
-  });
-
-  it('closes overlay on close button', async () => {
-    setupMocksForData();
-    const wrapper = createWrapper();
-    const { container } = render(
-      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
-      { wrapper },
-    );
-    await waitFor(() => {
-      expect(container.querySelector('.fs-market-card')).not.toBeNull();
-    });
-    fireEvent.click(container.querySelector('.fs-market-card') as HTMLElement);
-    await waitFor(() => {
-      expect(container.querySelector('.fs-overlay-close')).not.toBeNull();
-    });
-    fireEvent.click(container.querySelector('.fs-overlay-close') as HTMLElement);
-    await waitFor(() => {
-      expect(container.querySelector('.fs-overlay-backdrop')).toBeNull();
-    });
-  });
-
-  it('MarketList remains mounted while overlay is open', async () => {
-    setupMocksForData();
-    const wrapper = createWrapper();
-    const { container } = render(
-      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
-      { wrapper },
-    );
-    await waitFor(() => {
-      expect(container.querySelector('.fs-market-card')).not.toBeNull();
-    });
-    fireEvent.click(container.querySelector('.fs-market-card') as HTMLElement);
-    await waitFor(() => {
-      expect(container.querySelector('.fs-overlay-backdrop')).not.toBeNull();
-    });
-    // Both the market card and overlay should be present simultaneously
-    expect(container.querySelector('.fs-market-card')).not.toBeNull();
-    expect(container.querySelector('.fs-overlay-backdrop')).not.toBeNull();
-  });
-
-  it('passes state prop through to discoverMarkets', async () => {
-    vi.mocked(discoverMarkets).mockResolvedValue([mockMarketForCard] as any);
-    const wrapper = createWrapper();
-    render(
-      <MarketOverlay state="open">{(id) => <div>Layout {id}</div>}</MarketOverlay>,
-      { wrapper },
-    );
-    await waitFor(() => {
-      expect(vi.mocked(discoverMarkets)).toHaveBeenCalled();
-    });
-    const callArgs = vi.mocked(discoverMarkets).mock.calls[0];
-    expect(callArgs[1]).toEqual(expect.objectContaining({ state: 'open' }));
-  });
-
-  it('passes categories prop through to discoverMarkets', async () => {
-    vi.mocked(discoverMarkets).mockResolvedValue([mockMarketForCard] as any);
-    const wrapper = createWrapper();
-    render(
-      <MarketOverlay categories={['crypto', 'politics']}>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
-      { wrapper },
-    );
-    await waitFor(() => {
-      expect(vi.mocked(discoverMarkets)).toHaveBeenCalled();
-    });
-    const callArgs = vi.mocked(discoverMarkets).mock.calls[0];
-    expect(callArgs[1]).toEqual(expect.objectContaining({ categories: ['crypto', 'politics'] }));
-  });
-
-  it('renders MarketFilterBar by default (showFilterBar=true)', async () => {
-    setupMocksForData();
-    const wrapper = createWrapper();
-    const { container } = render(
-      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
-      { wrapper },
-    );
-    await waitFor(() => {
-      expect(container.querySelector('.fs-market-filter-bar')).not.toBeNull();
-    });
-  });
-
-  it('does not render MarketFilterBar when showFilterBar=false', async () => {
-    setupMocksForData();
-    const wrapper = createWrapper();
-    const { container } = render(
-      <MarketOverlay showFilterBar={false}>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
-      { wrapper },
-    );
-    await waitFor(() => {
-      expect(container.querySelector('.fs-market-card')).not.toBeNull();
-    });
-    expect(container.querySelector('.fs-market-filter-bar')).toBeNull();
-  });
-
-  it('unmounts without errors', async () => {
-    setupMocksForData();
-    const wrapper = createWrapper();
-    const { unmount } = render(
-      <MarketOverlay>{(id) => <div>Layout {id}</div>}</MarketOverlay>,
-      { wrapper },
-    );
-    await act(async () => {});
-    expect(() => unmount()).not.toThrow();
-  });
-
-  it('accessibility audit', async () => {
-    setupMocksForData();
-    const wrapper = createWrapper();
-    const { container } = render(
-      <main>
-        <MarketOverlay showFilterBar={false}>{(id) => <div>Layout {id}</div>}</MarketOverlay>
-      </main>,
-      { wrapper },
-    );
-    await waitFor(() => {
-      expect(container.querySelector('.fs-market-card')).not.toBeNull();
-    });
-    const results = await axe(container);
-    expect(results).toHaveNoViolations();
   });
 });
 
@@ -2905,5 +2631,740 @@ describe('Portal-Proof', () => {
     expect(wrapperDiv).toBeTruthy();
     const className = wrapperDiv?.className || '';
     expect(className).toMatch(/fs-theme-/);
+  });
+});
+
+// ============================================================================
+// MarketExplorer and view component tests (Stream 5)
+// ============================================================================
+
+// Rich mock data with categories for explorer views
+const mockMarketsForExplorer = [
+  {
+    ...mockMarketForCard,
+    marketId: 1,
+    title: 'Bitcoin Price',
+    totalVolume: 50000,
+    poolBalance: 10000,
+    positionsOpen: 42,
+    consensusMean: 50.0,
+    metadata: { categories: ['Crypto'] },
+  },
+  {
+    ...mockMarketForCard,
+    marketId: 2,
+    title: 'Ethereum Price',
+    totalVolume: 30000,
+    poolBalance: 8000,
+    positionsOpen: 28,
+    consensusMean: 35.0,
+    metadata: { categories: ['Crypto'] },
+  },
+  {
+    ...mockMarketForCard,
+    marketId: 3,
+    title: 'Election Winner',
+    totalVolume: 20000,
+    poolBalance: 5000,
+    positionsOpen: 15,
+    consensusMean: 60.0,
+    metadata: { categories: ['Politics'] },
+  },
+];
+
+function setupMocksForExplorer() {
+  vi.mocked(discoverMarkets).mockResolvedValue(mockMarketsForExplorer as any);
+  vi.mocked(queryMarketState).mockResolvedValue(mockMarketData as any);
+  vi.mocked(getConsensusCurve).mockResolvedValue(mockConsensusData as any);
+}
+
+function setupMocksForExplorerLoading() {
+  vi.mocked(discoverMarkets).mockReturnValue(new Promise(() => {}) as any);
+}
+
+function setupMocksForExplorerError() {
+  vi.mocked(discoverMarkets).mockRejectedValue(new Error('Discovery failed'));
+}
+
+// ── MarketExplorer ──
+
+describe('MarketExplorer', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    cleanup();
+  });
+
+  it('throws when rendered without FunctionSpaceProvider', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => {
+      render(<MarketExplorer />);
+    }).toThrow('MarketExplorer must be used within FunctionSpaceProvider');
+    spy.mockRestore();
+  });
+
+  it('renders default single view (cards) with no tab bar', async () => {
+    setupMocksForExplorer();
+    const wrapper = createWrapper();
+    const { container } = render(<MarketExplorer />, { wrapper });
+    await waitFor(() => {
+      expect(container.querySelector('.fs-market-explorer')).not.toBeNull();
+    });
+    // No tab bar when single default view
+    expect(container.querySelector('.fs-market-explorer-tabs')).toBeNull();
+  });
+
+  it('renders tab bar when multiple views are provided', async () => {
+    setupMocksForExplorer();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketExplorer views={['cards', 'pulse', 'table']} />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-market-explorer-tabs')).not.toBeNull();
+    });
+    // Tab labels should match VIEW_LABELS
+    expect(screen.getByText('Cards')).toBeDefined();
+    expect(screen.getByText('Pulse')).toBeDefined();
+    expect(screen.getByText('List')).toBeDefined();
+  });
+
+  it('switches active view when a tab is clicked', async () => {
+    setupMocksForExplorer();
+    const { user } = setup(<MarketExplorer views={['cards', 'pulse']} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Pulse')).toBeDefined();
+    });
+
+    await user.click(screen.getByText('Pulse'));
+
+    // Pulse view renders PulseCards with market titles
+    await waitFor(() => {
+      expect(screen.getByText('Bitcoin Price')).toBeDefined();
+    });
+    // The active tab button should have the active class
+    expect(screen.getByText('Pulse').className).toContain('active');
+  });
+
+  it('shows filter bar by default', async () => {
+    setupMocksForExplorer();
+    const wrapper = createWrapper();
+    const { container } = render(<MarketExplorer />, { wrapper });
+    await waitFor(() => {
+      expect(container.querySelector('.fs-market-filter-bar')).not.toBeNull();
+    });
+  });
+
+  it('hides filter bar when showFilterBar={false}', async () => {
+    setupMocksForExplorer();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketExplorer showFilterBar={false} />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-market-explorer')).not.toBeNull();
+    });
+    expect(container.querySelector('.fs-market-filter-bar')).toBeNull();
+  });
+
+  it('passes loading state through to views', async () => {
+    setupMocksForExplorerLoading();
+    const wrapper = createWrapper();
+    const { container } = render(<MarketExplorer />, { wrapper });
+    // Cards view shows skeleton loading via MarketCardGrid
+    expect(container.querySelector('.fs-skeleton')).not.toBeNull();
+  });
+
+  it('passes error state through to views', async () => {
+    setupMocksForExplorerError();
+    const wrapper = createWrapper();
+    const { container } = render(<MarketExplorer />, { wrapper });
+    await waitFor(() => {
+      expect(container.textContent).toContain('Discovery failed');
+    });
+  });
+
+  it('renders empty state with custom message', async () => {
+    vi.mocked(discoverMarkets).mockResolvedValue([] as any);
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketExplorer emptyMessage="No predictions available" />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.textContent).toContain('No predictions available');
+    });
+  });
+
+  it('fires onSelect callback on market click', async () => {
+    setupMocksForExplorer();
+    const onSelect = vi.fn();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketExplorer onSelect={onSelect} />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-market-card')).not.toBeNull();
+    });
+    const card = container.querySelector('.fs-market-card') as HTMLElement;
+    fireEvent.click(card);
+    expect(onSelect).toHaveBeenCalledWith(1);
+  });
+
+  it('children render prop opens overlay on market click', async () => {
+    setupMocksForExplorer();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketExplorer>
+        {(marketId) => <div data-testid="overlay-content">Trading {marketId}</div>}
+      </MarketExplorer>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-market-card')).not.toBeNull();
+    });
+    const card = container.querySelector('.fs-market-card') as HTMLElement;
+    fireEvent.click(card);
+    await waitFor(() => {
+      expect(screen.getByTestId('overlay-content')).toBeDefined();
+      expect(screen.getByTestId('overlay-content').textContent).toBe('Trading 1');
+    });
+  });
+
+  it('overlay close returns to market list', async () => {
+    setupMocksForExplorer();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketExplorer>
+        {(marketId) => <div data-testid="overlay-content">Trading {marketId}</div>}
+      </MarketExplorer>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-market-card')).not.toBeNull();
+    });
+    // Open overlay
+    const card = container.querySelector('.fs-market-card') as HTMLElement;
+    fireEvent.click(card);
+    await waitFor(() => {
+      expect(screen.getByTestId('overlay-content')).toBeDefined();
+    });
+    // Close overlay via close button
+    const closeBtn = container.querySelector('.fs-overlay-close') as HTMLElement;
+    fireEvent.click(closeBtn);
+    await waitFor(() => {
+      expect(container.querySelector('[data-testid="overlay-content"]')).toBeNull();
+    });
+  });
+
+  it('instance-proof: no hardcoded DOM ids (useId pattern)', async () => {
+    setupMocksForExplorer();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <>
+        <MarketExplorer views={['cards']} />
+        <MarketExplorer views={['cards']} />
+      </>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      const explorers = container.querySelectorAll('.fs-market-explorer');
+      expect(explorers.length).toBe(2);
+    });
+    // Check for duplicate DOM ids
+    const ids = Array.from(container.querySelectorAll('[id]')).map(el => el.id);
+    const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i);
+    expect(duplicates).toEqual([]);
+  });
+
+  it('unmounts without console errors or warnings', async () => {
+    setupMocksForExplorer();
+    const wrapper = createWrapper();
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const { unmount } = render(<MarketExplorer />, { wrapper });
+    await waitFor(() => {
+      expect(document.querySelector('.fs-market-explorer')).not.toBeNull();
+    });
+
+    unmount();
+
+    // Filter out React StrictMode double-render noise
+    const realErrors = spy.mock.calls.filter(
+      call => !String(call[0]).includes('act(')
+    );
+    expect(realErrors.length).toBe(0);
+
+    spy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  it('accessibility audit: cards view', async () => {
+    setupMocksForExplorer();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketExplorer views={['cards']} showFilterBar={false} />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-market-explorer')).not.toBeNull();
+    });
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+
+  it('accessibility audit: table view', async () => {
+    setupMocksForExplorer();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketExplorer views={['table']} showFilterBar={false} />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-market-explorer')).not.toBeNull();
+    });
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+
+  it('accessibility audit: heatmap view', async () => {
+    setupMocksForExplorer();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketExplorer views={['heatmap']} showFilterBar={false} />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-market-explorer')).not.toBeNull();
+    });
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+});
+
+// ── MarketCardGrid backward-compatibility ──
+
+describe('MarketList backward-compatibility', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    cleanup();
+  });
+
+  it('deprecated MarketList renders same component as MarketCardGrid', () => {
+    // MarketList is a re-export alias of MarketCardGrid
+    // Verify it renders the same grid with the same card output
+    const wrapperA = createWrapper();
+    const markets = [{ ...mockMarketForCard, marketId: 99 }];
+    const { container: containerA } = render(
+      <MarketCardGrid markets={markets as any} />,
+      { wrapper: wrapperA },
+    );
+    const cardsA = containerA.querySelectorAll('.fs-market-card');
+    const textA = cardsA[0]?.textContent;
+    cleanup();
+
+    const wrapperB = createWrapper();
+    const { container: containerB } = render(
+      <MarketList markets={markets as any} />,
+      { wrapper: wrapperB },
+    );
+    const cardsB = containerB.querySelectorAll('.fs-market-card');
+    expect(cardsA.length).toBe(1);
+    expect(cardsB.length).toBe(1);
+    expect(textA).toBe(cardsB[0].textContent);
+  });
+});
+
+// ── Grid view tests (pulse, compact, gauge, split) via MarketExplorer ──
+
+describe('Grid Views via MarketExplorer', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    cleanup();
+    setupMocksForExplorer();
+  });
+
+  it('PulseCard renders within MarketExplorer and displays market data', async () => {
+    const { user } = setup(<MarketExplorer views={['pulse']} showFilterBar={false} />);
+    await waitFor(() => {
+      // PulseCard shows market title
+      expect(screen.getByText('Bitcoin Price')).toBeDefined();
+      // PulseCard shows status badge
+      expect(screen.getAllByText('Active').length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  it('PulseCard click triggers onSelect', async () => {
+    const onSelect = vi.fn();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketExplorer views={['pulse']} onSelect={onSelect} showFilterBar={false} />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-pulse-card')).not.toBeNull();
+    });
+    const card = container.querySelector('.fs-pulse-card') as HTMLElement;
+    fireEvent.click(card);
+    expect(onSelect).toHaveBeenCalledWith(1);
+  });
+
+  it('CompactCard renders within MarketExplorer and displays market data', async () => {
+    setup(<MarketExplorer views={['compact']} showFilterBar={false} />);
+    await waitFor(() => {
+      expect(screen.getByText('Bitcoin Price')).toBeDefined();
+      expect(screen.getByText('Ethereum Price')).toBeDefined();
+    });
+  });
+
+  it('CompactCard click triggers onSelect', async () => {
+    const onSelect = vi.fn();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketExplorer views={['compact']} onSelect={onSelect} showFilterBar={false} />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-compact-card')).not.toBeNull();
+    });
+    const card = container.querySelector('.fs-compact-card') as HTMLElement;
+    fireEvent.click(card);
+    expect(onSelect).toHaveBeenCalledWith(1);
+  });
+
+  it('GaugeCard renders within MarketExplorer and displays market data', async () => {
+    setup(<MarketExplorer views={['gauge']} showFilterBar={false} />);
+    await waitFor(() => {
+      expect(screen.getByText('Bitcoin Price')).toBeDefined();
+    });
+  });
+
+  it('GaugeCard click triggers onSelect', async () => {
+    const onSelect = vi.fn();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketExplorer views={['gauge']} onSelect={onSelect} showFilterBar={false} />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-gauge-card')).not.toBeNull();
+    });
+    const card = container.querySelector('.fs-gauge-card') as HTMLElement;
+    fireEvent.click(card);
+    expect(onSelect).toHaveBeenCalledWith(1);
+  });
+
+  it('SplitCard renders within MarketExplorer and displays market data', async () => {
+    setup(<MarketExplorer views={['split']} showFilterBar={false} />);
+    await waitFor(() => {
+      expect(screen.getByText('Bitcoin Price')).toBeDefined();
+      expect(screen.getByText('Election Winner')).toBeDefined();
+    });
+  });
+
+  it('SplitCard click triggers onSelect', async () => {
+    const onSelect = vi.fn();
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketExplorer views={['split']} onSelect={onSelect} showFilterBar={false} />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-split-card')).not.toBeNull();
+    });
+    const card = container.querySelector('.fs-split-card') as HTMLElement;
+    fireEvent.click(card);
+    expect(onSelect).toHaveBeenCalledWith(1);
+  });
+});
+
+// ── TableView tests via MarketExplorer ──
+
+describe('TableView via MarketExplorer', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    cleanup();
+    setupMocksForExplorer();
+  });
+
+  it('renders sortable column buttons', async () => {
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketExplorer views={['table']} showFilterBar={false} />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      const sortBtns = container.querySelectorAll('.fs-table-view-sort-btn');
+      expect(sortBtns.length).toBe(5);
+      const labels = Array.from(sortBtns).map(b => b.textContent);
+      expect(labels).toContain('Default');
+      expect(labels).toContain('Volume');
+      expect(labels).toContain('Positions');
+      expect(labels).toContain('Liquidity');
+      expect(labels).toContain('Closing');
+    });
+  });
+
+  it('default sort shows no rank column', async () => {
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketExplorer views={['table']} showFilterBar={false} />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(screen.getByText('Bitcoin Price')).toBeDefined();
+    });
+    // No rank column in default sort
+    expect(container.querySelector('.fs-table-view-rank')).toBeNull();
+  });
+
+  it('sorting by a field shows rank column', async () => {
+    const { user } = setup(
+      <MarketExplorer views={['table']} showFilterBar={false} />,
+    );
+    await waitFor(() => {
+      const sortBtns = document.querySelectorAll('.fs-table-view-sort-btn');
+      expect(sortBtns.length).toBeGreaterThan(0);
+    });
+    // Click Volume sort button (sort bar button, not column header)
+    const sortButtons = document.querySelectorAll('.fs-table-view-sort-btn');
+    const volumeBtn = Array.from(sortButtons).find(btn => btn.textContent === 'Volume') as HTMLElement;
+    await user.click(volumeBtn);
+
+    await waitFor(() => {
+      expect(document.querySelector('.fs-table-view-rank')).not.toBeNull();
+    });
+  });
+
+  it('limits rows to 20', async () => {
+    // Create 25 markets
+    const manyMarkets = Array.from({ length: 25 }, (_, i) => ({
+      ...mockMarketForCard,
+      marketId: i + 1,
+      title: `Market ${i + 1}`,
+      totalVolume: 50000 - i * 100,
+      metadata: {},
+    }));
+    vi.mocked(discoverMarkets).mockResolvedValue(manyMarkets as any);
+
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketExplorer views={['table']} showFilterBar={false} />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-table-view-row')).not.toBeNull();
+    });
+    const rows = container.querySelectorAll('.fs-table-view-row');
+    expect(rows.length).toBeLessThanOrEqual(20);
+  });
+});
+
+// ── HeatmapView tests via MarketExplorer ──
+
+describe('HeatmapView via MarketExplorer', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    cleanup();
+    setupMocksForExplorer();
+  });
+
+  it('renders category blocks from market data', async () => {
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketExplorer views={['heatmap']} showFilterBar={false} />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-heatmap-view')).not.toBeNull();
+      // Should show category blocks with block titles
+      const blockTitles = container.querySelectorAll('.fs-heatmap-block-title');
+      const titles = Array.from(blockTitles).map(el => el.textContent);
+      expect(titles).toContain('Crypto');
+      expect(titles).toContain('Politics');
+    });
+  });
+
+  it('category colors come from theme (not hardcoded)', async () => {
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketExplorer views={['heatmap']} showFilterBar={false} />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-heatmap-block')).not.toBeNull();
+    });
+    // Category blocks use color-mix with theme-resolved category colors
+    const block = container.querySelector('.fs-heatmap-block') as HTMLElement;
+    const bg = block.style.background;
+    // Should use color-mix pattern, not hardcoded hex
+    expect(bg).toContain('color-mix');
+  });
+
+  it('drill-down on category click', async () => {
+    const { user, container } = setup(
+      <MarketExplorer views={['heatmap']} showFilterBar={false} />,
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-heatmap-block')).not.toBeNull();
+    });
+    // Click the Crypto category block (via aria-label)
+    const cryptoBlock = screen.getByLabelText('Crypto category');
+    await user.click(cryptoBlock);
+
+    // Should drill down showing individual markets and a back button
+    await waitFor(() => {
+      expect(screen.getByText('Bitcoin Price')).toBeDefined();
+      expect(screen.getByText('Ethereum Price')).toBeDefined();
+    });
+  });
+
+  it('back button returns to overview', async () => {
+    const { user, container } = setup(
+      <MarketExplorer views={['heatmap']} showFilterBar={false} />,
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-heatmap-block')).not.toBeNull();
+    });
+    // Drill down
+    const cryptoBlock = screen.getByLabelText('Crypto category');
+    await user.click(cryptoBlock);
+
+    await waitFor(() => {
+      expect(screen.getByText('Bitcoin Price')).toBeDefined();
+    });
+
+    // Click back button (contains left arrow entity + "Back")
+    const backBtn = document.querySelector('.fs-heatmap-back-btn') as HTMLElement;
+    await user.click(backBtn);
+
+    // Should return to category overview
+    await waitFor(() => {
+      expect(screen.getByLabelText('Crypto category')).toBeDefined();
+      expect(screen.getByLabelText('Politics category')).toBeDefined();
+    });
+  });
+});
+
+// ── ChartsView tests via MarketExplorer ──
+
+describe('ChartsView via MarketExplorer', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    cleanup();
+    setupMocksForExplorer();
+  });
+
+  it('renders bar chart container', async () => {
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketExplorer views={['charts']} showFilterBar={false} />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-charts-bar-container')).not.toBeNull();
+    });
+  });
+
+  it('metric toggle switches between Volume/Liquidity/Traders', async () => {
+    const { user } = setup(
+      <MarketExplorer views={['charts']} showFilterBar={false} />,
+    );
+    await waitFor(() => {
+      expect(screen.getByText('Volume')).toBeDefined();
+      expect(screen.getByText('Liquidity')).toBeDefined();
+      expect(screen.getByText('Traders')).toBeDefined();
+    });
+    // Volume is active by default
+    const volumeBtn = document.querySelector('.fs-charts-metric-btn.active') as HTMLElement;
+    expect(volumeBtn.textContent).toBe('Volume');
+
+    // Switch to Liquidity
+    await user.click(screen.getByText('Liquidity'));
+    const liquidityBtn = document.querySelector('.fs-charts-metric-btn.active') as HTMLElement;
+    expect(liquidityBtn.textContent).toBe('Liquidity');
+  });
+
+  it('top 3 summary cards shown', async () => {
+    const wrapper = createWrapper();
+    const { container } = render(
+      <MarketExplorer views={['charts']} showFilterBar={false} />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      const top3Cards = container.querySelectorAll('.fs-charts-top3-card');
+      expect(top3Cards.length).toBe(3);
+    });
+    // Check rank badges
+    expect(screen.getByText('#1')).toBeDefined();
+    expect(screen.getByText('#2')).toBeDefined();
+    expect(screen.getByText('#3')).toBeDefined();
+  });
+});
+
+// ── Instance-Proof for new view components ──
+
+describe('Instance-Proof: new view components', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    cleanup();
+    setupMocksForExplorer();
+  });
+
+  function getDuplicateIds(container: HTMLElement): string[] {
+    const ids = Array.from(container.querySelectorAll('[id]')).map(el => el.id);
+    return ids.filter((id, i) => ids.indexOf(id) !== i);
+  }
+
+  it('PulseCard: no duplicate ids with two instances', async () => {
+    const wrapper = createWrapper();
+    const market = mockMarketsForExplorer[0] as any;
+    const { container } = render(
+      <>
+        <PulseCard market={market} />
+        <PulseCard market={market} />
+      </>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-pulse-card')).not.toBeNull();
+    });
+    expect(getDuplicateIds(container)).toEqual([]);
+  });
+
+  it('GaugeCard: no duplicate ids with two instances', async () => {
+    const wrapper = createWrapper();
+    const market = mockMarketsForExplorer[0] as any;
+    const { container } = render(
+      <>
+        <GaugeCard market={market} />
+        <GaugeCard market={market} />
+      </>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.fs-gauge-card')).not.toBeNull();
+    });
+    expect(getDuplicateIds(container)).toEqual([]);
+  });
+
+  it('HeatmapView: no duplicate ids with two instances', async () => {
+    const wrapper = createWrapper();
+    const { container } = render(
+      <>
+        <HeatmapView markets={mockMarketsForExplorer as any} />
+        <HeatmapView markets={mockMarketsForExplorer as any} />
+      </>,
+      { wrapper },
+    );
+    await waitFor(() => {
+      const views = container.querySelectorAll('.fs-heatmap-view');
+      expect(views.length).toBe(2);
+    });
+    expect(getDuplicateIds(container)).toEqual([]);
   });
 });

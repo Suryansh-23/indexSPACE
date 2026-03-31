@@ -364,7 +364,7 @@ The hook delegates to `discoverMarkets(client, options)` from core. Filtering, s
 ```tsx
 import { useMarkets } from '@functionspace/react';
 
-function MarketList() {
+function MarketBrowseExample() {
   const { markets, loading, error } = useMarkets();
 
   if (loading) return <div>Loading markets...</div>;
@@ -409,11 +409,11 @@ function PopularMarkets() {
 }
 ```
 
-**With MarketList component:**
+**With MarketCardGrid component:**
 
 ```tsx
 import { useMarkets } from '@functionspace/react';
-import { MarketList } from '@functionspace/ui';
+import { MarketCardGrid } from '@functionspace/ui';
 
 function MarketBrowser({ onSelect }: { onSelect: (id: number) => void }) {
   const { markets, loading, error } = useMarkets({
@@ -423,7 +423,7 @@ function MarketBrowser({ onSelect }: { onSelect: (id: number) => void }) {
     pollInterval: 5000,
   });
 
-  return <MarketList markets={markets ?? []} loading={loading} error={error} onSelect={onSelect} />;
+  return <MarketCardGrid markets={markets ?? []} loading={loading} error={error} onSelect={onSelect} />;
 }
 ```
 
@@ -473,7 +473,7 @@ function useMarketFilters(
 
 ```tsx
 import { useMarketFilters } from '@functionspace/react';
-import { MarketFilterBar, MarketList } from '@functionspace/ui';
+import { MarketFilterBar, MarketCardGrid } from '@functionspace/ui';
 
 function MarketBrowser() {
   const { markets, loading, error, filterBarProps } = useMarketFilters({
@@ -485,7 +485,7 @@ function MarketBrowser() {
   return (
     <div>
       <MarketFilterBar {...filterBarProps} />
-      <MarketList markets={markets} loading={loading} error={error} />
+      <MarketCardGrid markets={markets} loading={loading} error={error} />
     </div>
   );
 }
@@ -1465,7 +1465,10 @@ See the complete core type reference in `core.txt`. Key types used in headless m
 - **`FSThemeInput`** -- Accepted by the `theme` prop on `FunctionSpaceProvider`. Can be a preset string (`"fs-dark"`, `"fs-light"`, `"native-dark"`, `"native-light"`) or an object with overrides.
 - **`CacheConfig`** -- Accepted by the `cache` prop on `FunctionSpaceProvider`. Configures `staleTime`, `gcTime`, `defaultPollInterval`, `revalidateOnFocus`, `revalidateOnReconnect`, `defaultRetry`, `defaultRetryDelay`.
 - **`QueryOptions`** -- Accepted by all data-fetching hooks. Configures `pollInterval`, `enabled`, `retry`, `retryDelay`.
-- **`ChartColors`** -- Concrete hex values for Recharts SVG. Accessible via `ctx.chartColors`. Includes `grid`, `axisText`, `consensus`, `previewLine`, `payout`, `positions`, `fanBands`.
+- **`ChartColors`** -- Concrete hex values for Recharts SVG. Accessible via `ctx.chartColors`. Includes `grid`, `axisText`, `consensus`, `previewLine`, `payout`, `positions`, `fanBands`, `categoryColors`.
+- **`CategoryColors`** -- `Record<string, string>` mapping category names to hex color strings. Accessed via `ctx.chartColors.categoryColors`.
+- **`DEFAULT_CATEGORY_COLORS`** -- `{ dark: CategoryColors; light: CategoryColors }` -- default color maps for known categories (General, Sports, Crypto, Finance, Tech, Culture, Politics, Macro). Exported from `@functionspace/react`.
+- **`FALLBACK_CATEGORY_COLOR`** -- `{ dark: string; light: string }` -- fallback hex color for categories not in the default map. Exported from `@functionspace/react`.
 
 ### Theme Presets
 

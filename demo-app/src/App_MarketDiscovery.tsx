@@ -1,68 +1,29 @@
-import React, { useState } from 'react';
-import { FunctionSpaceProvider, useMarketFilters } from '@functionspace/react';
-import { MarketList, MarketFilterBar } from '@functionspace/ui';
+import React from 'react';
+import { FunctionSpaceProvider } from '@functionspace/react';
+import { MarketExplorer, TradePanel, MarketStats, ConsensusChart } from '@functionspace/ui';
 import { config, widgetTheme } from './App';
-
-// ── Swap trading layout by changing this import ──
-import { BasicTradingLayout as TradingLayout } from './App_BasicTradingLayout';
-// import { ShapeCutterTradingLayout as TradingLayout } from './App_ShapeCutterTradingLayout';
-// import { DistRangeLayout as TradingLayout } from './App_DistRange';
-// import { BinaryPanelLayout as TradingLayout } from './App_BinaryPanel';
-// import { CustomShapeLayout as TradingLayout } from './App_CustomShapeLayout';
-// import { TimelineBinaryLayout as TradingLayout } from './App_TimelineBinaryTradingLayout';
-
-// ── Market List View ──
-
-function MarketListView({ onSelect }: { onSelect: (id: number) => void }) {
-  const { markets, loading, error, filterBarProps } = useMarketFilters({
-    state: 'open',
-    pollInterval: 5000,
-  });
-
-  return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
-      <h1 style={{ color: 'var(--fs-text)', marginBottom: '1.5rem', fontFamily: 'inherit' }}>Markets</h1>
-      <MarketFilterBar {...filterBarProps} maxWidth="1200px" />
-      <div style={{ marginTop: '1rem' }} />
-      <MarketList markets={markets} loading={loading} error={error} onSelect={onSelect} />
-    </div>
-  );
-}
-
-// ── Trading View ──
-
-function TradingView({ marketId, onBack }: { marketId: number; onBack: () => void }) {
-  return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
-      <button
-        onClick={onBack}
-        style={{
-          color: 'var(--fs-text-secondary)',
-          marginBottom: '1rem',
-          cursor: 'pointer',
-          background: 'none',
-          border: 'none',
-          fontSize: '0.9rem',
-          fontFamily: 'inherit',
-        }}
-      >
-        &larr; Back to Markets
-      </button>
-      <TradingLayout marketId={marketId} />
-    </div>
-  );
-}
 
 // ── Inner Layout (named export for docs site reuse) ──
 
 export function MarketDiscoveryLayout() {
-  const [selectedMarketId, setSelectedMarketId] = useState<number | null>(null);
-
-  if (selectedMarketId === null) {
-    return <MarketListView onSelect={setSelectedMarketId} />;
-  }
-
-  return <TradingView marketId={selectedMarketId} onBack={() => setSelectedMarketId(null)} />;
+  return (
+    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
+      <h1 style={{ color: 'var(--fs-text)', marginBottom: '1.5rem', fontFamily: 'inherit' }}>Market Discovery</h1>
+      <MarketExplorer
+        views={['cards', 'pulse', 'compact', 'gauge', 'split', 'table', 'heatmap', 'charts']}
+        state="open"
+        pollInterval={5000}
+      >
+        {(marketId) => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <MarketStats marketId={marketId} />
+            <ConsensusChart marketId={marketId} height={350} zoomable />
+            <TradePanel marketId={marketId} modes={['gaussian', 'range']} />
+          </div>
+        )}
+      </MarketExplorer>
+    </div>
+  );
 }
 
 // ── Default Export (wraps in provider) ──

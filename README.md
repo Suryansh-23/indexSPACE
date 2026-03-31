@@ -151,9 +151,9 @@ Pre-built React components organized by purpose. Each widget is self-contained -
 | `PositionTable` | `marketId`, `pageSize?`, `tabs?`, `onSell?` | Tabbed position/trade table with row selection and sell actions |
 | `TimeSales` | `marketId` | Real-time trade log |
 | `MarketCard` | `market`, `onSelect?` | Summary card for a single market (title, consensus mean, volume, liquidity, traders, status) |
-| `MarketList` | `markets`, `onSelect?`, `loading?` | Scrollable list of MarketCards for market discovery |
+| `MarketCardGrid` | `markets`, `onSelect?`, `loading?` | Responsive grid of MarketCards for market discovery |
 | `MarketFilterBar` | `...filterBarProps` | Search, category chips, sort controls -- driven by `useMarketFilters` |
-| `MarketOverlay` | `children`, `state?`, `showFilterBar?`, `featuredCategories?`, ... | Browse-and-trade overlay with filter bar, MarketList, and slide-over panel |
+| `MarketExplorer` | `views?`, `children?`, `onSelect?`, `state?`, `showFilterBar?`, ... | Multi-view market discovery with tabbed views (cards, pulse, compact, gauge, split, table, heatmap, charts), filter bar, and optional overlay panel |
 
 **Auth** (`auth/`)
 
@@ -205,7 +205,7 @@ Browse and select markets, then trade on the selected one:
 
 ```tsx
 import { FunctionSpaceProvider, useMarkets } from '@functionspace/react';
-import { MarketList, MarketCharts, TradePanel } from '@functionspace/ui';
+import { MarketCardGrid, MarketCharts, TradePanel } from '@functionspace/ui';
 
 function App() {
   const [marketId, setMarketId] = useState<number | null>(null);
@@ -405,6 +405,6 @@ packages/
     ├── styles/base.css        All widget styles (CSS variables only)
     ├── charts/               ConsensusChart, DistributionChart, TimelineChart, MarketCharts
     ├── trading/              TradePanel, ShapeCutter, BinaryPanel, BucketRangeSelector, BucketTradePanel, CustomShapeEditor
-    ├── market/               MarketStats, MarketFilterBar, MarketOverlay, PositionTable, TimeSales
+    ├── market/               MarketStats, MarketCardGrid, MarketExplorer, MarketFilterBar, PositionTable, TimeSales
     └── auth/                 AuthWidget
 ```

@@ -103,6 +103,8 @@ Every new function must be classifiable by both layer AND category. This keeps t
 | Add/modify cache context | `packages/react/src/QueryCacheContext.ts` |
 | Add auth functions | `packages/core/src/auth/auth.ts` |
 | Add auth widgets | `packages/ui/src/auth/` (AuthWidget, PasswordlessAuthWidget) |
+| Add discovery math (treemap) | `packages/core/src/discovery/treemap.ts` |
+| Add market explorer views | `packages/ui/src/market/views/` (PulseCard, CompactCard, GaugeCard, SplitCard, TableView, HeatmapView, ChartsView) |
 | Add chart zoom/pan math | `packages/core/src/chart/zoom.ts` |
 | Add internal UI primitives | `packages/ui/src/components/` (not exported from package root) |
 | Edit documentation content | `packages/docs/docs/` (Markdown/MDX files) |
@@ -111,7 +113,9 @@ Every new function must be classifiable by both layer AND category. This keeps t
 | Edit docs search config | `packages/docs/docusaurus.config.js` (`themes` array, `@easyops-cn/docusaurus-search-local`) |
 | Edit docs SDK integration | `packages/docs/src/plugins/sdk-webpack-plugin.js`, `packages/docs/src/theme/Root.tsx` |
 | Update AI context files | `packages/docs/static/llms.txt`, `core.txt`, `react.txt`, `ui.txt` |
-| Exported types from react | `CacheConfig`, `QueryOptions`, `RetryDelayFn`, `FSContext`, `FSThemeInput`, `ChartColors`, `FanBandColors`, `ThemePresetId`, `FSTheme`, `ResolvedFSTheme`, `DistributionState`, `DistributionStateConfig`, `ChartZoomOptions`, `ChartZoomResult`, `UseCustomShapeReturn`, `UseBuyReturn`, `UseSellReturn`, `UsePreviewPayoutReturn`, `UsePreviewSellReturn`, `FunctionSpaceProviderProps`, `PasswordlessLoginResult`, `MarketDiscoveryOptions`, `SortOption`, `UseMarketFiltersConfig`, `UseMarketFiltersReturn`, `MarketFilterBarProps` |
+| Exported types from react | `CacheConfig`, `QueryOptions`, `RetryDelayFn`, `FSContext`, `FSThemeInput`, `ChartColors`, `CategoryColors`, `FanBandColors`, `ThemePresetId`, `FSTheme`, `ResolvedFSTheme`, `DistributionState`, `DistributionStateConfig`, `ChartZoomOptions`, `ChartZoomResult`, `UseCustomShapeReturn`, `UseBuyReturn`, `UseSellReturn`, `UsePreviewPayoutReturn`, `UsePreviewSellReturn`, `FunctionSpaceProviderProps`, `PasswordlessLoginResult`, `MarketDiscoveryOptions`, `SortOption`, `UseMarketFiltersConfig`, `UseMarketFiltersReturn`, `MarketFilterBarProps` |
+| Exported types from ui | `MarketStatsProps`, `MarketCardProps`, `MarketCardGridProps`, `MarketListProps`, `MarketExplorerProps`, `MarketExplorerView`, `PositionTableProps`, `PositionTabId`, `TimeSalesProps`, `TradeInputBaseProps`, `XPointMode`, `ChartView`, `DistributionState`, `DistributionStateConfig` |
+| Exported constants from react | `DEFAULT_CATEGORY_COLORS`, `FALLBACK_CATEGORY_COLOR` |
 
 ## Testing Requirements
 
@@ -242,7 +246,7 @@ Multi-agent adversarial review of recent implementation work. Invoked manually w
 ## Deferred Work
 
 - **Prediction field cleanup.** `Position.prediction` and `TradeEntry.prediction` remain on the types. `buy()` still accepts `options.prediction` (deprecated, not sent to server). `useBuy` does not forward it. Removal was deferred -- when picked up, remove fields from both types, remove the option from `buy()`, remove Prediction columns from PositionTable/TimeSales, and update consumer docs.
-- **Context-level marketId.** Phase 2B (MarketOverlay) uses render props and `onSelect` callbacks for market selection. A context-level `marketId` on `FunctionSpaceContext` was not needed for this pattern. Remains deferred as a potential future enhancement if multiple independent widgets need to react to market selection changes simultaneously across the widget tree.
+- **Context-level marketId.** MarketExplorer uses render props and `onSelect` callbacks for market selection. A context-level `marketId` on `FunctionSpaceContext` was not needed for this pattern. Remains deferred as a potential future enhancement if multiple independent widgets need to react to market selection changes simultaneously across the widget tree.
 
 ## Commit Style
 

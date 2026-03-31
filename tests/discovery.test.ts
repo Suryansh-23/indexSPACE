@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { MarketState, MarketDiscoveryOptions } from '../packages/core/src/types';
 import { filterMarkets } from '../packages/core/src/discovery/filters';
+import { treemapLayout } from '../packages/core/src/discovery/treemap';
+import type { TreemapItem, TreemapRect } from '../packages/core/src/discovery/treemap';
 
 // Mock discoverMarkets for L2 convenience tests
 vi.mock('../packages/core/src/discovery/markets', () => ({
@@ -383,5 +385,139 @@ describe('L2 discovery convenience functions', () => {
         filters: [extraFilter],
       });
     });
+  });
+});
+
+// ============================================================================
+// treemapLayout unit tests
+// ============================================================================
+
+describe('treemapLayout', () => {
+  it('empty array returns empty array', () => {
+    const result = treemapLayout([]);
+    expect(result).toEqual([]);
+  });
+
+  it('single item fills entire container (x=0, y=0, w=1, h=1)', () => {
+    const item = { value: 42 };
+    const result = treemapLayout([item]);
+    expect(result).toHaveLength(1);
+    expect(result[0].x).toBe(0);
+    expect(result[0].y).toBe(0);
+    expect(result[0].w).toBe(1);
+    expect(result[0].h).toBe(1);
+    expect(result[0].item).toBe(item);
+  });
+
+  it('two equal items split container in half (landscape splits horizontally)', () => {
+    const items = [{ value: 50 }, { value: 50 }];
+    const result = treemapLayout(items);
+    expect(result).toHaveLength(2);
+    // Landscape default (w=1, h=1): equal items split horizontally
+    expect(result[0].w).toBeCloseTo(0.5, 5);
+    expect(result[1].w).toBeCloseTo(0.5, 5);
+    expect(result[0].h).toBe(1);
+    expect(result[1].h).toBe(1);
+  });
+
+  it('two unequal items split proportionally', () => {
+    const items = [{ value: 75 }, { value: 25 }];
+    const result = treemapLayout(items);
+    expect(result).toHaveLength(2);
+    // First item gets 75% of width, second gets 25%
+    expect(result[0].w).toBeCloseTo(0.75, 5);
+    expect(result[1].w).toBeCloseTo(0.25, 5);
+  });
+
+  it('items with zero total value distribute equally along height axis', () => {
+    const items = [{ value: 0 }, { value: 0 }, { value: 0 }];
+    const result = treemapLayout(items);
+    expect(result).toHaveLength(3);
+    for (const rect of result) {
+      expect(rect.w).toBe(1);
+      expect(rect.h).toBeCloseTo(1 / 3, 5);
+    }
+    // Each item occupies a different y position
+    expect(result[0].y).toBeCloseTo(0, 5);
+    expect(result[1].y).toBeCloseTo(1 / 3, 5);
+    expect(result[2].y).toBeCloseTo(2 / 3, 5);
+  });
+
+  it('custom container bounds (x0, y0, w0, h0 overrides)', () => {
+    const item = { value: 10 };
+    const result = treemapLayout([item], 0.1, 0.2, 0.5, 0.3);
+    expect(result).toHaveLength(1);
+    expect(result[0].x).toBe(0.1);
+    expect(result[0].y).toBe(0.2);
+    expect(result[0].w).toBe(0.5);
+    expect(result[0].h).toBe(0.3);
+  });
+
+  it('multiple items produce non-overlapping rectangles that cover the container', () => {
+    const items = [{ value: 40 }, { value: 30 }, { value: 20 }, { value: 10 }];
+    const result = treemapLayout(items);
+
+    // Total area should equal container area (1 * 1 = 1)
+    const totalArea = result.reduce((sum, r) => sum + r.w * r.h, 0);
+    expect(totalArea).toBeCloseTo(1, 5);
+
+    // No rectangle should overlap another
+    for (let i = 0; i < result.length; i++) {
+      for (let j = i + 1; j < result.length; j++) {
+        const a = result[i];
+        const b = result[j];
+        const overlapX = a.x < b.x + b.w && a.x + a.w > b.x;
+        const overlapY = a.y < b.y + b.h && a.y + a.h > b.y;
+        expect(overlapX && overlapY).toBe(false);
+      }
+    }
+  });
+
+  it('all output coordinates are within [0, 1] range (normalized)', () => {
+    const items = [{ value: 15 }, { value: 25 }, { value: 35 }, { value: 5 }, { value: 20 }];
+    const result = treemapLayout(items);
+
+    for (const rect of result) {
+      expect(rect.x).toBeGreaterThanOrEqual(0);
+      expect(rect.y).toBeGreaterThanOrEqual(0);
+      expect(rect.x + rect.w).toBeLessThanOrEqual(1 + 1e-10);
+      expect(rect.y + rect.h).toBeLessThanOrEqual(1 + 1e-10);
+      expect(rect.w).toBeGreaterThan(0);
+      expect(rect.h).toBeGreaterThan(0);
+    }
+  });
+
+  it('output preserves original item data via item property on each rect', () => {
+    const items = [
+      { value: 10, name: 'Alpha' },
+      { value: 20, name: 'Beta' },
+    ];
+    const result = treemapLayout(items);
+    expect(result).toHaveLength(2);
+    // Each rect.item should be the original object (same reference)
+    const names = result.map((r) => r.item.name).sort();
+    expect(names).toEqual(['Alpha', 'Beta']);
+    // Verify identity (same reference, not copy)
+    for (const rect of result) {
+      expect(items).toContain(rect.item);
+    }
+  });
+
+  it('generic type parameter passes through (T extends TreemapItem)', () => {
+    interface CustomItem extends TreemapItem {
+      label: string;
+      category: string;
+    }
+    const items: CustomItem[] = [
+      { value: 30, label: 'First', category: 'A' },
+      { value: 70, label: 'Second', category: 'B' },
+    ];
+    const result: TreemapRect<CustomItem>[] = treemapLayout(items);
+    expect(result).toHaveLength(2);
+    // TypeScript should allow accessing extended properties
+    for (const rect of result) {
+      expect(typeof rect.item.label).toBe('string');
+      expect(typeof rect.item.category).toBe('string');
+    }
   });
 });

@@ -196,10 +196,10 @@ Example:
 .fs-passwordless-auth,
 .fs-custom-shape,
 .fs-market-card,
-.fs-market-list,
+.fs-market-card-grid,
+.fs-market-explorer,
 .fs-overlay-panel,
-.fs-market-filter-bar,
-.fs-market-overlay {       /* ← add new widget roots here */
+.fs-market-filter-bar {       /* ← add new widget roots here */
   --fs-primary-glow: color-mix(in srgb, var(--fs-primary) 20%, transparent);
   --fs-primary-light: color-mix(in srgb, var(--fs-primary) 80%, white);
   --fs-header-gradient: color-mix(in srgb, var(--fs-primary) 15%, transparent);
@@ -651,6 +651,7 @@ All query functions accept an optional trailing `options?: { signal?: AbortSigna
 - `discoverPopularMarkets(client, options?)` -> `MarketState[]` (L2 -- preset: sortBy totalVolume desc, limit 10; merges caller options)
 - `discoverActiveMarkets(client, options?)` -> `MarketState[]` (L2 -- preset: state 'open'; merges caller options)
 - `discoverMarketsByCategory(client, categories, options?)` -> `MarketState[]` (L2 -- preset: categories filter; merges caller options)
+- `treemapLayout<T extends TreemapItem>(items, x0?, y0?, w0?, h0?)` -> `TreemapRect<T>[]` (L0 Pure Math -- recursive binary-split squarified treemap; used by HeatmapView in MarketExplorer)
 
 ### Auth
 - `loginUser(client, username, password)` → `{ user: UserProfile, token: string }` (raw fetch, bypasses ensureAuth)
@@ -753,9 +754,9 @@ onSuccess?.(result);       // Notify parent
 | `PasswordlessAuthWidget` | Passwordless login/signup with modal | Uses `useAuth` hook, modal overlay, auto-signup, PASSWORD_REQUIRED sentinel, silent re-auth via `storedUsername` prop |
 | `MarketStats` | Stats display | Minimal, read-only |
 | `MarketCard` | Single market summary card | Presentational -- receives `MarketState` as prop, no internal data fetching. Displays title, consensusMean, volume, pool, positions, status badge, resolution date. `onSelect` callback. |
-| `MarketList` | Responsive grid of MarketCards | Presentational -- receives `MarketState[]` as prop. Loading (skeleton cards), error, empty, and data states. Passes `onSelect` through to cards. |
+| `MarketCardGrid` | Responsive grid of MarketCards | Presentational -- receives `MarketState[]` as prop. Loading (skeleton cards), error, empty, and data states. Passes `onSelect` through to cards. Replaces `MarketList`. |
 | `MarketFilterBar` | Search, category chips, sort controls | Presentational filter bar driven by `useMarketFilters`. Spread `filterBarProps` from the hook. Props: `searchText`, `onSearchChange`, `onSearchClear`, `searchPlaceholder?`, `availableCategories`, `selectedCategories`, `onToggleCategory`, `featuredCategories?`, `sortOptions`, `activeSortField`, `sortOrder`, `onSortFieldChange`, `onSortOrderToggle`, `resultCount`, `loading?`, `onReset`, `maxWidth?`. |
-| `MarketOverlay` | Browse-and-trade overlay | Compound widget combining `MarketFilterBar` + `MarketList` + `Overlay`. Uses `useMarketFilters` internally. Render prop `children(marketId)` for panel content. Props: `state?`, `categories?`, `pollInterval?`, `emptyMessage?`, `showFilterBar?`, `featuredCategories?`, `sortOptions?`, `searchPlaceholder?`, `filterBarMaxWidth?`. |
+| `MarketExplorer` | Multi-view market discovery | Compound widget with tabbed views (cards, pulse, compact, gauge, split, table, heatmap, charts), `MarketFilterBar`, and optional `Overlay`. Uses `useMarketFilters` internally. Props: `views?`, `children?`, `onSelect?`, `state?`, `categories?`, `pollInterval?`, `emptyMessage?`, `showFilterBar?`, `featuredCategories?`, `sortOptions?`, `searchPlaceholder?`, `filterBarMaxWidth?`. Replaces `MarketOverlay`. |
 | `ConsensusChart` | Consensus PDF visualization | Standalone chart, reads context for overlays |
 | `DistributionChart` | Distribution bar chart | Standalone chart with bucket slider |
 | `TimelineChart` | Fan chart (percentile bands over time) | Standalone chart, fetches own history data (see note below) |
@@ -771,10 +772,11 @@ onSuccess?.(result);       // Notify parent
 
 **TimelineChart data-fetching pattern:** Unlike Consensus/Distribution (which receive shared `market` + `consensus` data as props from `MarketCharts`), `TimelineChartContent` calls `useMarketHistory` internally. This avoids fetching history data when the timeline tab isn't active. The `timeFilter` state is lifted to `MarketCharts` so it persists across tab switches.
 
-**Developer-configurable tabs pattern:** Both `MarketCharts` and `PositionTable` use the same tab pattern  -- an optional array prop controls which tabs appear, the first entry is initially active, and a single tab hides the tab bar:
+**Developer-configurable tabs pattern:** `MarketCharts`, `PositionTable`, and `MarketExplorer` use the same tab pattern  -- an optional array prop controls which tabs appear, the first entry is initially active, and a single tab hides the tab bar:
 ```typescript
 // MarketCharts: views?: ChartView[]    (default: ['consensus'])
 // PositionTable: tabs?: PositionTabId[] (default: ['open-orders', 'trade-history'])
+// MarketExplorer: views?: MarketExplorerView[] (default: ['cards'])
 const effectiveTabs = tabs && tabs.length > 0 ? tabs : DEFAULT_TABS;
 const showTabs = effectiveTabs.length > 1;
 const [activeTab, setActiveTab] = useState(effectiveTabs[0]);
@@ -1105,6 +1107,7 @@ packages/
 │   ├── discovery/markets.ts      # discoverMarkets (with MarketDiscoveryOptions)
 │   ├── discovery/filters.ts      # filterMarkets (pure client-side filtering)
 │   ├── discovery/convenience.ts  # discoverPopularMarkets, discoverActiveMarkets, discoverMarketsByCategory
+│   ├── discovery/treemap.ts      # treemapLayout (L0 Pure Math -- squarified treemap)
 │   └── auth/auth.ts          # loginUser, signupUser, fetchCurrentUser, validateUsername
 ├── react/src/
 │   ├── index.ts              # All exports
@@ -1145,12 +1148,23 @@ packages/
     ├── market/               # Read-only market info
     │   ├── index.ts
     │   ├── MarketCard.tsx
+    │   ├── MarketCardGrid.tsx
+    │   ├── MarketExplorer.tsx
     │   ├── MarketFilterBar.tsx
-    │   ├── MarketList.tsx
-    │   ├── MarketOverlay.tsx
+    │   ├── MarketList.tsx        # Deprecated -- use MarketCardGrid
     │   ├── MarketStats.tsx
     │   ├── PositionTable.tsx
-    │   └── TimeSales.tsx
+    │   ├── TimeSales.tsx
+    │   └── views/                # MarketExplorer view components
+    │       ├── index.ts
+    │       ├── viewUtils.ts
+    │       ├── PulseCard.tsx
+    │       ├── CompactCard.tsx
+    │       ├── GaugeCard.tsx
+    │       ├── SplitCard.tsx
+    │       ├── TableView.tsx
+    │       ├── HeatmapView.tsx
+    │       └── ChartsView.tsx
     └── components/           # Internal UI primitives (NOT exported from package root)
         ├── index.ts
         ├── Overlay.tsx
@@ -1203,6 +1217,6 @@ packages/docs/            # Docusaurus documentation site
 |--------|---------|----------|
 | `charts/` | Data visualizations | ConsensusChart, DistributionChart, TimelineChart, MarketCharts |
 | `trading/` | User input/actions | TradePanel, ShapeCutter, BinaryPanel, BucketRangeSelector, BucketTradePanel |
-| `market/` | Read-only market info | MarketCard, MarketList, MarketOverlay, MarketStats, PositionTable, TimeSales |
+| `market/` | Read-only market info | MarketCard, MarketCardGrid, MarketExplorer, MarketFilterBar, MarketStats, PositionTable, TimeSales |
 | `auth/` | Authentication | AuthWidget (login/signup forms), PasswordlessAuthWidget (username-only login with modal, auto-signup, silent re-auth) |
 | `components/` | Internal UI primitives (not exported from package root) | Slider, RangeSlider (rc-slider wrappers with consistent styling), Overlay (reusable modal shell) |

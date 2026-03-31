@@ -797,6 +797,34 @@ const entries: TradeEntry[] = positionsToTradeEntries(positions, { limit: 20 });
 // entries[0] = { id: "45_close", side: "sell", amount: 115.3, timestamp: "2025-06-15 10:23:45", ... }
 ```
 
+### Discovery Layout
+
+**`treemapLayout<T extends TreemapItem>(items, x0?, y0?, w0?, h0?)`** -- Computes a squarified treemap layout for a list of weighted items using a recursive binary-split algorithm. Protocol-agnostic (L0 Pure Math) -- no awareness of markets, positions, or charting libraries.
+
+```typescript
+import { treemapLayout } from '@functionspace/core';
+import type { TreemapItem, TreemapRect } from '@functionspace/core';
+```
+
+`TreemapItem`: `{ value: number; [key: string]: unknown }` -- minimum input shape. Extend with additional properties (e.g., market data).
+
+`TreemapRect<T>`: `{ x: number; y: number; w: number; h: number; item: T }` -- output rectangle with position, size, and original item reference.
+
+Parameters: `items` (required), `x0` (default 0), `y0` (default 0), `w0` (default 1), `h0` (default 1).
+
+```typescript
+const items = [
+  { value: 500, label: 'Sports' },
+  { value: 300, label: 'Crypto' },
+  { value: 200, label: 'Politics' },
+];
+
+const rects = treemapLayout(items, 0, 0, 800, 600);
+// rects[0] => { x: 0, y: 0, w: 400, h: 600, item: { value: 500, label: 'Sports' } }
+```
+
+Used internally by the `HeatmapView` in `MarketExplorer` for the heatmap market visualization.
+
 ---
 
 ## 7. NEVER Rules (Core-Only)

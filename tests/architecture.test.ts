@@ -322,12 +322,12 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('BucketTradePanel');
       expect(indexContent).toContain('CustomShapeEditor');
       expect(indexContent).toContain('MarketCard');
-      expect(indexContent).toContain('MarketList');
-      expect(indexContent).toContain('MarketOverlay');
+      expect(indexContent).toContain('MarketCardGrid');
+      expect(indexContent).toContain('MarketList'); // deprecated re-export
       expect(indexContent).toContain('MarketFilterBar');
       expect(indexContent).toContain('MarketCardProps');
-      expect(indexContent).toContain('MarketListProps');
-      expect(indexContent).toContain('MarketOverlayProps');
+      expect(indexContent).toContain('MarketCardGridProps');
+      expect(indexContent).toContain('MarketListProps'); // deprecated re-export
     });
 
     it('AuthWidget is exported from ui package', () => {
@@ -487,6 +487,42 @@ describe('SDK Architecture', () => {
       expect(indexContent).toContain('FilterAction');
       expect(indexContent).toContain('MarketFilter');
       expect(indexContent).toContain('MarketDiscoveryOptions');
+    });
+
+    it('MarketExplorer, MarketExplorerProps, and MarketExplorerView are exported from ui package', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/ui/src/index.ts'),
+        'utf-8'
+      );
+
+      expect(indexContent).toContain('MarketExplorer');
+      expect(indexContent).toContain('MarketExplorerProps');
+      expect(indexContent).toContain('MarketExplorerView');
+    });
+
+    it('treemapLayout and types are exported from core', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/core/src/index.ts'),
+        'utf-8'
+      );
+
+      expect(indexContent).toContain('treemapLayout');
+      expect(indexContent).toContain('TreemapItem');
+      expect(indexContent).toContain('TreemapRect');
+    });
+
+    it('category color types are exported from react package', () => {
+      const indexContent = fs.readFileSync(
+        path.join(__dirname, '../packages/react/src/index.ts'),
+        'utf-8'
+      );
+
+      // DEFAULT_CATEGORY_COLORS constant exported
+      expect(indexContent).toContain('DEFAULT_CATEGORY_COLORS');
+      // ChartColors type includes categoryColors field
+      expect(indexContent).toContain('ChartColors');
+      // CategoryColors type exported for consumers to type category color maps
+      expect(indexContent).toContain('CategoryColors');
     });
   });
 

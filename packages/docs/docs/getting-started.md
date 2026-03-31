@@ -42,12 +42,12 @@ console.log(`Market expects: ${stats.mean} ± ${stats.stdDev}`);
 
 ```tsx
 import { FunctionSpaceProvider, useMarkets } from '@functionspace/react';
-import { MarketList } from '@functionspace/ui';
+import { MarketCardGrid } from '@functionspace/ui';
 
 function MarketBrowser() {
   const { markets, loading, error } = useMarkets({ state: 'open' });
   return (
-    <MarketList
+    <MarketCardGrid
       markets={markets}
       loading={loading}
       error={error}

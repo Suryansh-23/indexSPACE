@@ -38,6 +38,6 @@ All trading components clear `ctx.setPreviewBelief(null)` and `ctx.setPreviewPay
 
 #### Market Browsing
 
-`MarketCard` and `MarketList` are presentational display components for market discovery. They receive `MarketState` data from the `useMarkets` hook and delegate navigation via an `onSelect` callback. See [Market Discovery Patterns](./composition-and-usage#market-discovery-patterns) for state-driven and route-driven integration approaches.
+`MarketCard` and `MarketCardGrid` are presentational display components for market discovery. They receive `MarketState` data from the `useMarkets` hook and delegate navigation via an `onSelect` callback. See [Market Discovery Patterns](./composition-and-usage#market-discovery-patterns) for state-driven and route-driven integration approaches.
 
 ---

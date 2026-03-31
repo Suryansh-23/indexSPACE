@@ -56,7 +56,7 @@ function useMarkets(
 ```tsx
 import { useMarkets } from '@functionspace/react';
 
-function MarketList() {
+function MarketBrowse() {
   const { markets, loading, error } = useMarkets();
 
   if (loading) return <p>Loading markets...</p>;

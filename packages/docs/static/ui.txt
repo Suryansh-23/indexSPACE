@@ -53,7 +53,7 @@ Description: A TypeScript SDK for embedding prediction market trading widgets in
 
 ### 1.2 What This Package Does
 
-The `@functionspace/ui` package provides pre-built React widgets for prediction market trading: chart components (ConsensusChart, DistributionChart, TimelineChart, MarketCharts), trading panels (TradePanel, ShapeCutter, BinaryPanel, BucketRangeSelector, BucketTradePanel, CustomShapeEditor), data display components (PositionTable, TimeSales, MarketStats, MarketCard, MarketList, MarketFilterBar, MarketOverlay), and auth widgets (AuthWidget, PasswordlessAuthWidget). All widgets are fully themed and self-contained.
+The `@functionspace/ui` package provides pre-built React widgets for prediction market trading: chart components (ConsensusChart, DistributionChart, TimelineChart, MarketCharts), trading panels (TradePanel, ShapeCutter, BinaryPanel, BucketRangeSelector, BucketTradePanel, CustomShapeEditor), data display components (PositionTable, TimeSales, MarketStats, MarketCard, MarketCardGrid, MarketFilterBar, MarketExplorer), and auth widgets (AuthWidget, PasswordlessAuthWidget). All widgets are fully themed and self-contained.
 
 ### 1.3 Package Dependency Chain
 
@@ -593,12 +593,12 @@ import { MarketCard } from '@functionspace/ui';
 
 Displays: Title, consensus mean with units, outcome range, volume, liquidity, traders, status badge, resolution date.
 
-### `MarketList`
+### `MarketCardGrid`
 
-Responsive grid of MarketCard components with loading, error, and empty states. Presentational -- receives data as props.
+Responsive grid of MarketCard components with loading, error, and empty states. Presentational -- receives data as props. Replaces the previous `MarketList`.
 
 ```tsx
-import { MarketList } from '@functionspace/ui';
+import { MarketCardGrid } from '@functionspace/ui';
 ```
 
 | Prop | Type | Default | Description |
@@ -611,17 +611,19 @@ import { MarketList } from '@functionspace/ui';
 
 Wire `onSelect` to state (`setSelectedMarketId`) for embedded widgets or to a router (`navigate`) for multi-page apps. See Market Discovery Navigation patterns below.
 
-### `MarketOverlay`
+### `MarketExplorer`
 
-Compound widget combining MarketFilterBar + MarketList with a slide-over overlay panel. Uses `useMarketFilters` internally for search, category, and sort state. Renders the consumer's trading UI inside the panel when a market is selected.
+Multi-view market discovery widget with tabbed view switching (cards, pulse, compact, gauge, split, table, heatmap, charts), integrated filter bar, and optional overlay panel for inline trading. Uses `useMarketFilters` internally. When `children` is provided, clicking a market opens an overlay; otherwise fires `onSelect`. Category colors are resolved from the theme via `ctx.chartColors.categoryColors`.
 
 ```tsx
-import { MarketOverlay } from '@functionspace/ui';
+import { MarketExplorer } from '@functionspace/ui';
 ```
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `children` | `(marketId: number) => React.ReactNode` | required | Render prop receiving the selected market ID |
+| `views` | `MarketExplorerView[]` | `['cards']` | View tabs to show. Tab bar hidden when only one view. |
+| `children` | `(marketId: number) => React.ReactNode` | -- | Render prop for overlay panel content |
+| `onSelect` | `(marketId: number) => void` | -- | Called when a market is selected (when children is not provided) |
 | `state` | `string?` | -- | Filter by resolution state (e.g., `'open'`) |
 | `categories` | `string[]?` | -- | Fixed list of available categories |
 | `pollInterval` | `number?` | -- | Polling interval in ms for refreshing market data |
@@ -632,7 +634,9 @@ import { MarketOverlay } from '@functionspace/ui';
 | `searchPlaceholder` | `string?` | `'Search markets...'` | Search input placeholder |
 | `filterBarMaxWidth` | `string?` | -- | CSS max-width for the filter bar |
 
-If you need full-page navigation instead of an overlay, use `MarketList` directly with state-driven or route-driven patterns.
+`MarketExplorerView`: `'cards' | 'pulse' | 'compact' | 'gauge' | 'split' | 'table' | 'heatmap' | 'charts'`
+
+If you need full-page navigation instead of an overlay, use `MarketCardGrid` directly with state-driven or route-driven patterns.
 
 ### `MarketFilterBar`
 
@@ -821,9 +825,9 @@ Layout notes:
 
 ### Browse-to-Trade
 
-**Browse-to-Trade:** Use `useMarkets` to fetch, `MarketList` to display, and `onSelect` to switch between list and trading views. `FunctionSpaceProvider` wraps above the navigation boundary.
+**Browse-to-Trade:** Use `useMarkets` to fetch, `MarketCardGrid` to display, and `onSelect` to switch between grid and trading views. `FunctionSpaceProvider` wraps above the navigation boundary.
 
-Alternatively, use `MarketOverlay` for a self-contained browse-and-trade overlay that handles market fetching, list display, and overlay management internally.
+Alternatively, use `MarketExplorer` for a self-contained browse-and-trade experience with multiple view modes and an optional overlay panel that handles market fetching, display, and overlay management internally.
 
 ---
 

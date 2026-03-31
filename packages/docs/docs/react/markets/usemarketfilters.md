@@ -80,7 +80,7 @@ interface SortOption {
 
 ```tsx
 import { useMarketFilters } from '@functionspace/react';
-import { MarketFilterBar, MarketList } from '@functionspace/ui';
+import { MarketFilterBar, MarketCardGrid } from '@functionspace/ui';
 
 function MarketBrowser() {
   const { markets, loading, error, filterBarProps } = useMarketFilters({
@@ -91,7 +91,7 @@ function MarketBrowser() {
   return (
     <div>
       <MarketFilterBar {...filterBarProps} />
-      <MarketList
+      <MarketCardGrid
         markets={markets}
         loading={loading}
         error={error}
@@ -107,7 +107,7 @@ function MarketBrowser() {
 ```tsx
 import type { SortOption } from '@functionspace/react';
 import { useMarketFilters } from '@functionspace/react';
-import { MarketFilterBar, MarketList } from '@functionspace/ui';
+import { MarketFilterBar, MarketCardGrid } from '@functionspace/ui';
 
 const mySortOptions: SortOption[] = [
   { field: 'totalVolume', label: 'Most Active', defaultOrder: 'desc' },
@@ -124,7 +124,7 @@ function CustomSortBrowser() {
   return (
     <div>
       <MarketFilterBar {...filterBarProps} />
-      <MarketList markets={markets} loading={loading} error={error} />
+      <MarketCardGrid markets={markets} loading={loading} error={error} />
     </div>
   );
 }
@@ -193,6 +193,6 @@ function CustomFilterUI() {
 }
 ```
 
-**Related:** `useMarkets` (underlying data hook), `MarketFilterBar` (pre-built filter UI), `MarketOverlay` (uses `useMarketFilters` internally)
+**Related:** `useMarkets` (underlying data hook), `MarketFilterBar` (pre-built filter UI), `MarketExplorer` (uses `useMarketFilters` internally)
 
 ---

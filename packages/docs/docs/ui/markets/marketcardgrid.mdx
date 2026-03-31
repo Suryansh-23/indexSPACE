@@ -1,20 +1,28 @@
 ---
-title: "MarketList"
+title: "MarketCardGrid"
 sidebar_position: 3
-description: "MarketList widget displaying a responsive grid of MarketCard components with loading, error, and empty states."
+description: "MarketCardGrid widget displaying a responsive grid of MarketCard components with loading, error, and empty states."
 ---
 
-# MarketList
+import { MarketCardGrid, MarketExplorer } from '@functionspace/ui';
+import WidgetDemo from '@site/src/components/WidgetDemo';
+import { DEMO_MARKET_ID } from '@site/src/constants';
 
-**`MarketList`**
+# MarketCardGrid
 
-Presentational list component that renders a responsive grid of `MarketCard` components. Receives an array of `MarketState` objects as props -- does not fetch data internally. Handles loading, error, and empty states.
+**`MarketCardGrid`**
+
+Presentational grid component that renders a responsive grid of `MarketCard` components. Receives an array of `MarketState` objects as props -- does not fetch data internally. Handles loading, error, and empty states. Replaces the previous `MarketList` component with the same API.
 
 ```tsx
-import { MarketList } from '@functionspace/ui';
+import { MarketCardGrid } from '@functionspace/ui';
 ```
 
-**CSS classes:** `fs-market-list`, `fs-market-list-loading`, `fs-market-list-error`, `fs-market-list-empty`
+<WidgetDemo title="Live Demo (via MarketExplorer cards view)" height="500px">
+  <MarketExplorer state="open" views={['cards']} />
+</WidgetDemo>
+
+**CSS class:** `fs-market-card-grid`
 
 **Props:**
 
@@ -30,7 +38,7 @@ import { MarketList } from '@functionspace/ui';
 
 | State    | Condition                   | Render                                |
 | -------- | --------------------------- | ------------------------------------- |
-| Loading  | `loading={true}`            | 6 skeleton placeholder cards          |
+| Loading  | `loading=\{true\}`          | 6 skeleton placeholder cards          |
 | Error    | `error` is truthy           | Error message text                    |
 | Empty    | `markets.length === 0`      | Empty state message                   |
 | Data     | `markets.length > 0`        | Grid of `MarketCard` components       |
@@ -40,6 +48,18 @@ import { MarketList } from '@functionspace/ui';
 * Each card receives the `onSelect` callback, so clicking any card bubbles to the parent.
 * Requires `FunctionSpaceProvider` ancestor (throws if missing).
 * Loading skeletons match the `MarketCard` layout structure.
+
+**Migration from MarketList:** `MarketCardGrid` is a drop-in replacement for `MarketList`. The props interface is identical. Update your imports:
+
+```tsx
+// Before
+import { MarketList } from '@functionspace/ui';
+<MarketList markets={markets} onSelect={handleSelect} />
+
+// After
+import { MarketCardGrid } from '@functionspace/ui';
+<MarketCardGrid markets={markets} onSelect={handleSelect} />
+```
 
 **Handling Selection:**
 
@@ -54,13 +74,13 @@ See [Market Discovery Patterns](../composition-and-usage#market-discovery-patter
 
 ```tsx
 import { FunctionSpaceProvider, useMarkets } from '@functionspace/react';
-import { MarketList } from '@functionspace/ui';
+import { MarketCardGrid } from '@functionspace/ui';
 
 function MarketDashboard() {
   const { markets, loading, error } = useMarkets({ state: 'open', sortBy: 'totalVolume' });
 
   return (
-    <MarketList
+    <MarketCardGrid
       markets={markets ?? []}
       loading={loading}
       error={error}
@@ -79,6 +99,6 @@ function App() {
 }
 ```
 
-**Related:** `MarketCard` (individual card), `useMarkets` (data hook for market listing)
+**Related:** `MarketCard` (individual card), `MarketExplorer` (uses `MarketCardGrid` for the `'cards'` view), `useMarkets` (data hook for market listing)
 
 ---

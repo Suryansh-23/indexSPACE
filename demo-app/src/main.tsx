@@ -12,8 +12,8 @@ import './index.css';
 // import App from './App_AllComponents';
 // import App from './App_StarterKitCapture';
 // import App from './App_MarketDiscovery';
-// import App from './App_MarketOverlay';
-import App from './App_MarketDiscoveryRouted';
+import App from './App_MarketOverlay';
+// import App from './App_MarketDiscoveryRouted';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

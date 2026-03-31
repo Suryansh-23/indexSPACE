@@ -82,7 +82,7 @@ function DistRangeLayout({ marketId }) {
 
 #### Market Discovery Patterns
 
-`MarketCard` and `MarketList` are presentational components -- they receive `MarketState` data and fire an `onSelect(marketId)` callback. The consumer decides what happens on selection. Two patterns exist depending on your app architecture.
+`MarketCard` and `MarketCardGrid` are presentational components -- they receive `MarketState` data and fire an `onSelect(marketId)` callback. The consumer decides what happens on selection. Two patterns exist depending on your app architecture.
 
 **Pattern 1: State-Driven Navigation (no router)**
 
@@ -91,26 +91,26 @@ Use this when building single-page apps, embedded widgets, or when the host app 
 ```tsx
 import { useState } from 'react';
 import { FunctionSpaceProvider, useMarkets } from '@functionspace/react';
-import { MarketList, MarketCharts, TradePanel, PositionTable } from '@functionspace/ui';
+import { MarketCardGrid, MarketCharts, TradePanel, PositionTable } from '@functionspace/ui';
 
 const config = { apiBase: 'https://api.example.com' };
 
 function MarketDiscoveryLayout() {
   const [selectedMarketId, setSelectedMarketId] = useState<number | null>(null);
+  const { markets, loading, error } = useMarkets({ state: 'open', sortBy: 'totalVolume' });
 
-  if (selectedMarketId === null) {
-    const { markets, loading, error } = useMarkets({ state: 'open', sortBy: 'totalVolume' });
-    return <MarketList markets={markets} loading={loading} error={error} onSelect={setSelectedMarketId} />;
+  if (selectedMarketId !== null) {
+    return (
+      <>
+        <button onClick={() => setSelectedMarketId(null)}>Back to Markets</button>
+        <MarketCharts marketId={selectedMarketId} />
+        <TradePanel marketId={selectedMarketId} />
+        <PositionTable marketId={selectedMarketId} />
+      </>
+    );
   }
 
-  return (
-    <>
-      <button onClick={() => setSelectedMarketId(null)}>Back to Markets</button>
-      <MarketCharts marketId={selectedMarketId} />
-      <TradePanel marketId={selectedMarketId} />
-      <PositionTable marketId={selectedMarketId} />
-    </>
-  );
+  return <MarketCardGrid markets={markets} loading={loading} error={error} onSelect={setSelectedMarketId} />;
 }
 
 export default function App() {
@@ -132,14 +132,14 @@ Use this for standalone multi-page apps where you need shareable/bookmarkable UR
 ```tsx
 import { BrowserRouter, Routes, Route, useParams, useNavigate } from 'react-router-dom';
 import { FunctionSpaceProvider, useMarkets } from '@functionspace/react';
-import { MarketList, MarketCharts, TradePanel, PositionTable } from '@functionspace/ui';
+import { MarketCardGrid, MarketCharts, TradePanel, PositionTable } from '@functionspace/ui';
 
 const config = { apiBase: 'https://api.example.com' };
 
-function MarketListPage() {
+function MarketBrowsePage() {
   const navigate = useNavigate();
   const { markets, loading, error } = useMarkets({ state: 'open', sortBy: 'totalVolume' });
-  return <MarketList markets={markets} loading={loading} error={error} onSelect={(id) => navigate(`/trade/${id}`)} />;
+  return <MarketCardGrid markets={markets} loading={loading} error={error} onSelect={(id) => navigate(`/trade/${id}`)} />;
 }
 
 function TradingPage() {
@@ -163,7 +163,7 @@ export default function App() {
     <FunctionSpaceProvider config={config} theme="fs-dark">
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<MarketListPage />} />
+          <Route path="/" element={<MarketBrowsePage />} />
           <Route path="/trade/:marketId" element={<TradingPage />} />
         </Routes>
       </BrowserRouter>
@@ -199,38 +199,38 @@ export default function App() {
 
 Never create a second provider for nested routes.
 
-See [MarketCard](./markets/marketcard) and [MarketList](./markets/marketlist) for props reference.
+See [MarketCard](./markets/marketcard) and [MarketCardGrid](./markets/marketcardgrid) for props reference.
 
 #### Embedded Market Discovery
 
-`MarketOverlay` provides a self-contained browse-and-trade flow using an overlay panel. It manages search, category, and sort state internally via `useMarketFilters`, renders a `MarketFilterBar` and `MarketList`, and opens a slide-over panel when a card is clicked. You supply the trading UI via a render prop:
+`MarketExplorer` provides a self-contained browse-and-trade flow with multiple view modes and an optional overlay panel. It manages search, category, and sort state internally via `useMarketFilters`, renders a `MarketFilterBar` and the active view, and opens a slide-over panel when a card is clicked (when a `children` render prop is provided). You supply the trading UI via a render prop:
 
 ```tsx
 <FunctionSpaceProvider config={config} theme="fs-dark">
-  <MarketOverlay state="open" featuredCategories={['sports', 'crypto']}>
+  <MarketExplorer state="open" featuredCategories={['sports', 'crypto']} views={['cards', 'pulse', 'compact', 'gauge', 'split', 'table', 'heatmap', 'charts']}>
     {(marketId) => (
       <>
         <MarketCharts marketId={marketId} />
         <TradePanel marketId={marketId} />
       </>
     )}
-  </MarketOverlay>
+  </MarketExplorer>
 </FunctionSpaceProvider>
 ```
 
-If you need full-page navigation instead of an overlay, use the state-driven or route-driven patterns above with `MarketList` directly.
+If you need full-page navigation instead of an overlay, use the state-driven or route-driven patterns above with `MarketCardGrid` directly.
 
-See [MarketOverlay](./markets/marketoverlay) for props reference.
+See [MarketExplorer](./markets/marketexplorer) for props reference.
 
 #### Market Filter Bar
 
 `MarketFilterBar` is a presentational filter component providing search, category chips, and sort controls. It is driven by the `useMarketFilters` hook, which manages all filter state and returns a `filterBarProps` bundle that can be spread directly onto the component.
 
-This pattern is useful when you want filter controls without the `MarketOverlay` wrapper -- for example, in a custom page layout or alongside your own list rendering.
+This pattern is useful when you want filter controls without the `MarketExplorer` wrapper -- for example, in a custom page layout or alongside your own list rendering.
 
 ```tsx
 import { useMarketFilters } from '@functionspace/react';
-import { MarketFilterBar, MarketList } from '@functionspace/ui';
+import { MarketFilterBar, MarketCardGrid } from '@functionspace/ui';
 
 function CustomMarketBrowser() {
   const { markets, loading, error, filterBarProps } = useMarketFilters({
@@ -242,7 +242,7 @@ function CustomMarketBrowser() {
   return (
     <div>
       <MarketFilterBar {...filterBarProps} searchPlaceholder="Find a market..." />
-      <MarketList
+      <MarketCardGrid
         markets={markets}
         loading={loading}
         error={error}
