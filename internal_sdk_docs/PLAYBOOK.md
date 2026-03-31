@@ -447,7 +447,7 @@ Every market has a `config` object with three core parameters used throughout th
 
 | Parameter | Meaning | Example |
 |-----------|---------|---------|
-| `numBuckets` | Polynomial degree  -- determines belief vector resolution (numBuckets+1 elements) | 20 |
+| `numBuckets` | Polynomial degree  -- determines belief vector resolution (numBuckets+2 elements) | 20 |
 | `lowerBound` | Lower bound of the market outcome range | 0 |
 | `upperBound` | Upper bound of the market outcome range | 100 |
 
@@ -465,14 +465,14 @@ The **universal constructor**. ALL belief vector creation MUST route through thi
 1. Takes an array of `Region` objects
 2. Generates a raw kernel for each region (`pointKernel` for PointRegion, `rangeKernel` for RangeRegion, `splineKernel` for SplineRegion)
 3. Combines them with weights
-4. Normalizes the result (private `normalize()` function  -- guarantees output sums to 1)
+4. Normalizes the result (private `normalize()` function  -- guarantees output sums to numBuckets+2)
 
 ```
 generateBelief(regions, numBuckets, lowerBound, upperBound)
   for each region:
-    if type === 'point' → pointKernel(region, numBuckets, lowerBound, upperBound)  → raw numBuckets+1 array
-    if type === 'range' → rangeKernel(region, numBuckets, lowerBound, upperBound)  → raw numBuckets+1 array
-    if type === 'spline' → splineKernel(region, numBuckets, lowerBound, upperBound) → raw numBuckets+1 array
+    if type === 'point' → pointKernel(region, numBuckets, lowerBound, upperBound)  → raw numBuckets+2 array
+    if type === 'range' → rangeKernel(region, numBuckets, lowerBound, upperBound)  → raw numBuckets+2 array
+    if type === 'spline' → splineKernel(region, numBuckets, lowerBound, upperBound) → raw numBuckets+2 array
     combined[k] += raw[k] * weight
   return normalize(combined)
 ```
@@ -553,7 +553,7 @@ Widget (e.g. TradePanel, ShapeCutter)
   → L2 generator or generateBelief directly
     → pointKernel / rangeKernel / splineKernel (private, internal)
       → normalize (private, internal)
-        → BeliefVector (number[], numBuckets+1 elements, sums to 1)
+        → BeliefVector (number[], numBuckets+2 elements, sums to numBuckets+2)
 
 BeliefVector → ctx.setPreviewBelief(belief)     [instant, on every input change]
             → ConsensusChart / MarketCharts reads ctx.previewBelief
@@ -579,7 +579,7 @@ All density rendering uses quadratic B-spline evaluation via a single function:
 
 - Maps each output point to a position in the coefficient array
 - Evaluates a quadratic B-spline basis over neighboring coefficients (smooth, C1-continuous curve)
-- Applies density scaling `(numBuckets+1)/(upperBound-lowerBound)` for correct PDF normalization
+- Applies normalization-agnostic density scaling `n/(coeffSum*range)` where n = coefficients.length for correct PDF normalization
 - Boundary values are 0.5x interior values because the B-spline basis function support extends outside [0,1]
 - Used by `ConsensusChart` for previews, consensus, and selected position curves
 
@@ -589,8 +589,8 @@ Same math as `evaluateDensityCurve` but for one x value. Used internally by `com
 
 **Invariants:**
 - Coefficients are non-negative (guaranteed by kernel functions)
-- Coefficients sum to 1 (guaranteed by `normalize` in `generateBelief`)
-- Density scaling is `(numBuckets+1)/(upperBound-lowerBound)`
+- Coefficients sum to numBuckets+2 (guaranteed by `normalize` in `generateBelief`)
+- Density scaling is normalization-agnostic: `n/(coeffSum*range)` where n = coefficients.length
 - Boundary values are 0.5x due to B-spline basis function support extending outside [0,1]
 - Preview and consensus use the same evaluation  -- what the user sees before submitting matches what they see after
 
@@ -845,7 +845,7 @@ Before creating anything, decide the correct approach (see "When to Create a New
 **If the shape needs a new L2 generator:**
 - [ ] Add L2 function to `generators.ts`  -- one line of logic constructing a Region array and passing to `generateBelief`
 - [ ] Export from `packages/core/src/index.ts`
-- [ ] Add tests to `tests/shapes.test.ts`  -- valid vector (numBuckets+1 elements, all >= 0, sums to ~1) + shape-specific assertions
+- [ ] Add tests to `tests/shapes.test.ts`  -- valid vector (numBuckets+2 elements, all >= 0, sums to ~numBuckets+2) + shape-specific assertions
 
 **If the shape is just existing generator with different params:**
 - [ ] No new function needed  -- widget passes different params to existing L2 or calls `generateBelief` directly

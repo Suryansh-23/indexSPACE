@@ -22,7 +22,7 @@ function computeStatistics(
 
 ```typescript
 {
-  mean: number;      // Expected value: lowerBound + (upperBound-lowerBound) * sum(k/numBuckets * p_k)
+  mean: number;      // Expected value: lowerBound + (upperBound-lowerBound) * sum(k/(n-1) * c_k) / coeffSum, where n = coefficients.length
   median: number;    // CDF integration to 0.5
   mode: number;      // Argmax of density on a 500-point grid
   variance: number;  // Numerical integration of (x - mean)^2 * density, normalized by total integrated weight

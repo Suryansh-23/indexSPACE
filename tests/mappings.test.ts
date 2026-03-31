@@ -50,7 +50,7 @@ const mockMarketStateRaw = {
     lambda_s: 0.1,
     lambda_d: 0.05,
   },
-  alpha_vector: [10, 20, 30, 20, 10, 10],
+  alpha_vector: [5, 10, 20, 30, 20, 10, 5, 2],
   is_settled: false,
   settlement_outcome: null,
   settlement_payouts: null,
@@ -81,9 +81,9 @@ const mockMarketStateRaw = {
 };
 
 const expectedMarketState = {
-  alpha: [10, 20, 30, 20, 10, 10],
-  consensus: [0.1, 0.2, 0.3, 0.2, 0.1, 0.1],
-  totalMass: 100,
+  alpha: [5, 10, 20, 30, 20, 10, 5, 2],
+  consensus: [5/102, 10/102, 20/102, 30/102, 20/102, 10/102, 5/102, 2/102],
+  totalMass: 102,
   poolBalance: 500.0,
   participantCount: 12,
   totalVolume: 1200.0,
@@ -115,14 +115,14 @@ const expectedMarketState = {
   marketType: 'standard',
   marketSubtype: null,
   metadata: mockMarketStateRaw.metadata,
-  consensusMean: 46.00000000000001,
+  consensusMean: 43.977591036414566,
 };
 
 const mockPositionsRaw = {
   positions: [
     {
       position_id: 'pos_001',
-      position_vector: [0.1, 0.2, 0.3, 0.2, 0.1, 0.1],
+      position_vector: [0.5, 1.0, 1.5, 1.5, 1.5, 1.0, 0.5, 0.5],
       minted_claims: 95.5,
       collateral: 100.0,
       status: 'open',
@@ -136,7 +136,7 @@ const mockPositionsRaw = {
     },
     {
       position_id: 'pos_002',
-      position_vector: [0.05, 0.1, 0.1, 0.3, 0.25, 0.2],
+      position_vector: [0.05, 0.1, 0.1, 0.3, 0.25, 0.2, 0.5, 0.5],
       minted_claims: 48.2,
       collateral: 50.0,
       status: 'closed',
@@ -154,7 +154,7 @@ const mockPositionsRaw = {
 const expectedPositions = [
   {
     positionId: 'pos_001',
-    belief: [0.1, 0.2, 0.3, 0.2, 0.1, 0.1],
+    belief: [0.5, 1.0, 1.5, 1.5, 1.5, 1.0, 0.5, 0.5],
     collateral: 100.0,
     claims: 95.5,
     owner: 'trader1',
@@ -170,7 +170,7 @@ const expectedPositions = [
   },
   {
     positionId: 'pos_002',
-    belief: [0.05, 0.1, 0.1, 0.3, 0.25, 0.2],
+    belief: [0.05, 0.1, 0.1, 0.3, 0.25, 0.2, 0.5, 0.5],
     collateral: 50.0,
     claims: 48.2,
     owner: 'trader2',
@@ -195,7 +195,7 @@ const mockHistoryRaw = {
       trade_id: 101,
       side: 'buy',
       position_id: 'pos_42',
-      alpha_vector: [10, 20, 30, 20, 10, 10],
+      alpha_vector: [5, 10, 20, 30, 20, 10, 5, 2],
       total_deposited: 1000.0,
       total_withdrawn: 200.0,
       total_volume: 1200.0,
@@ -208,7 +208,7 @@ const mockHistoryRaw = {
       trade_id: 102,
       side: 'sell',
       position_id: 'pos_43',
-      alpha_vector: [12, 18, 28, 22, 10, 10],
+      alpha_vector: [6, 9, 14, 11, 5, 5, 3, 1],
       total_deposited: 1000.0,
       total_withdrawn: 250.0,
       total_volume: 1250.0,
@@ -228,7 +228,7 @@ const expectedHistory = {
       tradeId: 101,
       side: 'buy',
       positionId: 'pos_42',
-      alphaVector: [10, 20, 30, 20, 10, 10],
+      alphaVector: [5, 10, 20, 30, 20, 10, 5, 2],
       totalDeposits: 1000.0,
       totalWithdrawals: 200.0,
       totalVolume: 1200.0,
@@ -241,7 +241,7 @@ const expectedHistory = {
       tradeId: 102,
       side: 'sell',
       positionId: 'pos_43',
-      alphaVector: [12, 18, 28, 22, 10, 10],
+      alphaVector: [6, 9, 14, 11, 5, 5, 3, 1],
       totalDeposits: 1000.0,
       totalWithdrawals: 250.0,
       totalVolume: 1250.0,
@@ -257,21 +257,21 @@ const mockBuyResponseRaw = {
   message: 'Position created successfully',
   position: {
     position_id: 99,
-    position_vector: [0.1, 0.2, 0.3, 0.2, 0.1, 0.1],
+    position_vector: [0.5, 1.0, 1.5, 1.5, 1.0, 1.0, 0.5],
     minted_claims: 9.5,
     collateral: 10,
     position_type: 'raw',
-    position_params: { position_vector: [0.1, 0.2, 0.3, 0.2, 0.1, 0.1] },
+    position_params: { position_vector: [0.5, 1.0, 1.5, 1.5, 1.0, 1.0, 0.5] },
   },
 };
 
 const expectedBuyResult = {
   positionId: 99,
-  belief: [0.1, 0.2, 0.3, 0.2, 0.1, 0.1],
+  belief: [0.5, 1.0, 1.5, 1.5, 1.0, 1.0, 0.5],
   claims: 9.5,
   collateral: 10,
   positionType: 'raw',
-  positionParams: { position_vector: [0.1, 0.2, 0.3, 0.2, 0.1, 0.1] },
+  positionParams: { position_vector: [0.5, 1.0, 1.5, 1.5, 1.0, 1.0, 0.5] },
 };
 
 const mockSellResponseRaw = {
@@ -377,7 +377,7 @@ const mockDiscoverMarketsRaw = {
       current_pool: 500.0,
       deleted: false,
       deleted_at: null,
-      alpha_vector: [10, 20, 30, 20, 10, 10],
+      alpha_vector: [5, 10, 20, 30, 20, 10, 5, 2],
       market_model_params: {
         P0: 100, mu: 0.01, eps_alpha: 0.001, tau: 1.0,
         gamma: 0.5, lambda_s: 0.1, lambda_d: 0.05,
@@ -412,7 +412,7 @@ const mockDiscoverMarketsRaw = {
       current_pool: 100.0,
       deleted: false,
       deleted_at: null,
-      alpha_vector: [5, 5],
+      alpha_vector: [3, 5, 5, 3],
       market_model_params: {
         P0: 50, mu: 0.01, eps_alpha: 0.001, tau: 1.0,
         gamma: 0.5, lambda_s: 0.1, lambda_d: 0.05,
@@ -440,9 +440,9 @@ const mockDiscoverMarketsRaw = {
 
 const expectedDiscoverMarkets = [
   {
-    alpha: [10, 20, 30, 20, 10, 10],
-    consensus: [0.1, 0.2, 0.3, 0.2, 0.1, 0.1],
-    totalMass: 100,
+    alpha: [5, 10, 20, 30, 20, 10, 5, 2],
+    consensus: [5/102, 10/102, 20/102, 30/102, 20/102, 10/102, 5/102, 2/102],
+    totalMass: 102,
     poolBalance: 500.0,
     participantCount: 12,
     totalVolume: 1500.0,
@@ -464,12 +464,12 @@ const expectedDiscoverMarkets = [
     marketType: 'standard',
     marketSubtype: null,
     metadata: mockDiscoverMarketsRaw.markets[0].metadata,
-    consensusMean: 46.00000000000001,
+    consensusMean: 43.977591036414566,
   },
   {
-    alpha: [5, 5],
-    consensus: [0.5, 0.5],
-    totalMass: 10,
+    alpha: [3, 5, 5, 3],
+    consensus: [3/16, 5/16, 5/16, 3/16],
+    totalMass: 16,
     poolBalance: 100.0,
     participantCount: 3,
     totalVolume: 200.0,
@@ -672,7 +672,7 @@ describe('queryMarketState', () => {
   });
 
   it('throws when alpha_vector sums to zero', async () => {
-    const rawZeroAlpha = { ...mockMarketStateRaw, alpha_vector: [0, 0, 0, 0, 0, 0] };
+    const rawZeroAlpha = { ...mockMarketStateRaw, alpha_vector: [0, 0, 0, 0, 0, 0, 0, 0] };
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(rawZeroAlpha),
@@ -927,7 +927,7 @@ describe('queryMarketHistory', () => {
           trade_id: 101,
           side: 'buy',
           position_id: 123,
-          alpha_vector: [10, 20, 30, 20, 10, 10],
+          alpha_vector: [5, 10, 20, 30, 20, 10, 5, 2],
           total_deposited: 1000.0,
           total_withdrawn: 200.0,
           total_volume: 1200.0,
@@ -969,14 +969,14 @@ describe('buy', () => {
     });
 
     const client = makeMockClientWithAuth();
-    await buy(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5, { prediction: 50 });
+    await buy(client, '123', [0.5, 1.0, 1.5, 1.5, 1.0, 1.0, 0.5], 10, 5, { prediction: 50 });
 
     const [, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(init.body);
     expect(body).toEqual({
       collateral: 10,
       position_type: 'raw',
-      position_params: { position_vector: [0.1, 0.2, 0.3, 0.2, 0.1, 0.1] },
+      position_params: { position_vector: [0.5, 1.0, 1.5, 1.5, 1.0, 1.0, 0.5] },
     });
   });
 
@@ -987,7 +987,7 @@ describe('buy', () => {
     });
 
     const client = makeMockClientWithAuth();
-    await buy(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5, { prediction: 50 });
+    await buy(client, '123', [0.5, 1.0, 1.5, 1.5, 1.0, 1.0, 0.5], 10, 5, { prediction: 50 });
 
     const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toContain('/api/market/trading/buy/123');
@@ -1002,7 +1002,7 @@ describe('buy', () => {
     });
 
     const client = makeMockClientWithAuth();
-    const result = await buy(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5, { prediction: 50 });
+    const result = await buy(client, '123', [0.5, 1.0, 1.5, 1.5, 1.0, 1.0, 0.5], 10, 5, { prediction: 50 });
 
     expect(result).toEqual(expectedBuyResult);
   });
@@ -1014,14 +1014,14 @@ describe('buy', () => {
     });
 
     const client = makeMockClientWithAuth();
-    await buy(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5);
+    await buy(client, '123', [0.5, 1.0, 1.5, 1.5, 1.0, 1.0, 0.5], 10, 5);
 
     const [, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(init.body);
     expect(body).toEqual({
       collateral: 10,
       position_type: 'raw',
-      position_params: { position_vector: [0.1, 0.2, 0.3, 0.2, 0.1, 0.1] },
+      position_params: { position_vector: [0.5, 1.0, 1.5, 1.5, 1.0, 1.0, 0.5] },
     });
     expect(body).not.toHaveProperty('prediction');
   });
@@ -1031,7 +1031,7 @@ describe('buy', () => {
       success: true,
       position: {
         position_id: 99,
-        position_vector: [0.5, 0.5],
+        position_vector: [1.0, 1.0, 1.0],
         minted_claims: 5,
         collateral: 10,
       },
@@ -1042,7 +1042,7 @@ describe('buy', () => {
     });
 
     const client = makeMockClientWithAuth();
-    const result = await buy(client, '123', [0.5, 0.5], 10, 1);
+    const result = await buy(client, '123', [1.0, 1.0, 1.0], 10, 1);
 
     expect(result.positionId).toBe(99);
     expect(result.positionType).toBeUndefined();
@@ -1056,7 +1056,7 @@ describe('buy', () => {
     });
 
     const client = makeMockClientWithAuth();
-    await expect(buy(client, '123', [0.5, 0.5], 10, 1)).rejects.toThrow(
+    await expect(buy(client, '123', [1.0, 1.0, 1.0], 10, 1)).rejects.toThrow(
       'Missing position in buy response',
     );
   });
@@ -1250,14 +1250,14 @@ describe('previewPayoutCurve', () => {
     });
 
     const client = makeMockClientWithAuth();
-    await previewPayoutCurve(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5, 100);
+    await previewPayoutCurve(client, '123', [0.5, 1.0, 1.5, 1.5, 1.0, 1.0, 0.5], 10, 5, 100);
 
     const [, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(init.body);
     expect(body).toEqual({
       collateral: 10,
       position_type: 'raw',
-      position_params: { position_vector: [0.1, 0.2, 0.3, 0.2, 0.1, 0.1] },
+      position_params: { position_vector: [0.5, 1.0, 1.5, 1.5, 1.0, 1.0, 0.5] },
       num_outcomes: 100,
     });
   });
@@ -1269,14 +1269,14 @@ describe('previewPayoutCurve', () => {
     });
 
     const client = makeMockClientWithAuth();
-    await previewPayoutCurve(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5);
+    await previewPayoutCurve(client, '123', [0.5, 1.0, 1.5, 1.5, 1.0, 1.0, 0.5], 10, 5);
 
     const [, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(init.body);
     expect(body).toEqual({
       collateral: 10,
       position_type: 'raw',
-      position_params: { position_vector: [0.1, 0.2, 0.3, 0.2, 0.1, 0.1] },
+      position_params: { position_vector: [0.5, 1.0, 1.5, 1.5, 1.0, 1.0, 0.5] },
     });
     expect(body).not.toHaveProperty('num_outcomes');
   });
@@ -1288,7 +1288,7 @@ describe('previewPayoutCurve', () => {
     });
 
     const client = makeMockClientWithAuth();
-    await previewPayoutCurve(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5, 100);
+    await previewPayoutCurve(client, '123', [0.5, 1.0, 1.5, 1.5, 1.0, 1.0, 0.5], 10, 5, 100);
 
     const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toContain('/api/views/preview/payout/123');
@@ -1303,7 +1303,7 @@ describe('previewPayoutCurve', () => {
     });
 
     const client = makeMockClientWithAuth();
-    const result = await previewPayoutCurve(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5, 100);
+    const result = await previewPayoutCurve(client, '123', [0.5, 1.0, 1.5, 1.5, 1.0, 1.0, 0.5], 10, 5, 100);
 
     expect(result).toEqual(expectedPayoutCurve);
   });
@@ -1316,7 +1316,7 @@ describe('previewPayoutCurve', () => {
 
     const client = makeMockClientWithAuth();
     await expect(
-      previewPayoutCurve(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5, 100),
+      previewPayoutCurve(client, '123', [0.5, 1.0, 1.5, 1.5, 1.0, 1.0, 0.5], 10, 5, 100),
     ).rejects.toThrow('Missing max_payout in payout curve response');
   });
 
@@ -1328,7 +1328,7 @@ describe('previewPayoutCurve', () => {
 
     const client = makeMockClientWithAuth();
     await expect(
-      previewPayoutCurve(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5, 100),
+      previewPayoutCurve(client, '123', [0.5, 1.0, 1.5, 1.5, 1.0, 1.0, 0.5], 10, 5, 100),
     ).rejects.toThrow('Missing max_payout_outcome in payout curve response');
   });
 
@@ -1340,7 +1340,7 @@ describe('previewPayoutCurve', () => {
 
     const client = makeMockClientWithAuth();
     await expect(
-      previewPayoutCurve(client, '123', [0.1, 0.2, 0.3, 0.2, 0.1, 0.1], 10, 5, 100),
+      previewPayoutCurve(client, '123', [0.5, 1.0, 1.5, 1.5, 1.0, 1.0, 0.5], 10, 5, 100),
     ).rejects.toThrow('Missing collateral in payout curve response');
   });
 });
@@ -1721,7 +1721,7 @@ describe('discoverMarkets', () => {
     const rawZeroAlpha = {
       markets: [{
         ...mockDiscoverMarketsRaw.markets[0],
-        alpha_vector: [0, 0, 0, 0, 0, 0],
+        alpha_vector: [0, 0, 0, 0, 0, 0, 0, 0],
       }],
     };
     globalThis.fetch = vi.fn().mockResolvedValue({

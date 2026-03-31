@@ -977,7 +977,7 @@ function useDistributionState(
 
 ## 6. Building Beliefs
 
-A belief vector is a `number[]` of length `numBuckets + 1` that sums to 1. It expresses a trader's probability distribution over possible outcomes. Every trade in the SDK starts with constructing a belief.
+A belief vector is a `number[]` of length `numBuckets + 2` that sums to `numBuckets + 2`. It expresses a trader's probability distribution over possible outcomes. Every trade in the SDK starts with constructing a belief.
 
 The three parameters `numBuckets`, `lowerBound`, and `upperBound` always come from the market configuration. Never hardcode them.
 
@@ -999,7 +999,7 @@ function generateBelief(
   numBuckets: number,
   lowerBound: number,
   upperBound: number,
-): BeliefVector  // number[] of length numBuckets+1, sums to 1
+): BeliefVector  // number[] of length numBuckets+2, sums to numBuckets+2
 ```
 
 ### Region Types
@@ -1455,7 +1455,7 @@ See the complete core type reference in `core.txt`. Key types used in headless m
 - **`BuyResult`** -- Returned by `buy()`. Contains `positionId`, `belief`, `claims`, `collateral`, `positionType?`, `positionParams?`.
 - **`SellResult`** -- Returned by `sell()`. Contains `positionId`, `collateralReturned`, `creditedTo?`.
 - **`PayoutCurve`** -- Returned by `previewPayoutCurve()`. Contains `previews`, `maxPayout`, `maxPayoutOutcome`.
-- **`BeliefVector`** -- `number[]` of length `numBuckets + 1` summing to 1. Passed to `buy()` and `ctx.setPreviewBelief()`. Can be validated with `validateBeliefVector(vector, numBuckets)`.
+- **`BeliefVector`** -- `number[]` of length `numBuckets + 2` summing to `numBuckets + 2`. Passed to `buy()` and `ctx.setPreviewBelief()`. Can be validated with `validateBeliefVector(vector, numBuckets)`.
 - **`BucketData`** -- Returned by `useBucketDistribution()`. Contains `range`, `min`, `max`, `probability`, `percentage`.
 - **`TradeEntry`** -- Returned by `useTradeHistory()`. Contains `id`, `timestamp`, `side`, `prediction`, `amount`, `username`.
 

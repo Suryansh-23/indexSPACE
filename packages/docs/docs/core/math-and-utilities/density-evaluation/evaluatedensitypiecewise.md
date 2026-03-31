@@ -19,7 +19,7 @@ function evaluateDensityPiecewise(
 ): number  // probability density at x
 ```
 
-Values outside `[lowerBound, upperBound]` are clamped to the edge density values (the edge coefficient scaled by `(numBuckets+1)/(upperBound-lowerBound)`). The return value is a density (can be > 1), not a probability. To get the probability of a range, integrate the density over that range (or use `calculateBucketDistribution`).
+Values outside `[lowerBound, upperBound]` are clamped to the edge density values (the edge coefficient scaled by normalization-agnostic factor `n/(coeffSum*range)` where n = coefficients.length). The return value is a density (can be > 1), not a probability. To get the probability of a range, integrate the density over that range (or use `calculateBucketDistribution`).
 
 **Example:**
 

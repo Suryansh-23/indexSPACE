@@ -8,7 +8,7 @@ description: "Evaluate a coefficient vector into chart-ready { x, y } density po
 
 **`evaluateDensityCurve(coefficients, lowerBound, upperBound, numPoints?)`**
 
-**Layer:** L0. Evaluates a coefficient vector as a continuous probability density function across the full outcome range, returning chart-ready `{ x, y }[]` points. Uses quadratic B-spline evaluation over adjacent coefficients, scaled by `(numBuckets+1)/(upperBound-lowerBound)` to produce a proper PDF (integrates to 1). Boundary values are 0.5x interior values because the B-spline basis function support extends outside [0,1].
+**Layer:** L0. Evaluates a coefficient vector as a continuous probability density function across the full outcome range, returning chart-ready `{ x, y }[]` points. Uses quadratic B-spline evaluation (Cox-de Boor `evalBasis`) over adjacent coefficients, with normalization-agnostic density scaling `n/(coeffSum*range)` where n = coefficients.length, to produce a proper PDF (integrates to 1). Boundary values are 0.5x interior values because the B-spline basis function support extends outside [0,1].
 
 ```typescript
 function evaluateDensityCurve(

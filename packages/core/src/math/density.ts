@@ -1,8 +1,22 @@
 import type { ConsensusSummary, PercentileSet } from '../types.js';
 
 /**
+ * Evaluate a single quadratic B-spline basis function.
+ * Basis i is centered at (i - 2) * h, with support width 3h.
+ */
+function evalBasis(x: number, i: number, h: number): number {
+  const u = x - (i - 2) * h;
+  if (u <= 0 || u >= 3 * h) return 0;
+  const h2 = 2 * h * h;
+  if (u < h) return (u * u) / h2;
+  if (u < 2 * h) return (-2 * u * u + 6 * h * u - 3 * h * h) / h2;
+  return (3 * h - u) ** 2 / h2;
+}
+
+/**
  * Evaluate the density PDF at a single point via quadratic B-spline evaluation.
- * Uses the three-basis quadratic B-spline kernel, scaled by (numBuckets+1)/(upperBound-lowerBound).
+ * Uses K+2 coefficient vectors with the backend's B-spline basis functions.
+ * Scale factor: n / (coeffSum * range) where n = coefficients.length.
  */
 export function evaluateDensityPiecewise(
   coefficients: number[],
@@ -10,21 +24,29 @@ export function evaluateDensityPiecewise(
   lowerBound: number,
   upperBound: number,
 ): number {
-  const numBuckets = coefficients.length - 1;
-  if (numBuckets < 0) return 0;
-  const scale = (numBuckets + 1) / (upperBound - lowerBound);
-  const u = (x - lowerBound) / (upperBound - lowerBound);
-  if (u <= 0) return coefficients[0] * 0.5 * scale;
-  if (u >= 1) return coefficients[numBuckets] * 0.5 * scale;
-  const h = 1 / numBuckets;
-  const k = Math.min(Math.floor(u / h), numBuckets - 1);
-  const tau = u - k * h;
-  const cPrev = k > 0 ? coefficients[k - 1] : 0;
-  const cCurr = coefficients[k];
-  const cNext = k + 1 < coefficients.length ? coefficients[k + 1] : 0;
-  return (cPrev * (h - tau) * (h - tau) / (2 * h * h)
-        + cCurr * (0.5 + tau / h - (tau * tau) / (h * h))
-        + cNext * (tau * tau) / (2 * h * h)) * scale;
+  const n = coefficients.length;
+  const K = n - 2;
+  if (K < 0) return 0;
+
+  const range = upperBound - lowerBound;
+  if (range <= 0) return 0;
+
+  const coeffSum = coefficients.reduce((a, b) => a + b, 0);
+  if (coeffSum <= 0) return 0;
+  const scale = n / (coeffSum * range);
+
+  // K=0 guard: single bucket, uniform density = 1/range
+  if (K === 0) return 1 / range;
+
+  const u = (x - lowerBound) / range;
+  const h = 1 / K;
+
+  let val = 0;
+  for (let i = 0; i < n; i++) {
+    val += coefficients[i] * evalBasis(u, i, h);
+  }
+
+  return Math.max(0, val * scale);
 }
 
 /**
@@ -38,31 +60,50 @@ export function evaluateDensityCurve(
   numPoints: number = 200,
 ): Array<{ x: number; y: number }> {
   const points: Array<{ x: number; y: number }> = [];
-  const numBuckets = coefficients.length - 1;
-  if (numBuckets < 0) return points;
+  const n = coefficients.length;
+  const K = n - 2;
+  if (K < 0) return points;
 
-  const scale = (numBuckets + 1) / (upperBound - lowerBound);
+  const range = upperBound - lowerBound;
+  if (range <= 0) return points;
+  if (numPoints <= 1) {
+    const mid = (lowerBound + upperBound) / 2;
+    return numPoints === 1 ? [{ x: mid, y: evaluateDensityPiecewise(coefficients, mid, lowerBound, upperBound) }] : points;
+  }
+
+  const coeffSum = coefficients.reduce((a, b) => a + b, 0);
+  if (coeffSum <= 0) {
+    // All-zero coefficients: return flat zero curve
+    for (let i = 0; i < numPoints; i++) {
+      const x = lowerBound + range * i / (numPoints - 1);
+      points.push({ x, y: 0 });
+    }
+    return points;
+  }
+  const scale = n / (coeffSum * range);
+
+  // K=0 guard: single bucket, uniform density = 1/range
+  if (K === 0) {
+    const y = 1 / range;
+    for (let i = 0; i < numPoints; i++) {
+      const x = lowerBound + range * i / (numPoints - 1);
+      points.push({ x, y });
+    }
+    return points;
+  }
+
+  const h = 1 / K;
 
   for (let i = 0; i < numPoints; i++) {
-    const x = lowerBound + (upperBound - lowerBound) * i / (numPoints - 1);
-    const u = (x - lowerBound) / (upperBound - lowerBound);
-    let y: number;
-    if (u <= 0) {
-      y = coefficients[0] * 0.5 * scale;
-    } else if (u >= 1) {
-      y = coefficients[numBuckets] * 0.5 * scale;
-    } else {
-      const h = 1 / numBuckets;
-      const k = Math.min(Math.floor(u / h), numBuckets - 1);
-      const tau = u - k * h;
-      const cPrev = k > 0 ? coefficients[k - 1] : 0;
-      const cCurr = coefficients[k];
-      const cNext = k + 1 < coefficients.length ? coefficients[k + 1] : 0;
-      y = (cPrev * (h - tau) * (h - tau) / (2 * h * h)
-            + cCurr * (0.5 + tau / h - (tau * tau) / (h * h))
-            + cNext * (tau * tau) / (2 * h * h)) * scale;
+    const x = lowerBound + range * i / (numPoints - 1);
+    const u = (x - lowerBound) / range;
+
+    let val = 0;
+    for (let j = 0; j < n; j++) {
+      val += coefficients[j] * evalBasis(u, j, h);
     }
-    points.push({ x, y });
+
+    points.push({ x, y: Math.max(0, val * scale) });
   }
 
   return points;
@@ -76,14 +117,16 @@ export function computeStatistics(
   lowerBound: number,
   upperBound: number,
 ): { mean: number; median: number; mode: number; variance: number; stdDev: number } {
-  const numBuckets = coefficients.length - 1;
+  const numBuckets = coefficients.length - 2;
 
-  // Mean (closed form): mean = lowerBound + (upperBound-lowerBound) * Σ (k/numBuckets) * p_k
-  let mean = 0;
-  for (let k = 0; k <= numBuckets; k++) {
-    mean += (k / numBuckets) * coefficients[k];
+  // Mean (closed form): normalized by coefficient sum
+  const totalC = coefficients.reduce((a, b) => a + b, 0);
+  let meanU = 0;
+  for (let k = 0; k <= numBuckets + 1; k++) {
+    meanU += (k / (numBuckets + 1)) * coefficients[k];
   }
-  mean = lowerBound + (upperBound - lowerBound) * mean;
+  meanU = totalC > 0 ? meanU / totalC : 0.5;
+  const mean = lowerBound + (upperBound - lowerBound) * meanU;
 
   // Variance: numerical integration
   const numPointsVar = 500;

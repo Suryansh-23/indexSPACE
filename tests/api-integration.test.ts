@@ -30,11 +30,11 @@ function makeClient() {
 // ── Math tests (no backend) ──
 
 describe('Math: generateGaussian', () => {
-  it('produces vector of length numBuckets+1 that sums to 1', () => {
+  it('produces vector of length numBuckets+2 that sums to numBuckets+2', () => {
     const v = generateGaussian(60, 9, numBuckets, lowerBound, upperBound);
-    expect(v.length).toBe(numBuckets + 1);
+    expect(v.length).toBe(numBuckets + 2);
     const sum = v.reduce((a, b) => a + b, 0);
-    expect(sum).toBeCloseTo(1.0, 10);
+    expect(sum).toBeCloseTo(numBuckets + 2, 10);
   });
 
   it('all values are non-negative', () => {
@@ -46,11 +46,11 @@ describe('Math: generateGaussian', () => {
 });
 
 describe('Math: generateRange', () => {
-  it('produces vector that sums to 1 with non-negative values', () => {
+  it('produces vector that sums to numBuckets+2 with non-negative values', () => {
     const v = generateRange(50, 70, numBuckets, lowerBound, upperBound);
-    expect(v.length).toBe(numBuckets + 1);
+    expect(v.length).toBe(numBuckets + 2);
     const sum = v.reduce((a, b) => a + b, 0);
-    expect(sum).toBeCloseTo(1.0, 10);
+    expect(sum).toBeCloseTo(numBuckets + 2, 10);
     for (const val of v) {
       expect(val).toBeGreaterThanOrEqual(0);
     }

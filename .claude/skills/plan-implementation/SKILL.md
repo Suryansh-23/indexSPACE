@@ -625,7 +625,7 @@ All API calls go through `fs_demo/src/services/apiService.js`. Cross-reference b
 
 ### Core Domain Concepts
 
-- **Belief vector (pVector):** K+1 dimensional array of non-negative numbers summing to 1. Represents probability distribution over market outcome range [L, H].
+- **Belief vector (pVector):** K+2 dimensional array of non-negative numbers summing to K+2 (where K = numBuckets). Represents probability distribution over market outcome range [L, H].
 - **Consensus PDF:** Market's aggregate probability distribution. Fetched via `GET /market/consensus_pdf`. Returns `{x_values, y_values, market_params}` where `y_values` are probability density (not mass).
 
 ### Existing Handoff Documents (Format Reference)

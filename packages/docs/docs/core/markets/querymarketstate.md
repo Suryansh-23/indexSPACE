@@ -49,7 +49,7 @@ The `config` object contains the parameters you need for building beliefs (`numB
 
 | Config Field   | Description                                                              |
 | -------------- | ------------------------------------------------------------------------ |
-| `numBuckets`   | Number of outcome buckets. Belief vectors have length `numBuckets + 1`.  |
+| `numBuckets`   | Number of outcome buckets. Belief vectors have length `numBuckets + 2`.  |
 | `lowerBound`   | Lower bound of outcome space.                                            |
 | `upperBound`   | Upper bound of outcome space.                                            |
 | `K` *(deprecated)* | Alias for `numBuckets`. Will be removed in a future release.         |

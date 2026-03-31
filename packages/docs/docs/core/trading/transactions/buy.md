@@ -29,7 +29,7 @@ async function buy(
 | `marketId`           | `string \| number` | The market to trade in.                                                                                                                        |
 | `belief`             | `BeliefVector`     | The probability distribution to trade on. Generated with `generateBelief` or any convenience generator.                                        |
 | `collateral`         | `number`           | Amount of currency to put up. Minimum is typically 1.                                                                                          |
-| `numBuckets`         | `number`           | Number of outcome buckets (from `market.config.numBuckets`). Must equal `belief.length - 1`.                                                          |
+| `numBuckets`         | `number`           | Number of outcome buckets (from `market.config.numBuckets`). Must equal `belief.length - 2`.                                                          |
 | `options.prediction` | `number?`          | Optional center-of-mass hint. Accepted for backward compatibility but no longer sent to the server. |
 
 **Returns `BuyResult`:**
@@ -81,10 +81,10 @@ ctx.invalidate(marketId);
 
 | Cause                                | Error message pattern                                                          | Stage |
 | ------------------------------------ | ------------------------------------------------------------------------------ | ----- |
-| Invalid belief vector                | `"Belief vector length X does not match expected numBuckets+1 = Y"`            | Client-side, before network request |
+| Invalid belief vector                | `"Belief vector length X does not match expected numBuckets+2 = Y"`            | Client-side, before network request |
 | Non-finite values                    | `"Belief vector contains non-finite values (NaN or Infinity)"`                 | Client-side |
 | Negative values                      | `"Belief vector contains negative values"`                                     | Client-side |
-| Sum != 1.0                           | `"Belief vector does not sum to 1.0 (sum = X)"`                               | Client-side |
+| Sum != numBuckets+2                  | `"Belief vector does not sum to numBuckets+2 (sum = X)"`                      | Client-side |
 | Not authenticated (guest mode)       | `"Authentication required. Please sign in to perform this action."`            | Client-side |
 | HTTP error (e.g., 400, 500)          | `"API error: {status} {statusText} on POST /api/market/trading/buy/{marketId}"` | Server response |
 | API-level failure (`success: false`) | `"API error: {message}"` (message from server response)                        | Server response |

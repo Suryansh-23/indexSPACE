@@ -1,7 +1,7 @@
 ---
 title: "validateBeliefVector"
 sidebar_position: 1
-description: "Validate a belief vector (length, finite values, non-negative, sums to 1) before API submission."
+description: "Validate a belief vector (length, finite values, non-negative, sums to numBuckets+2) before API submission."
 ---
 
 # validateBeliefVector
@@ -18,8 +18,8 @@ function validateBeliefVector(vector: number[], numBuckets: number): void
 
 | Parameter    | Type       | Description                                                                                |
 | ------------ | ---------- | ------------------------------------------------------------------------------------------ |
-| `vector`     | `number[]` | The belief vector to validate. Must have length `numBuckets + 1`.                          |
-| `numBuckets` | `number`   | Number of outcome buckets (from `market.config.numBuckets`). Vector length must be `numBuckets + 1`. |
+| `vector`     | `number[]` | The belief vector to validate. Must have length `numBuckets + 2`.                          |
+| `numBuckets` | `number`   | Number of outcome buckets (from `market.config.numBuckets`). Vector length must be `numBuckets + 2`. |
 
 **Throws:**
 
@@ -27,10 +27,10 @@ function validateBeliefVector(vector: number[], numBuckets: number): void
 
 | Check                | Error message                                                                    | When it fires                              |
 | -------------------- | -------------------------------------------------------------------------------- | ------------------------------------------ |
-| Length mismatch      | `"Belief vector length X does not match expected numBuckets+1 = Y"`              | `vector.length !== numBuckets + 1`         |
+| Length mismatch      | `"Belief vector length X does not match expected numBuckets+2 = Y"`              | `vector.length !== numBuckets + 2`         |
 | Non-finite values    | `"Belief vector contains non-finite values (NaN or Infinity)"`      | Any element is `NaN` or `Infinity`                 |
 | Negative values      | `"Belief vector contains negative values"`                          | Any element is less than 0                         |
-| Sum != 1.0           | `"Belief vector does not sum to 1.0 (sum = X)"`                    | Sum of elements deviates from 1.0 by >= 1e-6       |
+| Sum != numBuckets+2  | `"Belief vector does not sum to numBuckets+2 (sum = X)"`           | Sum of elements deviates from numBuckets+2 by proportional tolerance |
 
 All four checks run client-side, before any network request. This provides fast feedback and avoids wasting a round-trip on obviously invalid input.
 

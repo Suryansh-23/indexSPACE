@@ -12,56 +12,61 @@ import { validateUsername } from '../packages/core/src/index.js';
 
 describe('validateBeliefVector', () => {
   it('accepts a valid belief vector', () => {
-    expect(() => validateBeliefVector([0.2, 0.3, 0.5], 2)).not.toThrow();
+    // numBuckets=2 -> length 4, sum = 4
+    expect(() => validateBeliefVector([1.0, 1.0, 1.0, 1.0], 2)).not.toThrow();
   });
 
   it('throws on wrong length', () => {
     expect(() => validateBeliefVector([0.5, 0.5], 5)).toThrow('length 2');
-    expect(() => validateBeliefVector([0.5, 0.5], 5)).toThrow('numBuckets+1 = 6');
+    expect(() => validateBeliefVector([0.5, 0.5], 5)).toThrow('numBuckets+2 = 7');
   });
 
-  it('throws when vector does not sum to 1.0', () => {
-    expect(() => validateBeliefVector([0.5, 0.5, 0.5], 2)).toThrow(
-      'does not sum to 1.0',
+  it('throws when vector does not sum to numBuckets+2', () => {
+    // numBuckets=2 -> expected sum = 4, but [0.5, 0.5, 0.5, 0.5] sums to 2
+    expect(() => validateBeliefVector([0.5, 0.5, 0.5, 0.5], 2)).toThrow(
+      'does not sum to 4',
     );
   });
 
   it('throws on negative values', () => {
-    expect(() => validateBeliefVector([-0.1, 0.6, 0.5], 2)).toThrow(
+    expect(() => validateBeliefVector([-0.1, 1.0, 1.0, 2.1], 2)).toThrow(
       'negative',
     );
   });
 
-  it('edge case: numBuckets=0 with single-element vector passes', () => {
-    expect(() => validateBeliefVector([1.0], 0)).not.toThrow();
+  it('edge case: numBuckets=0 with two-element vector passes', () => {
+    // numBuckets=0 -> length 2, sum = 2
+    expect(() => validateBeliefVector([1.0, 1.0], 0)).not.toThrow();
   });
 
-  it('edge case: sum within tolerance (0.9999999) passes', () => {
-    // Build a vector that sums to 0.9999999 -- well within 1e-6 tolerance
-    const vec = [0.3333333, 0.3333333, 0.3333333];
-    // sum = 0.9999999, diff from 1.0 = 1e-7 < 1e-6
-    expect(() => validateBeliefVector(vec, 2)).not.toThrow();
+  it('edge case: sum within tolerance passes', () => {
+    // numBuckets=1 -> expected sum = 3
+    // Build a vector that sums close to 3
+    const vec = [1.0, 1.0, 0.9999999];
+    // sum = 2.9999999, diff from 3.0 relative = |2.9999999/3 - 1| < 1e-6
+    expect(() => validateBeliefVector(vec, 1)).not.toThrow();
   });
 
-  it('edge case: sum just outside tolerance (1.001) throws', () => {
-    expect(() => validateBeliefVector([0.5, 0.5, 0.001], 2)).toThrow(
-      'does not sum to 1.0',
+  it('edge case: sum just outside tolerance throws', () => {
+    // numBuckets=2 -> expected sum = 4, but [1.0, 1.0, 1.0, 1.01] sums to 4.01
+    expect(() => validateBeliefVector([1.0, 1.0, 1.0, 1.01], 2)).toThrow(
+      'does not sum to 4',
     );
   });
 
-  it('edge case: empty vector with numBuckets=0 throws (expects length 1, not 0)', () => {
+  it('edge case: empty vector with numBuckets=0 throws (expects length 2, not 0)', () => {
     expect(() => validateBeliefVector([], 0)).toThrow('length 0');
-    expect(() => validateBeliefVector([], 0)).toThrow('numBuckets+1 = 1');
+    expect(() => validateBeliefVector([], 0)).toThrow('numBuckets+2 = 2');
   });
 
   it('throws on NaN values', () => {
-    expect(() => validateBeliefVector([NaN, 0.5, 0.5], 2)).toThrow(
+    expect(() => validateBeliefVector([NaN, 1.0, 1.0, 1.0], 2)).toThrow(
       'non-finite',
     );
   });
 
   it('throws on Infinity values', () => {
-    expect(() => validateBeliefVector([Infinity, 0, 0], 2)).toThrow(
+    expect(() => validateBeliefVector([Infinity, 0, 0, 0], 2)).toThrow(
       'non-finite',
     );
   });
