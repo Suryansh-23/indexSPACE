@@ -75,13 +75,15 @@ Handoff document: `Docs/order-depth-widget-handoff.md`
 - MODIFY `packages/react/src/index.ts`
 
 **Steps:**
-1. Create `useOrderDepth(marketId)` hook in `packages/react/src/useOrderDepth.ts`
+1. Create `useOrderDepth(marketId, options?)` hook in `packages/react/src/useOrderDepth.ts`
    - Follow canonical pattern from `packages/react/src/useMarket.ts`
    - Context check with throw
-   - useState triple: `orderDepth`, `loading` (init true), `error`
-   - useCallback wrapping `queryOrderDepth`, depending on `[ctx.client, marketId]`
-   - useEffect depending on `[fetch, ctx.invalidationCount]`
-   - Return `{ orderDepth, loading, error, refetch: fetch }`
+   - useQueryCache for cache access
+   - CacheKey via useMemo: `['orderDepth', normalizedId]`
+   - useCallback wrapping `queryOrderDepth` with AbortSignal: `(signal) => queryOrderDepth(ctx.client, marketId, { signal })`
+   - useCacheSubscription for data subscription (uses useSyncExternalStore)
+   - Return `{ orderDepth, loading, isFetching, error, refetch }`
+   - Accept optional QueryOptions (pollInterval, enabled).
 2. Export from `packages/react/src/index.ts`
    - `export { useOrderDepth } from './useOrderDepth.js';`
 
@@ -340,7 +342,7 @@ None. Sequential dependency chain (core -> react -> ui) is correctly ordered.
 ## Pattern Compliance
 
 ### Hooks
-useOrderDepth follows the canonical pattern exactly: context check, useState triple, useCallback with [ctx.client, marketId], useEffect with [fetch, ctx.invalidationCount], return { orderDepth, loading, error, refetch: fetch }. COMPLIANT.
+useOrderDepth follows the canonical pattern exactly: context check, useQueryCache, CacheKey via useMemo, useCallback wrapping queryOrderDepth with AbortSignal, useCacheSubscription for data, return { orderDepth, loading, isFetching, error, refetch }. Accepts QueryOptions. COMPLIANT.
 
 ### Widgets
 OrderDepthChart is self-contained with loading/error states, uses hook for data, uses context with null check, styles in base.css. COMPLIANT.

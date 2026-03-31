@@ -13,6 +13,7 @@ export interface BucketTradePanelProps {
   defaultAutoMode?: boolean;
   showCustomRange?: boolean;
   onBuy?: (result: BuyResult) => void;
+  onError?: (error: Error) => void;
 }
 
 export function BucketTradePanel({
@@ -23,6 +24,7 @@ export function BucketTradePanel({
   defaultAutoMode,
   showCustomRange,
   onBuy,
+  onError,
 }: BucketTradePanelProps) {
   const distState = useDistributionState(marketId, { defaultBucketCount });
 
@@ -40,6 +42,7 @@ export function BucketTradePanel({
         defaultAutoMode={defaultAutoMode}
         showCustomRange={showCustomRange}
         onBuy={onBuy}
+        onError={onError}
       />
     </div>
   );

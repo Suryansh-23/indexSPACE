@@ -5,28 +5,28 @@ import type { BucketData } from '../types.js';
  * Uses trapezoidal integration with linear interpolation at boundaries.
  *
  * @param points - Density curve points as {x, y}[] (from evaluateDensityCurve or ConsensusCurve.points)
- * @param L - Lower bound of market outcome range
- * @param H - Upper bound of market outcome range
+ * @param lowerBound - Lower bound of market outcome range
+ * @param upperBound - Upper bound of market outcome range
  * @param numBuckets - Number of equal-width buckets (default 12, clamped to [1, 200])
  * @param decimals - Decimal places for range label formatting (default 0)
  * @returns Array of BucketData with probability mass per bucket
  */
 export function calculateBucketDistribution(
   points: Array<{ x: number; y: number }>,
-  L: number,
-  H: number,
+  lowerBound: number,
+  upperBound: number,
   numBuckets: number = 12,
   decimals: number = 0,
 ): BucketData[] {
-  if (!points || points.length < 2 || H <= L) return [];
+  if (!points || points.length < 2 || upperBound <= lowerBound) return [];
 
   const n = Math.max(1, Math.min(200, Math.round(numBuckets)));
-  const bucketWidth = (H - L) / n;
+  const bucketWidth = (upperBound - lowerBound) / n;
   const buckets: BucketData[] = [];
 
   for (let i = 0; i < n; i++) {
-    const bucketMin = L + i * bucketWidth;
-    const bucketMax = L + (i + 1) * bucketWidth;
+    const bucketMin = lowerBound + i * bucketWidth;
+    const bucketMax = lowerBound + (i + 1) * bucketWidth;
 
     let probability = 0;
 

@@ -40,7 +40,7 @@ import { TradePanel } from '@functionspace/ui';
 * **Range mode:** Two-handle range slider for selecting an outcome range. Initializes to the middle 50% of the market range. Generates belief via `generateRange` with sharpness `1` (hard edges).
 * **Amount input:** USDC input (minimum $1), default `'100'`. Displays debounced potential payout as `$X.XX`.
 * **Post-trade reset:** All inputs revert to defaults (prediction to midpoint, confidence to 50, range to 25-75%, amount to '100').
-* **Prediction passed to `buy()`:** In Gaussian mode, the slider value. In Range mode, the midpoint of the selected range.
+* **Prediction passed to `useBuy`'s `execute()`:** In Gaussian mode, the slider value. In Range mode, the midpoint of the selected range.
 
 **Context interactions:**
 
@@ -48,7 +48,7 @@ import { TradePanel } from '@functionspace/ui';
 * **Writes:** `ctx.setPreviewBelief(belief)` on input change, `ctx.setPreviewPayout(result)` after debounced preview, clears both on unmount
 * **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useMarket`, `generateGaussian`, `generateRange`, `previewPayoutCurve`, `buy`
+**Internal calls:** `useMarket`, `useBuy`, `usePreviewPayout`, `generateGaussian`, `generateRange`
 
 **Example:**
 

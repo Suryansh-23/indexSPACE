@@ -2,6 +2,7 @@ name: implement-feature
 description: Supervised multi-agent implementation of SDK features. Enforces plan-first workflow with parallel validation, file-ownership-isolated work streams, and living doc updates.
 user_invocable: true
 argument-hint: <handoff-doc-or-plan-path>
+
 ---
 
 # Implement Feature (Supervised Multi-Agent)
@@ -24,8 +25,9 @@ Orchestrator (you, the main Claude session)
   |     Each supervisor owns: plan -> implement -> validate -> report
   |     |
   |     +-- Layer 3: IMPLEMENTATION SUB-AGENT (1 per supervisor)
+  |          Reads living docs (CLAUDE.md, PLAYBOOK.md) + writes reasoning approach
   |          Works directly in parent workspace (file ownership prevents conflicts)
-  |          Supervisor validates, loops REVISE if needed (max 2 cycles)
+  |          Supervisor validates reasoning gate + checklist, REVISE if needed (max 3 cycles)
   |
   +-- Orchestrator: verify changes, run regression, update docs
 ```
@@ -45,6 +47,7 @@ These are the source of truth. If the code disagrees with the docs, the code is 
 ## PHASE 1 -- Understand the Input
 
 The user will provide one of:
+
 - **A handoff document path** (e.g., `Docs/custom-shape-widget-handoff.md`) -- read it completely
 - **A review remediation document** (e.g., `Docs/reviews/feature/review-feature.md`) -- read it completely
 - **A verbal description** of the feature
@@ -52,6 +55,7 @@ The user will provide one of:
 If `$ARGUMENTS` is provided, read that file first.
 
 Then determine:
+
 - **What type of change is this?** (widget, hook, core function, belief shape, improvement, or combination)
 - **Which SDK layers are affected?** (core, react, ui, or multiple)
 - **What existing patterns apply?** (Reference the PLAYBOOK's existing widget reference and core functions list)
@@ -60,6 +64,7 @@ Then determine:
 ## PHASE 2 -- Ask Clarifying Questions
 
 Before planning, resolve all ambiguity. Ask the user about:
+
 - Scope boundaries (what's in, what's out)
 - Behavioral expectations not covered by the handoff/description
 - Design choices where multiple valid approaches exist
@@ -107,16 +112,19 @@ Docs/plans/<feature-name>-plan.md
 ### 3c: Validate the Plan (Layer 1 -- 3 Parallel Validators)
 
 Read the three validator agent prompts from `.claude/skills/implement-feature/agents/`:
+
 - `validator-codebase.md`
 - `validator-gaps.md`
 - `validator-conventions.md`
 
 Create an output directory:
+
 ```bash
 mkdir -p Docs/plans/<feature-name>-validation/
 ```
 
 Dispatch all 3 validators in a **single message** so they run in parallel. Each validator:
+
 - Uses `subagent_type: "general-purpose"`
 - Uses `model: "opus"`
 - Gets the full agent prompt with these placeholders replaced:
@@ -126,6 +134,7 @@ Dispatch all 3 validators in a **single message** so they run in parallel. Each 
   > "IMPORTANT: For all file reading use the Read tool, for all content searching use the Grep tool, for all file finding use the Glob tool. Do NOT use Bash commands for these operations (no cat, grep, find, head, tail, echo). Only use the Bash tool for commands that truly require shell execution: git commands, npx vitest, npx vite build, and mkdir."
 
 After all 3 validators complete:
+
 1. Read their output files
 2. Synthesize findings into corrections
 3. Update the plan file with corrections
@@ -153,6 +162,7 @@ Read the supervisor agent prompt from `.claude/skills/implement-feature/agents/s
 ### For Each Work Stream
 
 Dispatch a supervisor agent with:
+
 - `subagent_type: "general-purpose"`
 - `model: "opus"`
 - A prompt containing:
@@ -168,15 +178,26 @@ Dispatch independent work streams in a **single message** so they run in paralle
 ### Handling Supervisor Reports
 
 When supervisors return:
+
 1. Check each report's status (COMPLETE / PARTIAL / BLOCKED)
 2. If any are PARTIAL or BLOCKED, assess whether the issues are:
    - **Self-contained** -- can be fixed by re-dispatching that supervisor with additional instructions
    - **Cross-stream** -- require changes in another stream's files (escalate to manual fix)
 3. **Verify changes landed** -- read a sample of modified files to confirm changes are in the working tree
 
+### Cross-Stream Integration Check
+
+After all supervisors complete, before running regression:
+
+1. Read the Cross-Stream Dependencies section from each supervisor report
+2. For each dependency declared: verify the usage exists (read the file, confirm the import and call)
+3. If any stream reports "dependency expected but not found" -> investigate and fix before regression
+4. If any stream created something listed as another stream's dependency but that stream didn't use it -> investigate
+
 ### Post-Implementation Verification
 
-After all supervisors complete successfully:
+After the integration check passes:
+
 1. Run `git status --short` to confirm all expected files show as modified/untracked
 2. Spot-check key files (especially Foundation changes) by reading them
 3. If any changes are missing, investigate and re-apply before proceeding
@@ -196,6 +217,7 @@ This pipeline uses **file ownership** rather than **git worktree isolation** to 
 - The orchestrator verifies compliance in supervisor reports
 
 This is preferred over git worktrees because:
+
 1. **Uncommitted changes are invisible across worktrees.** Worktrees share a repo but not working-tree state. Foundation stream output (uncommitted edits) would not be visible to downstream streams in separate worktrees unless committed first.
 2. **No merge-back step needed.** All changes land directly in the working tree. No branch management, no merge conflicts, no data loss from failed merge-backs.
 3. **Simpler mental model.** One working tree, one set of files, one git status to check.
@@ -211,6 +233,7 @@ cd packages/docs && npx docusaurus build  # Docs site must build
 ```
 
 Then run the appropriate automated reviewers based on what changed:
+
 - **Architecture changes** (hooks, components, imports, exports) -- Run architecture-reviewer agent
 - **Theme changes** (CSS variables, chart colors, presets, base.css) -- Run theme-reviewer agent
 - **Both** if changes span architecture and theming
@@ -223,16 +246,16 @@ This is NOT optional. If it's not in the docs, the work is not done.
 
 Synthesize the "Doc Updates Needed" sections from all supervisor reports. Then consult the update matrix in `internal_sdk_docs/CLAUDE.md` (Step 3: Update the docs) and update:
 
-| What changed | Update in... |
-|---|---|
-| New widget | PLAYBOOK.md -- Widget Reference, File Locations |
-| New hook | PLAYBOOK.md -- Available Hooks; CLAUDE.md -- test table if new test file |
-| New core function | PLAYBOOK.md -- Core Functions list (correct category + layer) |
-| New belief shape | PLAYBOOK.md -- L2 generators table, Region Types if new |
-| New CSS widget root class | PLAYBOOK.md -- derived-variables selector example |
-| New pattern discovered | PLAYBOOK.md -- relevant section |
-| New test file | CLAUDE.md -- Testing Requirements table |
-| Architecture change | CLAUDE.md -- Architecture section |
+| What changed                                         | Update in...                                                                                      |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| New widget                                           | PLAYBOOK.md -- Widget Reference, File Locations                                                   |
+| New hook                                             | PLAYBOOK.md -- Available Hooks; CLAUDE.md -- test table if new test file                          |
+| New core function                                    | PLAYBOOK.md -- Core Functions list (correct category + layer)                                     |
+| New belief shape                                     | PLAYBOOK.md -- L2 generators table, Region Types if new                                           |
+| New CSS widget root class                            | PLAYBOOK.md -- derived-variables selector example                                                 |
+| New pattern discovered                               | PLAYBOOK.md -- relevant section                                                                   |
+| New test file                                        | CLAUDE.md -- Testing Requirements table                                                           |
+| Architecture change                                  | CLAUDE.md -- Architecture section                                                                 |
 | New/changed public API (widget, hook, core function) | `llms.txt` -- consumer integration guide; `packages/docs/docs/` -- Docusaurus documentation pages |
 
 ## PHASE 7 -- Completion Report and Review Prompt (MANDATORY)
@@ -249,21 +272,27 @@ Docs/plans/<feature-name>-complete.md
 # Implementation Complete: <feature-name>
 
 ## What Was Built
+
 [1-3 paragraph summary synthesized from supervisor reports]
 
 ## Files Changed
+
 [Consolidated list from all supervisor reports]
 
 ## Deviations from Plan
+
 [Any places where implementation differed from the plan, and why]
 
 ## Unresolved Issues
+
 [Any issues supervisors could not fix, or empty if none]
 
 ## Test Results
+
 [Final regression output from Phase 5]
 
 ## Doc Updates Made
+
 [Summary of what was updated in CLAUDE.md and PLAYBOOK.md]
 ```
 
@@ -272,6 +301,7 @@ After writing the completion report, present the user with the following prompt 
 > **Implementation complete. To review, run:**
 >
 > `/implement-feature-review` with:
+>
 > - Original handoff document: `<path to the original input document or "verbal description">`
 > - Plan: `Docs/plans/<feature-name>-plan.md`
 > - Validation: `Docs/plans/<feature-name>-validation/`
@@ -288,5 +318,10 @@ Fill in the actual paths. This gives the review agent full traceability from spe
 - **Data-fetching hooks** return `{ <named>, loading, error, refetch }`
 - **Belief shapes** route through `generateBelief` (L1) -- never bypass normalization
 - **File ownership is enforced** -- work streams must not modify each other's files
-- **Supervisors handle REVISE loops** -- max 2 cycles before escalating to orchestrator
+- **Supervisors handle REVISE loops** -- max 3 cycles with exact fix instructions before escalating to orchestrator
 - **Only summaries flow up** -- supervisors report outcomes, not implementation details
+- **Living docs at every layer** -- orchestrator, validators, supervisors, AND impl agents all read CLAUDE.md and PLAYBOOK.md. These are the source of truth.
+- **Reasoning before coding** -- impl agents write an IMPLEMENTATION APPROACH grounded in CLAUDE.md/PLAYBOOK.md rules before writing any code. Supervisors validate the reasoning gate before the validation checklist.
+- **Wiring is verified** -- every new item must have a specified consumer. No orphan code.
+- **Test quality standard** -- tests must assert on specific content, not toBeTruthy/toBeDefined. See the test quality uplift doc.
+- **Cross-stream deps reported** -- supervisors report what they consumed from other streams. Orchestrator verifies integration before regression.

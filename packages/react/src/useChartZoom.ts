@@ -72,7 +72,7 @@ export function useChartZoom(options: ChartZoomOptions): ChartZoomResult {
   // Keep xDomainRef in sync with state
   xDomainRef.current = xDomainState;
 
-  // Reset when resetTrigger changes — cancel any pending rAF first
+  // Reset when resetTrigger changes  -- cancel any pending rAF first
   useEffect(() => {
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current);
@@ -160,7 +160,7 @@ export function useChartZoom(options: ChartZoomOptions): ChartZoomResult {
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       if (!enabled) return;
-      if (xDomainRef.current === null) return; // not zoomed — no pan
+      if (xDomainRef.current === null) return; // not zoomed  -- no pan
       if (e.button !== 0) return; // left button only
 
       // Check pan exclusion selectors

@@ -89,10 +89,7 @@ The `@functionspace/ui` package provides pre-built React widgets for prediction 
 
 | # | Limitation | Impact | Workaround |
 |---|-----------|--------|------------|
-| 1 | **No query caching or request deduplication.** Each hook instance fires its own independent API request. | Redundant API traffic scales linearly with the number of mounted hooks. | Accept the redundant requests. Do not attempt to add TanStack Query or SWR. |
 | 2 | **No real-time transport (WebSocket/SSE).** All data freshness depends on explicit refetch calls or polling. | Market state goes stale between manual refetches. | Use `useTradeHistory` with `pollInterval` for live feeds. Call `ctx.invalidate(marketId)` after trades. |
-| 3 | **No mutation hooks.** `buy()` and `sell()` are imported from `@functionspace/core`, not `@functionspace/react`. | Custom trade UIs must import from two packages. | Pre-built trading components handle mutation lifecycle internally. |
-| 5 | **Global invalidation only.** `ctx.invalidate(marketId)` triggers global refetch regardless of which market. | Multi-market dashboards refetch all hooks on any trade. | Accept the global refetch behavior. |
 | 6 | **Only one trading component at a time.** Multiple trading components cause conflicting preview writes. | Unpredictable chart overlays. | Use tabs, modals, or conditional rendering. Only one trading component mounted at a time. |
 | 7 | **Settlement not yet implemented.** | Positions in resolved markets cannot be settled through the SDK. | Monitor `resolutionState` field. |
 
@@ -419,6 +416,7 @@ import { TradePanel } from '@functionspace/ui';
 | `marketId` | `string \| number` | required | Market to trade on |
 | `modes` | `('gaussian' \| 'range')[]` | `['gaussian', 'range']` | Which shape modes to offer |
 | `onBuy` | `(result: BuyResult) => void` | -- | Called after successful trade |
+| `onError` | `(error: Error) => void` | -- | Called on trade failure |
 
 ### `BinaryPanel`
 
@@ -497,6 +495,7 @@ import { BucketRangeSelector } from '@functionspace/ui';
 | `defaultAutoMode` | `boolean` | `false` | Start in auto mode (crops to 95% CI) |
 | `showCustomRange` | `boolean` | `true` | Show custom min/max range input |
 | `onBuy` | `(result: BuyResult) => void` | -- | Called after successful trade |
+| `onError` | `(error: Error) => void` | -- | Called on trade failure |
 
 ### `BucketTradePanel`
 
@@ -512,7 +511,10 @@ import { BucketTradePanel } from '@functionspace/ui';
 | `defaultBucketCount` | `number` | `12` | Shared initial bucket count |
 | `chartHeight` | `number` | `300` | Distribution chart height |
 | `maxSelections` | `number` | -- | Forwarded to `BucketRangeSelector` |
+| `defaultAutoMode` | `boolean` | `false` | Initial auto-mode state for bucket selection. Forwarded to inner BucketRangeSelector. |
+| `showCustomRange` | `boolean` | `true` | Whether to show the custom range input. Forwarded to inner BucketRangeSelector. |
 | `onBuy` | `(result: BuyResult) => void` | -- | Called after successful trade |
+| `onError` | `(error: Error) => void` | -- | Called on trade failure |
 
 ---
 
@@ -529,10 +531,14 @@ import { PositionTable } from '@functionspace/ui';
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `marketId` | `string \| number` | required | Market to display positions for |
-| `username` | `string` | required | Authenticated username. Pass `""` for unauthenticated views. |
 | `tabs` | `PositionTabId[]` | `['open-orders', 'trade-history']` | Which tabs to show |
 | `pageSize` | `number` | `20` | Rows per page |
+| `selectedPositionId` | `number \| null` | -- | Controlled selection state -- highlights a specific position row. |
+| `onSelectPosition` | `(id: number \| null) => void` | -- | Callback fired when a position row is clicked. |
 | `onSell` | `(result: SellResult) => void` | -- | Called after successful sell |
+| `onError` | `(error: Error) => void` | -- | Called on sell failure |
+
+> PositionTable reads the authenticated user from context automatically. No `username` prop is needed.
 
 `PositionTabId` values: `'open-orders'`, `'trade-history'`, `'market-positions'`
 
@@ -729,7 +735,6 @@ function App() {
         <div style={{ flex: 7, minWidth: 0 }}>
           <PositionTable
             marketId={MARKET_ID}
-            username="trader1"
             tabs={['open-orders', 'trade-history', 'market-positions']}
           />
         </div>
@@ -839,7 +844,6 @@ export default function App() {
         </div>
         <PositionTable
           marketId={MARKET_ID}
-          username={config.username}
           tabs={['open-orders', 'trade-history', 'market-positions']}
         />
       </div>
@@ -961,7 +965,7 @@ type ShapeId = 'gaussian' | 'spike' | 'range' | 'bimodal' | 'dip' | 'leftskew' |
 
 ### Key Core Types Used by UI
 
-- **`MarketState`** -- Contains `config` (K, L, H), `consensus`, `title`, `xAxisUnits`, `resolutionState`.
+- **`MarketState`** -- Contains `config` (numBuckets, lowerBound, upperBound), `consensus`, `title`, `xAxisUnits`, `resolutionState`.
 - **`BuyResult`** -- Returned by `buy()`. Contains `positionId`, `belief`, `claims`, `collateral`.
 - **`SellResult`** -- Returned by `sell()`. Contains `positionId`, `collateralReturned`.
 - **`Position`** -- Contains `positionId`, `belief`, `collateral`, `claims`, `status`, `prediction`.

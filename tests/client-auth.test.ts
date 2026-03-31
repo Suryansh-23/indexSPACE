@@ -92,7 +92,7 @@ describe('calculateBucketDistribution', () => {
     expect(result).toHaveLength(10);
   });
 
-  it('bucket ranges cover [L, H] exactly', () => {
+  it('bucket ranges cover [lowerBound, upperBound] exactly', () => {
     const points = [
       { x: 0, y: 1.0 },
       { x: 100, y: 1.0 },
@@ -135,7 +135,7 @@ describe('calculateBucketDistribution', () => {
     expect(calculateBucketDistribution([{ x: 50, y: 1 }], 0, 100, 10, 0)).toEqual([]);
   });
 
-  it('returns empty array when H <= L', () => {
+  it('returns empty array when upperBound <= lowerBound', () => {
     const points = [{ x: 0, y: 1 }, { x: 100, y: 1 }];
     expect(calculateBucketDistribution(points, 100, 0, 10, 0)).toEqual([]);
     expect(calculateBucketDistribution(points, 50, 50, 10, 0)).toEqual([]);
@@ -192,8 +192,8 @@ describe('calculateBucketDistribution', () => {
 describe('computePercentiles', () => {
   it('returns evenly spaced percentiles for uniform coefficients', () => {
     // Uniform: all coefficients equal → flat density
-    const K = 60;
-    const uniform = new Array(K + 1).fill(1 / (K + 1));
+    const numBuckets = 60;
+    const uniform = new Array(numBuckets + 1).fill(1 / (numBuckets + 1));
     const p = computePercentiles(uniform, 0, 100);
     // p50 should be near 50
     expect(p.p50).toBeCloseTo(50, 0);
@@ -205,10 +205,10 @@ describe('computePercentiles', () => {
 
   it('returns tight inner bands for peaked distribution', () => {
     // Peaked at center: Gaussian-like
-    const K = 60;
-    const peaked = new Array(K + 1).fill(0);
-    for (let i = 0; i <= K; i++) {
-      const u = i / K;
+    const numBuckets = 60;
+    const peaked = new Array(numBuckets + 1).fill(0);
+    for (let i = 0; i <= numBuckets; i++) {
+      const u = i / numBuckets;
       peaked[i] = Math.exp(-Math.pow((u - 0.5) * 10, 2));
     }
     const sum = peaked.reduce((a: number, b: number) => a + b, 0);
@@ -221,8 +221,8 @@ describe('computePercentiles', () => {
   });
 
   it('produces monotonically ordered percentiles', () => {
-    const K = 60;
-    const uniform = new Array(K + 1).fill(1 / (K + 1));
+    const numBuckets = 60;
+    const uniform = new Array(numBuckets + 1).fill(1 / (numBuckets + 1));
     const p = computePercentiles(uniform, 0, 100);
     expect(p.p2_5).toBeLessThanOrEqual(p.p12_5);
     expect(p.p12_5).toBeLessThanOrEqual(p.p25);
@@ -234,9 +234,9 @@ describe('computePercentiles', () => {
     expect(p.p87_5).toBeLessThanOrEqual(p.p97_5);
   });
 
-  it('all values within [L, H]', () => {
-    const K = 60;
-    const uniform = new Array(K + 1).fill(1 / (K + 1));
+  it('all values within [lowerBound, upperBound]', () => {
+    const numBuckets = 60;
+    const uniform = new Array(numBuckets + 1).fill(1 / (numBuckets + 1));
     const p = computePercentiles(uniform, 10, 90);
     const values = [p.p2_5, p.p12_5, p.p25, p.p37_5, p.p50, p.p62_5, p.p75, p.p87_5, p.p97_5];
     for (const v of values) {

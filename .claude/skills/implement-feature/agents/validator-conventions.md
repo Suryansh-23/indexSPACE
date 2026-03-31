@@ -50,10 +50,12 @@ Cross-reference with existing files using Glob to confirm the plan matches exist
 
 If the plan adds hooks, verify they follow the canonical pattern:
 - Context check with throw at the top
-- `useState` triple: named field, loading (init true), error
-- `useCallback` wrapping the fetch, depending on `[ctx.client, ...]`
-- `useEffect` depending on `[fetch, ctx.invalidationCount]`
-- Return shape: `{ <named>, loading, error, refetch: fetch }`
+- `useQueryCache()` for cache access
+- `CacheKey` via `useMemo` (e.g., `['queryName', normalizedId]`)
+- `useCallback` wrapping the core function with `(signal: AbortSignal) => coreFn(ctx.client, ...)`
+- `useCacheSubscription(cache, key, queryFn, options)` for data subscription (uses `useSyncExternalStore`)
+- Return shape: `{ <named>, loading, isFetching, error, refetch }`
+- Accepts optional `QueryOptions` (`pollInterval`, `enabled`).
 
 If the plan describes a hook that deviates from this pattern, flag it unless the plan explicitly justifies the deviation (e.g., state/action hooks like useAuth).
 

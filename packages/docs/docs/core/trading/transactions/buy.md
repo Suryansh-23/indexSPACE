@@ -29,7 +29,7 @@ async function buy(
 | `marketId`           | `string \| number` | The market to trade in.                                                                                                                        |
 | `belief`             | `BeliefVector`     | The probability distribution to trade on. Generated with `generateBelief` or any convenience generator.                                        |
 | `collateral`         | `number`           | Amount of currency to put up. Minimum is typically 1.                                                                                          |
-| `numBuckets`         | `number`           | Number of outcome buckets (K from `market.config.K`). Must equal `belief.length - 1`.                                                          |
+| `numBuckets`         | `number`           | Number of outcome buckets (from `market.config.numBuckets`). Must equal `belief.length - 1`.                                                          |
 | `options.prediction` | `number?`          | Optional center-of-mass hint. Accepted for backward compatibility but no longer sent to the server. |
 
 **Returns `BuyResult`:**
@@ -54,10 +54,10 @@ const client = new FSClient({ baseUrl: 'https://api.example.com' });
 await loginUser(client, 'user', 'pass');
 
 const market = await queryMarketState(client, 42);
-const { K, L, H } = market.config;
-const belief = generateGaussian(75, 5, K, L, H);
+const { numBuckets, lowerBound, upperBound } = market.config;
+const belief = generateGaussian(75, 5, numBuckets, lowerBound, upperBound);
 
-const result = await buy(client, 42, belief, 100, K);
+const result = await buy(client, 42, belief, 100, numBuckets);
 console.log(`Opened position ${result.positionId}, claims: ${result.claims}`);
 ```
 
@@ -66,10 +66,10 @@ console.log(`Opened position ${result.positionId}, claims: ${result.claims}`);
 ```typescript
 const ctx = useContext(FunctionSpaceContext);
 const { market } = useMarket(marketId);
-const { K, L, H } = market.config;
+const { numBuckets, lowerBound, upperBound } = market.config;
 
-const belief = generateGaussian(75, 5, K, L, H);
-const result = await buy(ctx.client, marketId, belief, 100, K, { prediction: 75 });
+const belief = generateGaussian(75, 5, numBuckets, lowerBound, upperBound);
+const result = await buy(ctx.client, marketId, belief, 100, numBuckets, { prediction: 75 });
 
 // After a successful buy, invalidate so other components (charts, position tables) refetch
 ctx.invalidate(marketId);
@@ -81,7 +81,7 @@ ctx.invalidate(marketId);
 
 | Cause                                | Error message pattern                                                          | Stage |
 | ------------------------------------ | ------------------------------------------------------------------------------ | ----- |
-| Invalid belief vector                | `"Belief vector length X does not match expected K+1 = Y"`                     | Client-side, before network request |
+| Invalid belief vector                | `"Belief vector length X does not match expected numBuckets+1 = Y"`            | Client-side, before network request |
 | Non-finite values                    | `"Belief vector contains non-finite values (NaN or Infinity)"`                 | Client-side |
 | Negative values                      | `"Belief vector contains negative values"`                                     | Client-side |
 | Sum != 1.0                           | `"Belief vector does not sum to 1.0 (sum = X)"`                               | Client-side |

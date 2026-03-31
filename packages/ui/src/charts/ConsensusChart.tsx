@@ -53,8 +53,8 @@ export function ConsensusChartContent({
     // Add preview belief overlay (from trade panel)
     // Uses coefficient-direct interpolation for sharp edges (not Bernstein polynomial which smooths)
     if (ctx.previewBelief && market) {
-      const { L, H } = market.config;
-      const previewCurve = evaluateDensityCurve(ctx.previewBelief, L, H, points.length);
+      const { lowerBound, upperBound } = market.config;
+      const previewCurve = evaluateDensityCurve(ctx.previewBelief, lowerBound, upperBound, points.length);
       for (let i = 0; i < points.length && i < previewCurve.length; i++) {
         points[i].preview = previewCurve[i].y;
       }
@@ -62,8 +62,8 @@ export function ConsensusChartContent({
 
     // Add selected position curve from context (automatic component coordination)
     if (ctx.selectedPosition?.belief && market) {
-      const { L, H } = market.config;
-      const selectedCurve = evaluateDensityCurve(ctx.selectedPosition.belief, L, H, points.length);
+      const { lowerBound, upperBound } = market.config;
+      const selectedCurve = evaluateDensityCurve(ctx.selectedPosition.belief, lowerBound, upperBound, points.length);
       for (let i = 0; i < points.length && i < selectedCurve.length; i++) {
         points[i].selected = selectedCurve[i].y;
       }
@@ -91,7 +91,7 @@ export function ConsensusChartContent({
             bestDist = dist;
           }
         }
-        const step = (market.config.H - market.config.L) / (market.config.K || 50);
+        const step = (market.config.upperBound - market.config.lowerBound) / (market.config.numBuckets || 50);
         if (bestDist < step * 2) {
           point.payout = best.payout;
         }
@@ -119,7 +119,7 @@ export function ConsensusChartContent({
       }
     }
     // Preview/overlays can stretch the axis up to 4x consensus height
-    // Beyond that, peaks get clipped — keeps consensus visible
+    // Beyond that, peaks get clipped  -- keeps consensus visible
     const cappedOverlay = Math.min(overlayMax, consensusMax * 4);
     const max = Math.max(consensusMax, cappedOverlay);
     return [0, max * 1.15];
@@ -289,10 +289,10 @@ export function ConsensusChartContent({
             }}
           />
 
-          {/* Consensus area — blue */}
+          {/* Consensus area  -- blue */}
           <Area
             yAxisId="left"
-            type="monotone"
+            type="linear"
             dataKey="consensus"
             stroke={ctx.chartColors.consensus}
             strokeWidth={2}
@@ -302,7 +302,7 @@ export function ConsensusChartContent({
             isAnimationActive={false}
           />
 
-          {/* Preview area — yellow dashed, linear interpolation for sharp edges */}
+          {/* Preview area  -- yellow dashed, linear interpolation for sharp edges */}
           {hasPreview && (
             <Area
               yAxisId="left"
@@ -318,11 +318,11 @@ export function ConsensusChartContent({
             />
           )}
 
-          {/* Selected position — green (from context, automatic coordination) */}
+          {/* Selected position  -- green (from context, automatic coordination) */}
           {hasSelected && (
             <Area
               yAxisId="left"
-              type="monotone"
+              type="linear"
               dataKey="selected"
               stroke={ctx.chartColors.positions[0]}
               strokeWidth={2}
@@ -333,11 +333,11 @@ export function ConsensusChartContent({
             />
           )}
 
-          {/* Payout — tooltip-only, invisible line for data access */}
+          {/* Payout  -- tooltip-only, invisible line for data access */}
           {hasPayout && (
             <Area
               yAxisId="right"
-              type="monotone"
+              type="linear"
               dataKey="payout"
               stroke="transparent"
               strokeWidth={0}
@@ -348,12 +348,12 @@ export function ConsensusChartContent({
             />
           )}
 
-          {/* Overlay curves — from props */}
+          {/* Overlay curves  -- from props */}
           {overlayCurves?.map((overlay) => (
             <Area
               key={overlay.id}
               yAxisId="left"
-              type="monotone"
+              type="linear"
               dataKey={overlay.id}
               stroke={overlay.color || ctx.chartColors.payout}
               strokeWidth={2}

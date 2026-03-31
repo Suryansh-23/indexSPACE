@@ -25,7 +25,7 @@ export function ArticleBody() {
       </p>
 
       <p>
-        The bullish case centers on Apple Intelligence — the suite of on-device AI features
+        The bullish case centers on Apple Intelligence  -- the suite of on-device AI features
         introduced at WWDC 2025 and expanded significantly in the iPhone 17 lineup.
         Early adoption data suggests these features are driving a meaningful upgrade cycle,
         particularly in the US and European markets where older iPhone 12 and 13 users
@@ -43,7 +43,7 @@ export function ArticleBody() {
       </p>
 
       <p>
-        The middle ground — where most analysts have landed — sits around 51-52 million units.
+        The middle ground  -- where most analysts have landed  -- sits around 51-52 million units.
         This assumes Apple Intelligence drives moderate uplift in developed markets while
         China shipments remain roughly flat year-over-year. The key wildcard is India,
         where Apple's aggressive pricing of the iPhone SE 4 could open a volume opportunity

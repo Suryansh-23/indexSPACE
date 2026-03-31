@@ -49,7 +49,7 @@ import { BucketRangeSelector } from '@functionspace/ui';
 * **Custom range panel:** Collapsible inputs for min/max values with apply/clear buttons. Ranges are validated -- out-of-bounds values are silently rejected (not clamped).
 * **Selection clearing:** Bucket selections reset automatically when bucket count or auto mode changes (because bucket boundaries shift).
 * **Belief construction:** Generates belief via `generateRange` from the selected bucket and custom range boundaries.
-* **Prediction:** The average midpoint of all selected ranges is passed to `buy()`.
+* **Prediction:** The average midpoint of all selected ranges is passed to `useBuy`'s `execute()`.
 * **Loading/error states:** Renders "Loading market data..." or "Error: \{message\}" when data is unavailable.
 
 **Context interactions:**
@@ -58,7 +58,7 @@ import { BucketRangeSelector } from '@functionspace/ui';
 * **Writes:** `ctx.setPreviewBelief(belief)` on selection change, `ctx.setPreviewPayout(result)` after debounced preview, clears both on unmount
 * **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useDistributionState`, `generateRange`, `previewPayoutCurve`, `buy`
+**Internal calls:** `useDistributionState`, `useBuy`, `usePreviewPayout`, `generateRange`
 
 **Example:**
 

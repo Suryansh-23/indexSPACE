@@ -1,6 +1,6 @@
 ---
 title: "useCustomShape"
-sidebar_position: 1
+sidebar_position: 6
 description: "Manages control point values, locks, drag state, and derived belief vectors for the shape editor."
 ---
 
@@ -16,7 +16,7 @@ function useCustomShape(market: MarketState | null): UseCustomShapeReturn
 
 | Parameter | Type                  | Description                                                                                                                            |
 | --------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `market`  | `MarketState \| null` | Market state providing `config.K`, `config.L`, `config.H` for belief construction. When `null`, `pVector` and `prediction` are `null`. |
+| `market`  | `MarketState \| null` | Market state providing `config.numBuckets`, `config.lowerBound`, `config.upperBound` for belief construction. When `null`, `pVector` and `prediction` are `null`. |
 
 **Returns `UseCustomShapeReturn`:**
 
@@ -75,7 +75,7 @@ function ShapeEditor({ marketId }: { marketId: number }) {
   const shape = useCustomShape(market);
 
   return (
-    
+    <div>
       {shape.controlValues.map((val, i) => (
         <input
           key={i}
@@ -89,7 +89,7 @@ function ShapeEditor({ marketId }: { marketId: number }) {
       ))}
       <p>Prediction: {shape.prediction?.toFixed(2)}</p>
       <button onClick={shape.resetToDefault}>Reset</button>
-    
+    </div>
   );
 }
 ```

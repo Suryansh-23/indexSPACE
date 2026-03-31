@@ -27,7 +27,6 @@ export type QueryFn<T> = (signal: AbortSignal) => Promise<T>;
 // Per-hook options (used in Step 2, but type defined here)
 export interface QueryOptions {
   pollInterval?: number;
-  staleTime?: number;
   enabled?: boolean;
 }
 

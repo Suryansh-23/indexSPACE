@@ -449,7 +449,7 @@
   color: var(--fs-negative);
 }
 
-/* Slider controls column — fixed min-height prevents widget resizing across shape changes */
+/* Slider controls column  -- fixed min-height prevents widget resizing across shape changes */
 .fs-sc-controls {
   display: flex;
   flex-direction: column;
@@ -1709,7 +1709,7 @@
   box-sizing: border-box;
 }
 
-/* Authenticated state — horizontal row, wraps when narrow */
+/* Authenticated state  -- horizontal row, wraps when narrow */
 .fs-auth-user-bar {
   display: flex;
   align-items: center;
@@ -1764,7 +1764,7 @@
   background: color-mix(in srgb, var(--fs-negative) 20%, transparent);
 }
 
-/* Unauthenticated state — actions */
+/* Unauthenticated state  -- actions */
 .fs-auth-actions {
   display: flex;
   gap: 0.75rem;

@@ -13,7 +13,6 @@ function serializeKey(key: CacheKey): string {
 export class QueryCache {
   private entries = new Map<string, CacheEntry>();
   private config: Required<CacheConfig>;
-  private destroyed = false;
   private visible = true;
 
   constructor(config: CacheConfig = {}) {
@@ -39,7 +38,6 @@ export class QueryCache {
   // ---------------------------------------------------------------------------
 
   subscribe(key: CacheKey, callback: () => void): () => void {
-    if (this.destroyed) return () => {};
     const serialized = serializeKey(key);
     const entry = this.getOrCreateEntry(serialized);
 
@@ -81,14 +79,12 @@ export class QueryCache {
   }
 
   registerQueryFn<T>(key: CacheKey, queryFn: QueryFn<T>): void {
-    if (this.destroyed) return;
     const serialized = serializeKey(key);
     const entry = this.getOrCreateEntry(serialized);
     entry.queryFn = queryFn as QueryFn<unknown>;
   }
 
   ensureFetching(key: CacheKey): void {
-    if (this.destroyed) return;
     const serialized = serializeKey(key);
     const entry = this.entries.get(serialized);
     if (!entry) return;
@@ -103,7 +99,6 @@ export class QueryCache {
   }
 
   async refetch(key: CacheKey): Promise<void> {
-    if (this.destroyed) return;
     const serialized = serializeKey(key);
     const entry = this.entries.get(serialized);
     if (!entry || !entry.queryFn) return;
@@ -118,7 +113,6 @@ export class QueryCache {
   }
 
   setPollInterval(key: CacheKey, interval: number): void {
-    if (this.destroyed) return;
     const serialized = serializeKey(key);
     const entry = this.entries.get(serialized);
     if (!entry) return;
@@ -132,7 +126,6 @@ export class QueryCache {
   }
 
   invalidate(marketId: string): void {
-    if (this.destroyed) return;
     for (const [serialized, entry] of this.entries) {
       const key: CacheKey = JSON.parse(serialized);
       if (key.length > 1 && key[1] === marketId) {
@@ -151,7 +144,6 @@ export class QueryCache {
   }
 
   invalidateAll(): void {
-    if (this.destroyed) return;
     for (const [serialized, entry] of this.entries) {
       // Abort in-flight request
       if (entry.abortController !== null) {
@@ -167,7 +159,6 @@ export class QueryCache {
   }
 
   handleFocus(): void {
-    if (this.destroyed) return;
     if (!this.config.revalidateOnFocus) return;
 
     for (const [serialized, entry] of this.entries) {
@@ -178,7 +169,6 @@ export class QueryCache {
   }
 
   handleReconnect(): void {
-    if (this.destroyed) return;
     if (!this.config.revalidateOnReconnect) return;
 
     for (const [serialized, entry] of this.entries) {
@@ -193,7 +183,6 @@ export class QueryCache {
   }
 
   setVisible(visible: boolean): void {
-    if (this.destroyed) return;
     this.visible = visible;
 
     if (visible) {
@@ -211,10 +200,29 @@ export class QueryCache {
     }
   }
 
-  destroy(): void {
-    if (this.destroyed) return;
-    this.destroyed = true;
+  /**
+   * Re-register event listeners after destroy(). Handles React StrictMode
+   * which runs effect cleanup (destroy) then re-runs effects (init).
+   * Safe to call multiple times -- addEventListener deduplicates.
+   */
+  init(): void {
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', this.handleReconnectEvent);
+      window.addEventListener('focus', this.handleFocusEvent);
+    }
+  }
 
+  /**
+   * Clean up event listeners, timers, and in-flight requests.
+   * Does NOT prevent future operations -- after destroy(), the cache
+   * still works if re-used (entries, queryFns, subscribers persist).
+   * This is intentional for React StrictMode compatibility where
+   * child effects re-register before the parent calls init().
+   */
+  destroy(): void {
     // Clear all timers and abort all controllers
     for (const [, entry] of this.entries) {
       this.clearPollTimer(entry);
@@ -301,8 +309,6 @@ export class QueryCache {
 
       // Guard: if this controller was aborted (replaced or cancelled), ignore result
       if (controller.signal.aborted) return;
-      // Guard: if destroyed during fetch, ignore result
-      if (this.destroyed) return;
 
       entry.abortController = null;
       entry.dataUpdatedAt = Date.now();
@@ -320,8 +326,6 @@ export class QueryCache {
     } catch (err: unknown) {
       // Guard: if this controller was aborted, ignore the error
       if (controller.signal.aborted) return;
-      // Guard: if destroyed during fetch, ignore result
-      if (this.destroyed) return;
 
       // Check if this is an AbortError -- never store as error state
       if (err instanceof DOMException && err.name === 'AbortError') return;
@@ -350,10 +354,6 @@ export class QueryCache {
 
   private startPollTimer(serialized: string, entry: CacheEntry): void {
     entry.pollTimer = setInterval(() => {
-      if (this.destroyed) {
-        this.clearPollTimer(entry);
-        return;
-      }
       this.ensureFetchingInternal(serialized, entry);
     }, entry.pollInterval);
   }
@@ -370,7 +370,6 @@ export class QueryCache {
   // ---------------------------------------------------------------------------
 
   private handleVisibilityChange = (): void => {
-    if (this.destroyed) return;
     if (typeof document === 'undefined') return;
 
     if (document.visibilityState === 'hidden') {

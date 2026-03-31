@@ -2,11 +2,8 @@ import React, { useState, useEffect, useRef, useContext, useMemo } from 'react';
 import {
   generateRange,
   computeStatistics,
-  previewPayoutCurve,
-  buy,
 } from '@functionspace/core';
-import type { BuyResult } from '@functionspace/core';
-import { FunctionSpaceContext, useMarket } from '@functionspace/react';
+import { FunctionSpaceContext, useMarket, useBuy, usePreviewPayout } from '@functionspace/react';
 import type { TradeInputBaseProps } from './types.js';
 import '../styles/base.css';
 
@@ -39,28 +36,24 @@ export function BinaryPanel({
   if (!ctx) throw new Error('BinaryPanel must be used within FunctionSpaceProvider');
 
   const { market, loading, error: marketError } = useMarket(marketId);
+  const { execute: submitBuy, loading: isSubmitting, error: buyError } = useBuy(marketId);
+  const { execute: previewPayout } = usePreviewPayout(marketId);
 
   const [side, setSide] = useState<'yes' | 'no' | null>(null);
   const [amount, setAmount] = useState('100');
   const [userOverrideX, setUserOverrideX] = useState<number | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // Local input state — allows free typing without mid-keystroke clamping
+  // Local input state -- allows free typing without mid-keystroke clamping
   const [xInputValue, setXInputValue] = useState('');
   const [isEditingX, setIsEditingX] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
       ctx.setPreviewBelief(null);
       ctx.setPreviewPayout(null);
     };
@@ -71,12 +64,12 @@ export function BinaryPanel({
   const consensusStats = useMemo(() => {
     if (!market) return null;
     if (xPoint.mode !== 'dynamic-mode' && xPoint.mode !== 'dynamic-mean') return null;
-    return computeStatistics(market.consensus, market.config.L, market.config.H);
+    return computeStatistics(market.consensus, market.config.lowerBound, market.config.upperBound);
   }, [market, xPoint.mode]);
 
   const resolvedX = useMemo(() => {
     if (!market) return null;
-    const { L, H } = market.config;
+    const { lowerBound, upperBound } = market.config;
     let raw: number | null = null;
 
     switch (xPoint.mode) {
@@ -84,17 +77,17 @@ export function BinaryPanel({
         raw = xPoint.value;
         break;
       case 'variable':
-        raw = userOverrideX ?? xPoint.initial ?? (L + H) / 2;
+        raw = userOverrideX ?? xPoint.initial ?? (lowerBound + upperBound) / 2;
         break;
       case 'dynamic-mode':
-        raw = userOverrideX ?? consensusStats?.mode ?? (L + H) / 2;
+        raw = userOverrideX ?? consensusStats?.mode ?? (lowerBound + upperBound) / 2;
         break;
       case 'dynamic-mean':
-        raw = userOverrideX ?? consensusStats?.mean ?? (L + H) / 2;
+        raw = userOverrideX ?? consensusStats?.mean ?? (lowerBound + upperBound) / 2;
         break;
     }
 
-    return raw !== null ? Math.max(L, Math.min(H, raw)) : null;
+    return raw !== null ? Math.max(lowerBound, Math.min(upperBound, raw)) : null;
   }, [market, xPoint, userOverrideX, consensusStats]);
 
   // Whether the X input is editable
@@ -116,15 +109,15 @@ export function BinaryPanel({
     }
   }, [resolvedX, isEditingX]);
 
-  // ── Belief (single useMemo — consumed by Phase 1, 2, 3, and isFormValid) ──
+  // ── Belief (single useMemo -- consumed by Phase 1, 2, 3, and isFormValid) ──
 
   const belief = useMemo(() => {
     if (!market || !side || resolvedX === null) return null;
-    const { K, L, H } = market.config;
+    const { numBuckets, lowerBound, upperBound } = market.config;
     if (side === 'yes') {
-      return generateRange(resolvedX, H, K, L, H, 1);
+      return generateRange(resolvedX, upperBound, numBuckets, lowerBound, upperBound, 1);
     } else {
-      return generateRange(L, resolvedX, K, L, H, 1);
+      return generateRange(lowerBound, resolvedX, numBuckets, lowerBound, upperBound, 1);
     }
   }, [market, side, resolvedX]);
 
@@ -138,12 +131,6 @@ export function BinaryPanel({
 
   // Phase 2: Debounced payout preview
   useEffect(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     const collateral = parseFloat(amount);
@@ -153,7 +140,7 @@ export function BinaryPanel({
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral, market.config.K, undefined, { signal: controller.signal });
+        const result = await previewPayout(belief, collateral);
         if (!mountedRef.current) return;
         ctx.setPreviewPayout(result);
       } catch (err) {
@@ -164,9 +151,6 @@ export function BinaryPanel({
     }, 500);
 
     return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [belief, amount, market, marketId]);
@@ -177,13 +161,8 @@ export function BinaryPanel({
     const collateral = parseFloat(amount);
     if (!belief || isNaN(collateral) || collateral < 1) return;
 
-    setIsSubmitting(true);
-    setError(null);
-
     try {
-      const result = await buy(ctx.client, marketId, belief, collateral, market.config.K, {
-        prediction: resolvedX!,
-      });
+      const result = await submitBuy(belief, collateral);
 
       setSide(null);
       setAmount('100');
@@ -191,13 +170,8 @@ export function BinaryPanel({
       ctx.setPreviewPayout(null);
 
       onBuy?.(result);
-      ctx.invalidate(marketId);
-    } catch (err: any) {
-      const errObj = err instanceof Error ? err : new Error(err?.message || 'Failed to submit trade');
-      setError(errObj.message);
-      onError?.(errObj);
-    } finally {
-      setIsSubmitting(false);
+    } catch (err) {
+      onError?.(err instanceof Error ? err : new Error(String(err)));
     }
   };
 
@@ -209,8 +183,8 @@ export function BinaryPanel({
     setIsEditingX(false);
     const val = parseFloat(xInputValue);
     if (!isNaN(val) && market) {
-      const { L, H } = market.config;
-      setUserOverrideX(Math.max(L, Math.min(H, val)));
+      const { lowerBound, upperBound } = market.config;
+      setUserOverrideX(Math.max(lowerBound, Math.min(upperBound, val)));
     }
   };
 
@@ -304,7 +278,7 @@ export function BinaryPanel({
               fontWeight: 700,
               padding: '0.125rem 0.375rem',
             }}>
-              {resolvedX !== null ? formatX(resolvedX) : '—'}
+              {resolvedX !== null ? formatX(resolvedX) : '--'}
             </span>
           )}
           {units}?
@@ -353,7 +327,7 @@ export function BinaryPanel({
             <span className="fs-input-hint">Minimum: 1.00 USDC</span>
           </div>
 
-          {error && <div className="fs-error-box">{error}</div>}
+          {buyError && <div className="fs-error-box">{buyError.message}</div>}
 
           <button
             type="submit"

@@ -11,6 +11,7 @@ Read these files completely before reviewing any code:
 1. `internal_sdk_docs/CLAUDE.md` -- Architecture rules and constraints
 2. `internal_sdk_docs/PLAYBOOK.md` -- Checklists and patterns
 3. `{HANDOFF_DOC_PATH}` -- **This is your primary reference.** Read every word. This defines what was supposed to be built.
+   Also check for a requirements doc at `Docs/{FEATURE_NAME}-requirements.md`. If it exists, use it as the primary requirements reference -- it is produced by `/plan-implementation` and is more structured than a raw handoff doc (includes SDK-readiness assessment, visual specification, improvement opportunities). Trace requirements from this doc through the plan to the implementation.
 4. `{PLAN_PATH}` -- The implementation plan. Contains work streams, file ownership, testing strategy, and doc update requirements. This tells you what the implementer PLANNED to do.
 5. `{COMPLETION_PATH}` -- The completion report. Contains what the implementer CLAIMS was done, including deviations and unresolved issues. Treat claims skeptically until verified.
 6. `{VALIDATION_DIR}` -- Pre-implementation validation reports. Read `validator-gaps.md` to see what gaps were identified before implementation began.
@@ -32,6 +33,7 @@ These files were modified or added during this implementation:
 Go through the handoff document line by line. Extract every discrete requirement, task, acceptance criterion, and behavioral expectation. Number them sequentially (R1, R2, R3...).
 
 Include:
+
 - Explicit requirements ("Add a component that...")
 - Implicit requirements ("The widget should handle loading states" -- implied by SDK conventions)
 - Behavioral expectations ("When the user clicks...")
@@ -42,6 +44,7 @@ Include:
 ### 2. Trace Each Requirement to Code
 
 For every requirement, find the implementing code in the changed files. Record:
+
 - **File and line number** where the requirement is implemented
 - **Implementation status**: COMPLETE, PARTIAL, MISSING, or MISINTERPRETED
 - **Evidence**: Quote the relevant code or explain what's missing
@@ -49,6 +52,7 @@ For every requirement, find the implementing code in the changed files. Record:
 ### 3. Check for Misinterpretations
 
 For each requirement marked COMPLETE or PARTIAL, verify:
+
 - Does the code actually do what the requirement says, or does it do something subtly different?
 - Are edge cases from the requirement handled?
 - Does the implementation match the intent, not just the letter?
@@ -99,19 +103,19 @@ Write your findings to `{OUTPUT_DIR}/01-plan-compliance.md` in this exact format
 
 ## Artifacts Available
 
-| Artifact | Path | Available? |
-|----------|------|-----------|
-| Handoff | {HANDOFF_DOC_PATH} | YES |
-| Plan | {PLAN_PATH} | YES/NO |
-| Validation | {VALIDATION_DIR} | YES/NO |
-| Completion Report | {COMPLETION_PATH} | YES/NO |
+| Artifact          | Path               | Available? |
+| ----------------- | ------------------ | ---------- |
+| Handoff           | {HANDOFF_DOC_PATH} | YES        |
+| Plan              | {PLAN_PATH}        | YES/NO     |
+| Validation        | {VALIDATION_DIR}   | YES/NO     |
+| Completion Report | {COMPLETION_PATH}  | YES/NO     |
 
 ## Requirements Traceability Matrix
 
-| ID | Requirement (from handoff) | Status | File:Line | Notes |
-|----|---------------------------|--------|-----------|-------|
-| R1 | ... | COMPLETE/PARTIAL/MISSING/MISINTERPRETED | path:line | ... |
-| R2 | ... | ... | ... | ... |
+| ID  | Requirement (from handoff) | Status                                  | File:Line | Notes |
+| --- | -------------------------- | --------------------------------------- | --------- | ----- |
+| R1  | ...                        | COMPLETE/PARTIAL/MISSING/MISINTERPRETED | path:line | ...   |
+| R2  | ...                        | ...                                     | ...       | ...   |
 
 ## Summary Statistics
 
@@ -124,20 +128,22 @@ Write your findings to `{OUTPUT_DIR}/01-plan-compliance.md` in this exact format
 ## Plan vs Implementation
 
 ### Work Stream Coverage
+
 | Work Stream | Planned Files | Actual Files | Match? | Notes |
-|------------|--------------|-------------|--------|-------|
-| ... | ... | ... | Y/N | ... |
+| ----------- | ------------- | ------------ | ------ | ----- |
+| ...         | ...           | ...          | Y/N    | ...   |
 
 ### Plan Deviations Verified
+
 | Claimed Deviation | Verified? | Justified? | Notes |
-|------------------|-----------|-----------|-------|
-| ... | Y/N | Y/N | ... |
+| ----------------- | --------- | ---------- | ----- |
+| ...               | Y/N       | Y/N        | ...   |
 
 ## Pre-Implementation Gaps
 
-| Gap (from validator) | Addressed? | Evidence | Notes |
-|---------------------|-----------|---------|-------|
-| ... | Y/N | file:line | ... |
+| Gap (from validator) | Addressed? | Evidence  | Notes |
+| -------------------- | ---------- | --------- | ----- |
+| ...                  | Y/N        | file:line | ...   |
 
 ## Detailed Findings
 

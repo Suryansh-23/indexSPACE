@@ -12,25 +12,34 @@
   "dependencies": {
     "@docusaurus/core": "^3.7.0",
     "@docusaurus/preset-classic": "^3.7.0",
-    "@mdx-js/react": "^3.0.0",
-    "clsx": "^2.1.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "recharts": "^2.10.0",
-    "rc-slider": "^11.1.9",
     "@easyops-cn/docusaurus-search-local": "^0.45.0",
     "@functionspace/core": "*",
     "@functionspace/react": "*",
-    "@functionspace/ui": "*"
+    "@functionspace/ui": "*",
+    "@mdx-js/react": "^3.0.0",
+    "clsx": "^2.1.0",
+    "dotenv": "^17.3.1",
+    "rc-slider": "^11.1.9",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "recharts": "^2.10.0"
   },
   "devDependencies": {
+    "@babel/preset-typescript": "^7.24.0",
     "@docusaurus/module-type-aliases": "^3.7.0",
     "@docusaurus/types": "^3.7.0",
-    "@babel/preset-typescript": "^7.24.0",
     "typescript": "~5.6.0"
   },
   "browserslist": {
-    "production": [">0.5%", "not dead", "not op_mini all"],
-    "development": ["last 2 chrome versions", "last 2 firefox versions", "last 2 safari versions"]
+    "production": [
+      ">0.5%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 2 chrome versions",
+      "last 2 firefox versions",
+      "last 2 safari versions"
+    ]
   }
 }

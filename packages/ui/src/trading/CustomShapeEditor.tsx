@@ -13,17 +13,13 @@ import {
 } from 'recharts';
 import {
   evaluateDensityCurve,
-  previewPayoutCurve,
-  buy,
+  evaluateDensityPiecewise,
 } from '@functionspace/core';
-import type { BuyResult } from '@functionspace/core';
-import { FunctionSpaceContext, useMarket, useConsensus, useCustomShape, useChartZoom, rechartsPlotArea } from '@functionspace/react';
+import { FunctionSpaceContext, useMarket, useConsensus, useCustomShape, useChartZoom, rechartsPlotArea, useBuy, usePreviewPayout } from '@functionspace/react';
+import type { TradeInputBaseProps } from './types.js';
 import '../styles/base.css';
 
-export interface CustomShapeEditorProps {
-  marketId: string | number;
-  onBuy?: (result: BuyResult) => void;
-  onError?: (error: Error) => void;
+export interface CustomShapeEditorProps extends TradeInputBaseProps {
   defaultNumPoints?: number;
   zoomable?: boolean;
 }
@@ -58,14 +54,13 @@ export function CustomShapeEditor({
   const { market, loading: marketLoading, error: marketError } = useMarket(marketId);
   const { consensus } = useConsensus(marketId, 100);
   const shape = useCustomShape(market);
+  const { execute: submitBuy, loading: isSubmitting, error: buyError } = useBuy(marketId);
+  const { execute: previewPayout } = usePreviewPayout(marketId);
 
   const [amount, setAmount] = useState('100');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [potentialPayout, setPotentialPayout] = useState<number | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
@@ -81,9 +76,6 @@ export function CustomShapeEditor({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
       ctx.setPreviewBelief(null);
       ctx.setPreviewPayout(null);
     };
@@ -100,12 +92,6 @@ export function CustomShapeEditor({
 
   // Phase 2: Debounced payout preview
   useEffect(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     const collateral = parseFloat(amount);
@@ -116,7 +102,7 @@ export function CustomShapeEditor({
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const result = await previewPayoutCurve(ctx.client, marketId, shape.pVector!, collateral, market.config.K, undefined, { signal: controller.signal });
+        const result = await previewPayout(shape.pVector!, collateral);
         if (!mountedRef.current) return;
         setPotentialPayout(result.maxPayout);
         ctx.setPreviewPayout(result);
@@ -129,9 +115,6 @@ export function CustomShapeEditor({
     }, 500);
 
     return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [shape.pVector, amount, market, marketId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -146,8 +129,8 @@ export function CustomShapeEditor({
     }));
 
     if (shape.pVector) {
-      const { L, H } = market.config;
-      const beliefCurve = evaluateDensityCurve(shape.pVector, L, H, points.length);
+      const { lowerBound, upperBound } = market.config;
+      const beliefCurve = evaluateDensityCurve(shape.pVector, lowerBound, upperBound, points.length);
       for (let i = 0; i < points.length && i < beliefCurve.length; i++) {
         points[i].belief = beliefCurve[i].y;
       }
@@ -155,8 +138,8 @@ export function CustomShapeEditor({
 
     // Add selected position curve from context (automatic component coordination)
     if (ctx.selectedPosition?.belief && market) {
-      const { L, H } = market.config;
-      const selectedCurve = evaluateDensityCurve(ctx.selectedPosition.belief, L, H, points.length);
+      const { lowerBound, upperBound } = market.config;
+      const selectedCurve = evaluateDensityCurve(ctx.selectedPosition.belief, lowerBound, upperBound, points.length);
       for (let i = 0; i < points.length && i < selectedCurve.length; i++) {
         points[i].selected = selectedCurve[i].y;
       }
@@ -175,7 +158,7 @@ export function CustomShapeEditor({
             bestDist = dist;
           }
         }
-        const step = (market.config.H - market.config.L) / (market.config.K || 50);
+        const step = (market.config.upperBound - market.config.lowerBound) / (market.config.numBuckets || 50);
         if (bestDist < step * 2) {
           point.payout = best.payout;
         }
@@ -202,7 +185,7 @@ export function CustomShapeEditor({
     enabled: zoomable,
   });
 
-  // Merge refs — both chartContainerRef (control-point coords) and zoom.containerRef (scroll zoom)
+  // Merge refs  -- both chartContainerRef (control-point coords) and zoom.containerRef (scroll zoom)
   const mergedChartRef = useCallback((node: HTMLDivElement | null) => {
     chartContainerRef.current = node;
     zoom.containerRef.current = node;
@@ -211,25 +194,14 @@ export function CustomShapeEditor({
   // Control point positions for chart scatter dots
   const controlDots = useMemo<ControlDot[]>(() => {
     if (!market || !shape.pVector) return [];
-    const { L, H, K } = market.config;
-    const step = (H - L) / K;
+    const { lowerBound, upperBound } = market.config;
     const N = shape.controlValues.length;
 
     return shape.controlValues.map((_, i) => {
-      const x = N === 1 ? (L + H) / 2 : L + (i / (N - 1)) * (H - L);
+      const x = N === 1 ? (lowerBound + upperBound) / 2 : lowerBound + (i / (N - 1)) * (upperBound - lowerBound);
 
-      // Interpolate Y from pVector density at this X
-      const exactIdx = (x - L) / step;
-      const loIdx = Math.floor(exactIdx);
-      const hiIdx = Math.min(Math.ceil(exactIdx), K);
-      let prob: number;
-      if (loIdx === hiIdx || loIdx >= K) {
-        prob = shape.pVector![Math.min(loIdx, K)];
-      } else {
-        const t = exactIdx - loIdx;
-        prob = shape.pVector![loIdx] * (1 - t) + shape.pVector![hiIdx] * t;
-      }
-      const density = prob / step;
+      // Evaluate density at this X via shared B-spline kernel (matches rendered curve)
+      const density = evaluateDensityPiecewise(shape.pVector!, x, lowerBound, upperBound);
 
       return {
         x: Math.round(x * 100) / 100,
@@ -290,13 +262,8 @@ export function CustomShapeEditor({
     const collateral = parseFloat(amount);
     if (!shape.pVector || isNaN(collateral) || collateral < 1) return;
 
-    setIsSubmitting(true);
-    setError(null);
-
     try {
-      const result = await buy(ctx.client, marketId, shape.pVector, collateral, market.config.K, {
-        prediction: shape.prediction ?? undefined,
-      });
+      const result = await submitBuy(shape.pVector, collateral);
 
       shape.resetToDefault();
       setPotentialPayout(null);
@@ -304,19 +271,15 @@ export function CustomShapeEditor({
       ctx.setPreviewPayout(null);
 
       onBuy?.(result);
-      ctx.invalidate(marketId);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to submit trade');
-      onError?.(err);
-    } finally {
-      setIsSubmitting(false);
+    } catch (err) {
+      onError?.(err instanceof Error ? err : new Error(String(err)));
     }
   };
 
   const collateral = parseFloat(amount);
   const isFormValid = shape.pVector !== null && !isNaN(collateral) && collateral >= 1;
 
-  // Dynamic Y-axis domain for density — caps overlay influence so consensus stays visible
+  // Dynamic Y-axis domain for density  -- caps overlay influence so consensus stays visible
   const densityDomain = useMemo<[number, number]>(() => {
     if (!chartData.length) return [0, 0.1];
     let consensusMax = 0;
@@ -345,7 +308,7 @@ export function CustomShapeEditor({
   const hasSelected = ctx.selectedPosition !== null;
   const hasPayout = chartData.some((d) => d.payout !== undefined);
 
-  // Memoized control dots renderer — avoids new function reference every render
+  // Memoized control dots renderer  -- avoids new function reference every render
   const renderControlDots = useCallback((props: any) => {
     const xScale = props.xAxisMap?.[0]?.scale;
     const yScale = props.yAxisMap?.left?.scale;
@@ -553,7 +516,7 @@ export function CustomShapeEditor({
               {/* Consensus area */}
               <Area
                 yAxisId="left"
-                type="monotone"
+                type="linear"
                 dataKey="consensus"
                 stroke={ctx.chartColors.consensus}
                 strokeWidth={2}
@@ -563,7 +526,7 @@ export function CustomShapeEditor({
                 isAnimationActive={false}
               />
 
-              {/* Belief preview area — dashed, linear for sharp edges */}
+              {/* Belief preview area  -- dashed, linear for sharp edges */}
               {hasPreview && (
                 <Area
                   yAxisId="left"
@@ -583,7 +546,7 @@ export function CustomShapeEditor({
               {hasSelected && (
                 <Area
                   yAxisId="left"
-                  type="monotone"
+                  type="linear"
                   dataKey="selected"
                   stroke={ctx.chartColors.positions[0]}
                   strokeWidth={2}
@@ -594,11 +557,11 @@ export function CustomShapeEditor({
                 />
               )}
 
-              {/* Payout — tooltip-only, invisible */}
+              {/* Payout  -- tooltip-only, invisible */}
               {hasPayout && (
                 <Area
                   yAxisId="right"
-                  type="monotone"
+                  type="linear"
                   dataKey="payout"
                   stroke="transparent"
                   strokeWidth={0}
@@ -609,7 +572,7 @@ export function CustomShapeEditor({
                 />
               )}
 
-              {/* Control dots rendered via Customized — completely outside Recharts data model,
+              {/* Control dots rendered via Customized  -- completely outside Recharts data model,
                   uses real axis scale functions so positions are always correct */}
               <Customized component={renderControlDots} />
             </ComposedChart>
@@ -623,19 +586,19 @@ export function CustomShapeEditor({
             <div className="fs-cs-stat">
               <span className="fs-cs-stat-label">Prediction</span>
               <span className="fs-cs-stat-value fs-cs-stat-primary">
-                {shape.prediction !== null ? shape.prediction.toFixed(2) : '\u2014'}
+                {shape.prediction !== null ? shape.prediction.toFixed(2) : '--'}
               </span>
             </div>
             <div className="fs-cs-stat">
               <span className="fs-cs-stat-label">Peak Payout</span>
               <span className={`fs-cs-stat-value ${potentialPayout !== null ? 'has-value' : ''}`}>
-                {potentialPayout !== null ? `$${potentialPayout.toFixed(2)}` : '\u2014'}
+                {potentialPayout !== null ? `$${potentialPayout.toFixed(2)}` : '--'}
               </span>
             </div>
             <div className="fs-cs-stat">
               <span className="fs-cs-stat-label">Max Loss</span>
               <span className="fs-cs-stat-value fs-cs-stat-negative">
-                {!isNaN(collateral) && collateral >= 1 ? `$${collateral.toFixed(2)}` : '\u2014'}
+                {!isNaN(collateral) && collateral >= 1 ? `$${collateral.toFixed(2)}` : '--'}
               </span>
             </div>
           </div>
@@ -686,7 +649,7 @@ export function CustomShapeEditor({
         </div>
 
         {/* Error */}
-        {error && <div className="fs-cs-error">{error}</div>}
+        {buyError && <div className="fs-cs-error">{buyError.message}</div>}
 
         {/* Footer: Amount + Submit */}
         <div className="fs-cs-footer">

@@ -46,7 +46,7 @@ Widget (UI) → Hook (React) → Query/Transaction (Core) → Backend API
 - **Server state** flows through hooks: `useMarket`, `useConsensus`, `usePositions`, etc.
 - **Preview state** flows through context: `previewBelief`, `previewPayout` (ephemeral, set by trade inputs)
 - **Coordination state** flows through context: `selectedPosition` (syncs chart overlays with table selection)
-- **Cache invalidation** uses `ctx.invalidate(marketId)` after mutations, which increments `invalidationCount` and triggers all hooks to refetch
+- **Cache invalidation** uses `ctx.invalidate(marketId)` after mutations, which marks that market's cache entries as stale and triggers subscribed hooks to refetch
 
 ---
 
@@ -59,10 +59,10 @@ Pure TypeScript with zero dependencies. Use this layer directly if you don't nee
 **API Client** -- `FSClient` handles authentication (token-based with auto-retry on 401), request building, and guest mode for unauthenticated browsing.
 
 **Math / Position Generation** -- Two-layer architecture for constructing belief vectors:
-- **L1**: `generateBelief(regions, K, L, H)` -- universal constructor. All belief vectors route through this single normalization path.
+- **L1**: `generateBelief(regions, numBuckets, lowerBound, upperBound)` -- universal constructor. All belief vectors route through this single normalization path.
 - **L2**: Convenience generators -- `generateGaussian`, `generateRange`, `generateDip`, `generateLeftSkew`, `generateRightSkew`. Thin wrappers that construct Region arrays and delegate to L1.
 
-**Density Evaluation** -- `evaluateDensityCurve` (multi-point for charts) and `evaluateDensityPiecewise` (single-point) use piecewise-linear interpolation over Bernstein coefficient arrays.
+**Density Evaluation** -- `evaluateDensityCurve` (multi-point for charts) and `evaluateDensityPiecewise` (single-point) use quadratic B-spline evaluation over Bernstein coefficient arrays.
 
 **Queries** -- `queryMarketState`, `queryMarketPositions`, `queryTradeHistory`, `queryMarketHistory`, `getConsensusCurve`, `queryDensityAt`.
 
@@ -79,8 +79,8 @@ import { FSClient, queryMarketState, generateGaussian, buy } from '@functionspac
 
 const client = new FSClient({ baseUrl: 'https://api.example.com', username: 'alice', password: 'secret' });
 const market = await queryMarketState(client, 1);
-const belief = generateGaussian(50, 5, market.config.K, market.config.L, market.config.H);
-const result = await buy(client, 1, belief, 100, market.config.K);
+const belief = generateGaussian(50, 5, market.config.numBuckets, market.config.lowerBound, market.config.upperBound);
+const result = await buy(client, 1, belief, 100, market.config.numBuckets);
 ```
 
 ### `@functionspace/react`
@@ -100,7 +100,7 @@ import { FunctionSpaceProvider } from '@functionspace/react';
 </FunctionSpaceProvider>
 ```
 
-**Hooks** -- Each returns `{ <named>, loading, error, refetch }` and reacts to `invalidationCount` for automatic cache busting after mutations.
+**Hooks** -- Each returns `{ <named>, loading, isFetching, error, refetch }` and uses cache subscription for automatic refetch after mutations.
 
 | Hook | Returns | Use For |
 |------|---------|---------|

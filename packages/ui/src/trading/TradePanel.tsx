@@ -2,50 +2,45 @@ import React, { useState, useEffect, useRef, useContext, useCallback } from 'rea
 import {
   generateGaussian,
   generateRange,
-  previewPayoutCurve,
-  buy,
 } from '@functionspace/core';
-import type { BuyResult } from '@functionspace/core';
-import { FunctionSpaceContext, useMarket } from '@functionspace/react';
+import { FunctionSpaceContext, useMarket, useBuy, usePreviewPayout } from '@functionspace/react';
+import type { TradeInputBaseProps } from './types.js';
 import { Slider } from '../components/Slider.js';
 import { RangeSlider } from '../components/RangeSlider.js';
 import '../styles/base.css';
 
-export interface TradePanelProps {
-  marketId: string | number;
+export interface TradePanelProps extends TradeInputBaseProps {
   modes?: ('gaussian' | 'range')[];
-  onBuy?: (result: BuyResult) => void;
 }
 
-export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy }: TradePanelProps) {
+export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy, onError }: TradePanelProps) {
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('TradePanel must be used within FunctionSpaceProvider');
 
   const { market } = useMarket(marketId);
+  const { execute: submitBuy, loading: isSubmitting, error: buyError } = useBuy(marketId);
+  const { execute: previewPayout } = usePreviewPayout(marketId);
 
   const [activeMode, setActiveMode] = useState<'gaussian' | 'range'>(modes[0]);
   const [amount, setAmount] = useState('100');
   const [prediction, setPrediction] = useState<number | null>(null);
   const [confidence, setConfidence] = useState(50); // 0-100 percentage
   const [rangeValues, setRangeValues] = useState<[number, number] | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [potentialPayout, setPotentialPayout] = useState<number | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
 
   // Initialize slider values from market config
   useEffect(() => {
     if (market) {
-      const { L, H } = market.config;
+      const { lowerBound, upperBound } = market.config;
       if (prediction === null) {
-        setPrediction((L + H) / 2);
+        setPrediction((lowerBound + upperBound) / 2);
       }
       if (rangeValues === null) {
-        const range = H - L;
-        setRangeValues([L + range * 0.25, L + range * 0.75]);
+        const range = upperBound - lowerBound;
+        setRangeValues([lowerBound + range * 0.25, lowerBound + range * 0.75]);
       }
     }
   }, [market, prediction, rangeValues]);
@@ -54,9 +49,6 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy }: T
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
       ctx.setPreviewBelief(null);
       ctx.setPreviewPayout(null);
     };
@@ -65,8 +57,8 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy }: T
   // Convert confidence (0-100) to stdDev
   const getStdDevFromConfidence = useCallback((conf: number): number => {
     if (!market) return 4.0;
-    const { L, H } = market.config;
-    const range = H - L;
+    const { lowerBound, upperBound } = market.config;
+    const range = upperBound - lowerBound;
     const minSigma = range * 0.01;  // 1% of range (high confidence)
     const maxSigma = range * 0.20;  // 20% of range (low confidence)
     return maxSigma - ((conf / 100) * (maxSigma - minSigma));
@@ -75,19 +67,19 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy }: T
   // Generate belief from current inputs
   const generateCurrentBelief = useCallback(() => {
     if (!market) return null;
-    const { K, L, H } = market.config;
+    const { numBuckets, lowerBound, upperBound } = market.config;
 
     if (activeMode === 'gaussian') {
       if (prediction === null) return null;
       const stdDev = getStdDevFromConfidence(confidence);
-      if (prediction < L || prediction > H) return null;
-      return generateGaussian(prediction, stdDev, K, L, H);
+      if (prediction < lowerBound || prediction > upperBound) return null;
+      return generateGaussian(prediction, stdDev, numBuckets, lowerBound, upperBound);
     } else {
       if (!rangeValues) return null;
       const [lo, hi] = rangeValues;
       if (lo >= hi) return null;
-      if (lo < L || hi > H) return null;
-      return generateRange(lo, hi, K, L, H, 1);
+      if (lo < lowerBound || hi > upperBound) return null;
+      return generateRange(lo, hi, numBuckets, lowerBound, upperBound, 1);
     }
   }, [market, activeMode, prediction, confidence, rangeValues, getStdDevFromConfidence]);
 
@@ -104,12 +96,6 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy }: T
 
   // Debounced payout preview
   useEffect(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     const belief = generateCurrentBelief();
@@ -121,7 +107,7 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy }: T
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral, market.config.K, undefined, { signal: controller.signal });
+        const result = await previewPayout(belief, collateral);
         if (!mountedRef.current) return;
         setPotentialPayout(result.maxPayout);
         ctx.setPreviewPayout(result);
@@ -134,9 +120,6 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy }: T
     }, 500);
 
     return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [generateCurrentBelief, amount, market, marketId]);
@@ -147,25 +130,16 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy }: T
     const collateral = parseFloat(amount);
     if (!belief || isNaN(collateral) || collateral < 1) return;
 
-    setIsSubmitting(true);
-    setError(null);
-
     try {
-      const predValue = activeMode === 'gaussian'
-        ? prediction!
-        : (rangeValues![0] + rangeValues![1]) / 2;
-
-      const result = await buy(ctx.client, marketId, belief, collateral, market.config.K, {
-        prediction: predValue,
-      });
+      const result = await submitBuy(belief, collateral);
 
       // Reset to defaults
       if (market) {
-        const { L, H } = market.config;
-        setPrediction((L + H) / 2);
+        const { lowerBound, upperBound } = market.config;
+        setPrediction((lowerBound + upperBound) / 2);
         setConfidence(50);
-        const range = H - L;
-        setRangeValues([L + range * 0.25, L + range * 0.75]);
+        const range = upperBound - lowerBound;
+        setRangeValues([lowerBound + range * 0.25, lowerBound + range * 0.75]);
       }
       setAmount('100');
       setPotentialPayout(null);
@@ -173,11 +147,8 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy }: T
       ctx.setPreviewPayout(null);
 
       onBuy?.(result);
-      ctx.invalidate(marketId);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to submit trade');
-    } finally {
-      setIsSubmitting(false);
+    } catch (err) {
+      onError?.(err instanceof Error ? err : new Error(String(err)));
     }
   };
 
@@ -192,7 +163,7 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy }: T
   // Calculate step based on market range
   const getStep = () => {
     if (!market) return 1;
-    const range = market.config.H - market.config.L;
+    const range = market.config.upperBound - market.config.lowerBound;
     return range / 100;
   };
 
@@ -245,16 +216,16 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy }: T
               {market && prediction !== null && (
                 <>
                   <Slider
-                    min={market.config.L}
-                    max={market.config.H}
+                    min={market.config.lowerBound}
+                    max={market.config.upperBound}
                     value={prediction}
                     onChange={setPrediction}
                     step={getStep()}
                     disabled={isSubmitting}
                   />
                   <div className="fs-slider-bounds">
-                    <span>{market.config.L}</span>
-                    <span>{market.config.H}</span>
+                    <span>{market.config.lowerBound}</span>
+                    <span>{market.config.upperBound}</span>
                   </div>
                 </>
               )}
@@ -286,8 +257,8 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy }: T
             {market && rangeValues && (
               <>
                 <RangeSlider
-                  min={market.config.L}
-                  max={market.config.H}
+                  min={market.config.lowerBound}
+                  max={market.config.upperBound}
                   values={rangeValues}
                   onChange={setRangeValues}
                   step={getStep()}
@@ -299,8 +270,8 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy }: T
                   <span className="fs-range-value">{rangeValues[1].toFixed(1)}</span>
                 </div>
                 <div className="fs-slider-bounds">
-                  <span>{market.config.L}</span>
-                  <span>{market.config.H}</span>
+                  <span>{market.config.lowerBound}</span>
+                  <span>{market.config.upperBound}</span>
                 </div>
               </>
             )}
@@ -310,14 +281,14 @@ export function TradePanel({ marketId, modes = ['gaussian', 'range'], onBuy }: T
         <div className="fs-payout-box">
           <span className="fs-payout-label">Potential Payout</span>
           <span className={`fs-payout-value ${potentialPayout !== null ? 'has-value' : 'no-value'}`}>
-            {potentialPayout !== null ? `$${potentialPayout.toFixed(2)}` : '—'}
+            {potentialPayout !== null ? `$${potentialPayout.toFixed(2)}` : '--'}
           </span>
           <p className="fs-payout-hint">
             This is your payout if the market settles at your exact prediction.
           </p>
         </div>
 
-        {error && <div className="fs-error-box">{error}</div>}
+        {buyError && <div className="fs-error-box">{buyError.message}</div>}
 
         <button
           type="submit"

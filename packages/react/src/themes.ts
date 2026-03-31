@@ -12,13 +12,13 @@ export interface FSTheme {
   textSecondary: string;
   border: string;
 
-  // ── Tier 1 (optional — defaults derived from core 9) ──
+  // ── Tier 1 (optional  -- defaults derived from core 9) ──
   bgSecondary?: string;
   surfaceHover?: string;
   borderSubtle?: string;
   textMuted?: string;
 
-  // ── Tier 2 (optional — consumed by components) ──
+  // ── Tier 2 (optional  -- consumed by components) ──
   navFrom?: string;
   navTo?: string;
   overlay?: string;
@@ -31,7 +31,7 @@ export interface FSTheme {
   badgeText?: string;
   logoFilter?: string;
 
-  // ── Tier 3 (optional — shape/personality) ──
+  // ── Tier 3 (optional  -- shape/personality) ──
   fontFamily?: string;
   radiusSm?: string;
   radiusMd?: string;
@@ -40,12 +40,12 @@ export interface FSTheme {
   transitionSpeed?: string;
 }
 
-/** Fully resolved theme — every token guaranteed present */
+/** Fully resolved theme  -- every token guaranteed present */
 export type ResolvedFSTheme = Required<FSTheme>;
 
 // ── Chart Colors ──
 
-/** Chart color values — concrete hex/rgba for Recharts SVG rendering */
+/** Chart color values  -- concrete hex/rgba for Recharts SVG rendering */
 export interface ChartColors {
   /** CartesianGrid stroke */
   grid: string;
@@ -134,7 +134,7 @@ const PRESET_CHART_COLORS: Record<ThemePresetId, Partial<ChartColors>> = {
     tooltipBorder: '#333333',
     tooltipText: '#E0E0E0',
     crosshair: '#333333',
-    consensus: '#6B7280',      // Gray, not brand blue — native is de-branded
+    consensus: '#6B7280',      // Gray, not brand blue  -- native is de-branded
     previewLine: '#9CA3AF',
     fanBands: {
       mean: '#6B7280',

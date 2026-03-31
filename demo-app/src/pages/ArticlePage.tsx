@@ -32,7 +32,7 @@ export function ArticlePage({ children, widgetWidth }: ArticlePageProps) {
             <section className="article-widget-section" style={widgetStyle}>
               <h2 className="article-section-heading">What Does the Market Think?</h2>
               <p className="article-widget-intro">
-                See what the crowd believes — and add your own forecast.
+                See what the crowd believes  -- and add your own forecast.
               </p>
               {/* DEMO: Enable the below to show the FS market */}
               <div className="fs-widget-container">
@@ -44,7 +44,7 @@ export function ArticlePage({ children, widgetWidth }: ArticlePageProps) {
               <p>
                 Whatever the outcome, the convergence of AI capabilities and consumer demand
                 makes Q3 2026 one of the most closely watched quarters in Apple's recent history.
-                Market participants continue to update their forecasts as new data emerges —
+                Market participants continue to update their forecasts as new data emerges  --
                 a process that the probability market above captures in real time.
               </p>
               <p>

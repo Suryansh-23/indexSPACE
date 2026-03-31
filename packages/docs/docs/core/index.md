@@ -6,4 +6,4 @@ description: "Entry point for @functionspace/core, the framework-agnostic pure T
 
 # Core
 
-`@functionspace/core` — Pure TypeScript. No React dependency.
+`@functionspace/core`  -- Pure TypeScript. No React dependency.

@@ -1,22 +1,19 @@
 import React, { useState, useEffect, useRef, useContext, useCallback, useMemo } from 'react';
 import {
   generateRange,
-  previewPayoutCurve,
-  buy,
 } from '@functionspace/core';
-import type { BuyResult, BucketData, RangeInput } from '@functionspace/core';
-import { FunctionSpaceContext, useDistributionState } from '@functionspace/react';
+import type { BucketData, RangeInput } from '@functionspace/core';
+import { FunctionSpaceContext, useDistributionState, useBuy, usePreviewPayout } from '@functionspace/react';
 import type { DistributionState } from '@functionspace/react';
+import type { TradeInputBaseProps } from './types.js';
 import '../styles/base.css';
 
-export interface BucketRangeSelectorProps {
-  marketId: string | number;
+export interface BucketRangeSelectorProps extends TradeInputBaseProps {
   distributionState?: DistributionState;
   defaultBucketCount?: number;
   maxSelections?: number;
   defaultAutoMode?: boolean;
   showCustomRange?: boolean;
-  onBuy?: (result: BuyResult) => void;
 }
 
 export function BucketRangeSelector({
@@ -27,6 +24,7 @@ export function BucketRangeSelector({
   defaultAutoMode = false,
   showCustomRange = true,
   onBuy,
+  onError,
 }: BucketRangeSelectorProps) {
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('BucketRangeSelector must be used within FunctionSpaceProvider');
@@ -34,6 +32,8 @@ export function BucketRangeSelector({
   // Use shared state if provided, otherwise create own
   const ownState = useDistributionState(marketId, { defaultBucketCount });
   const distState = distributionState ?? ownState;
+  const { execute: submitBuy, loading: isSubmitting, error: buyError } = useBuy(marketId);
+  const { execute: previewPayout } = usePreviewPayout(marketId);
 
   const { market, loading, error, bucketCount, percentiles, getBucketsForRange } = distState;
 
@@ -47,12 +47,9 @@ export function BucketRangeSelector({
 
   // Trade state
   const [amount, setAmount] = useState('100');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [tradeError, setTradeError] = useState<string | null>(null);
   const [potentialPayout, setPotentialPayout] = useState<number | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
 
   // Cleanup on unmount
@@ -60,9 +57,6 @@ export function BucketRangeSelector({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
       ctx.setPreviewBelief(null);
       ctx.setPreviewPayout(null);
     };
@@ -110,8 +104,8 @@ export function BucketRangeSelector({
     const max = parseFloat(customMax);
     if (!market || isNaN(min) || isNaN(max) || min >= max) return;
 
-    const effectiveL = autoMode && percentiles ? percentiles.p2_5 : market.config.L;
-    const effectiveH = autoMode && percentiles ? percentiles.p97_5 : market.config.H;
+    const effectiveL = autoMode && percentiles ? percentiles.p2_5 : market.config.lowerBound;
+    const effectiveH = autoMode && percentiles ? percentiles.p97_5 : market.config.upperBound;
 
     if (min < effectiveL || max > effectiveH) return;
 
@@ -145,8 +139,8 @@ export function BucketRangeSelector({
 
     if (ranges.length === 0) return null;
 
-    const { K, L, H } = market.config;
-    return generateRange(ranges, K, L, H);
+    const { numBuckets, lowerBound, upperBound } = market.config;
+    return generateRange(ranges, numBuckets, lowerBound, upperBound);
   }, [market, activeBuckets, selectedBuckets, customSelection]);
 
   // Phase 1: Instant preview
@@ -160,12 +154,6 @@ export function BucketRangeSelector({
 
   // Phase 2: Debounced payout preview
   useEffect(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     const collateral = parseFloat(amount);
@@ -176,7 +164,7 @@ export function BucketRangeSelector({
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral, market.config.K, undefined, { signal: controller.signal });
+        const result = await previewPayout(belief, collateral);
         if (!mountedRef.current) return;
         setPotentialPayout(result.maxPayout);
         ctx.setPreviewPayout(result);
@@ -189,9 +177,6 @@ export function BucketRangeSelector({
     }, 500);
 
     return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [belief, amount, market, marketId]);
@@ -202,22 +187,8 @@ export function BucketRangeSelector({
     const collateral = parseFloat(amount);
     if (!belief || isNaN(collateral) || collateral < 1 || !market) return;
 
-    setIsSubmitting(true);
-    setTradeError(null);
-
     try {
-      // Prediction: average midpoint of all selected ranges
-      const allRanges: Array<{ min: number; max: number }> = [
-        ...selectedBuckets
-          .filter(i => i >= 0 && i < activeBuckets.length)
-          .map(i => ({ min: activeBuckets[i].min, max: activeBuckets[i].max })),
-        ...(customSelection ? [customSelection] : []),
-      ];
-      const prediction = allRanges.reduce((sum, r) => sum + (r.min + r.max) / 2, 0) / allRanges.length;
-
-      const result = await buy(ctx.client, marketId, belief, collateral, market.config.K, {
-        prediction,
-      });
+      const result = await submitBuy(belief, collateral);
 
       // Reset
       setSelectedBuckets([]);
@@ -228,11 +199,8 @@ export function BucketRangeSelector({
       ctx.setPreviewPayout(null);
 
       onBuy?.(result);
-      ctx.invalidate(marketId);
-    } catch (err: any) {
-      setTradeError(err?.message || 'Failed to submit trade');
-    } finally {
-      setIsSubmitting(false);
+    } catch (err) {
+      onError?.(err instanceof Error ? err : new Error(String(err)));
     }
   };
 
@@ -311,7 +279,7 @@ export function BucketRangeSelector({
         <span className="fs-bucket-range-count">
           {totalSelections}/{maxSelections} selected
           {selectionLabels.length > 0 && (
-            <> — {selectionLabels.join(', ')}</>
+            <> -- {selectionLabels.join(', ')}</>
           )}
         </span>
         {showCustomRange && (
@@ -334,7 +302,7 @@ export function BucketRangeSelector({
                 type="number"
                 value={customMin}
                 onChange={(e) => setCustomMin(e.target.value)}
-                placeholder={String(market.config.L)}
+                placeholder={String(market.config.lowerBound)}
                 step="any"
               />
             </div>
@@ -344,7 +312,7 @@ export function BucketRangeSelector({
                 type="number"
                 value={customMax}
                 onChange={(e) => setCustomMax(e.target.value)}
-                placeholder={String(market.config.H)}
+                placeholder={String(market.config.upperBound)}
                 step="any"
               />
             </div>
@@ -390,14 +358,14 @@ export function BucketRangeSelector({
         <div className="fs-payout-box">
           <span className="fs-payout-label">Potential Payout</span>
           <span className={`fs-payout-value ${potentialPayout !== null ? 'has-value' : 'no-value'}`}>
-            {potentialPayout !== null ? `$${potentialPayout.toFixed(2)}` : '—'}
+            {potentialPayout !== null ? `$${potentialPayout.toFixed(2)}` : '--'}
           </span>
           <p className="fs-payout-hint">
             Maximum payout if the market settles within your selected ranges.
           </p>
         </div>
 
-        {tradeError && <div className="fs-error-box">{tradeError}</div>}
+        {buyError && <div className="fs-error-box">{buyError.message}</div>}
 
         <button
           type="submit"

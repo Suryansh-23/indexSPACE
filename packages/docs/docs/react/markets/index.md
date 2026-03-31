@@ -7,7 +7,7 @@ description: "Data-fetching hooks for market state, consensus curves, distributi
 
 # Markets - React
 
-Data-fetching hooks for market state, consensus curves, distribution analysis, and trade history. All follow the `{ named, loading, error, refetch }` return pattern and require `FunctionSpaceProvider`.
+Data-fetching hooks for market state, consensus curves, distribution analysis, and trade history. Primary hooks return `{ named, loading, isFetching, error, refetch }`. Composite hooks (`useBucketDistribution`, `useDistributionState`) return `{ named, loading, error, refetch }` without `isFetching`. All require `FunctionSpaceProvider`.
 
 | Hook | Returns | Description |
 |------|---------|-------------|

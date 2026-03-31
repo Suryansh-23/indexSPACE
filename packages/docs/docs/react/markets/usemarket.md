@@ -8,14 +8,16 @@ description: "Fetches complete market state including config, consensus coeffici
 
 **`useMarket(marketId)`**
 
-Fetches complete market state -- configuration, consensus coefficients, metadata, and resolution status -- and re-fetches when the market ID or provider invalidation count changes.
+Fetches complete market state -- configuration, consensus coefficients, metadata, and resolution status -- and re-fetches when the market ID changes or the market's cache entry is invalidated.
 
 ```typescript
 function useMarket(
   marketId: string | number,
+  options?: QueryOptions,
 ): {
   market: MarketState | null;
   loading: boolean;
+  isFetching: boolean;
   error: Error | null;
   refetch: () => Promise<void>;
 }
@@ -24,13 +26,25 @@ function useMarket(
 | Parameter  | Type               | Description       |
 | ---------- | ------------------ | ----------------- |
 | `marketId` | `string \| number` | Market identifier |
+| `options.pollInterval` | `number?` | Polling interval in milliseconds. When > 0, the cache entry refetches on a timer (visibility-aware). Default: `0` (no polling). |
+| `options.enabled` | `boolean?` | When `false`, suppresses fetching entirely. Default: `true`. |
 
 **Behavior:**
 
 * `market` is `null` until the first successful fetch; `loading` starts as `true`.
-* Re-fetches automatically when `marketId` changes or when the provider's invalidation count increments (e.g., after a `buy` or `sell` via `ctx.invalidate()`).
-* `refetch` is async. Calling it resets `loading` to `true` and `error` to `null` before the request fires.
+* `loading` is `true` only on the first fetch (no cached data). On background refetches (polling, invalidation), `loading` stays `false` and `isFetching` is `true`. This prevents UI flicker during polling.
+* Re-fetches automatically when `marketId` changes or when the market's cache entry is invalidated via `ctx.invalidate(marketId)`.
+* `refetch` returns a `Promise<void>`. It triggers a background refetch without resetting `loading`.
 * Throws `"useMarket must be used within FunctionSpaceProvider"` if rendered outside the provider.
+
+**`loading` vs `isFetching`:**
+
+| Field | When true | Use for |
+| ----- | --------- | ------- |
+| `loading` | First fetch only (no cached data yet) | Showing loading spinners or skeletons |
+| `isFetching` | Any in-flight request (first fetch or background refetch) | Showing subtle "refreshing" indicators |
+
+On the initial mount, both `loading` and `isFetching` are `true`. Once data is cached, subsequent refetches only set `isFetching` to `true` while the stale data remains displayed.
 
 **Delegates to:** `queryMarketState(client, marketId)` (see Core > Markets).
 
@@ -50,7 +64,7 @@ function MarketHeader({ marketId }: { marketId: number }) {
     
       <h2>{market.title}</h2>
       <p>
-        Range: {market.config.L} to {market.config.H} {market.xAxisUnits}
+        Range: {market.config.lowerBound} to {market.config.upperBound} {market.xAxisUnits}
       </p>
       <p>Status: {market.resolutionState}</p>
       <p>Participants: {market.participantCount}</p>

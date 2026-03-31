@@ -13,16 +13,16 @@ import {
 import type { ShapeId, ShapeDefinition, BeliefVector, Region, RangeInput } from '../packages/core/src/index.js';
 
 // Shared test parameters matching a realistic market config
-const K = 50;   // polynomial degree → 51 elements
-const L = 50;   // lower bound
-const H = 150;  // upper bound
+const numBuckets = 50;   // polynomial degree → 51 elements
+const lowerBound = 50;   // lower bound
+const upperBound = 150;  // upper bound
 const CENTER = 100;  // midpoint
 const SPREAD = 15;
 
 // ── Helpers ──
 
 function assertValidBelief(belief: BeliefVector, label: string) {
-  expect(belief).toHaveLength(K + 1);
+  expect(belief).toHaveLength(numBuckets + 1);
   const sum = belief.reduce((a, b) => a + b, 0);
   expect(sum).toBeCloseTo(1.0, 6);
   for (let i = 0; i < belief.length; i++) {
@@ -50,19 +50,19 @@ function troughIndex(belief: BeliefVector): number {
 
 describe('Backward compatibility', () => {
   it('generateGaussian without skew/inverted produces identical results to before', () => {
-    const belief = generateGaussian(CENTER, SPREAD, K, L, H);
+    const belief = generateGaussian(CENTER, SPREAD, numBuckets, lowerBound, upperBound);
     assertValidBelief(belief, 'gaussian');
-    // Peak should be near the center index (k=25 for center=100 in [50,150] range with K=50)
-    const expectedCenterIdx = Math.round(((CENTER - L) / (H - L)) * K);
+    // Peak should be near the center index (k=25 for center=100 in [50,150] range with numBuckets=50)
+    const expectedCenterIdx = Math.round(((CENTER - lowerBound) / (upperBound - lowerBound)) * numBuckets);
     expect(peakIndex(belief)).toBe(expectedCenterIdx);
   });
 
   it('generateRange is unchanged', () => {
-    const belief = generateRange(80, 120, K, L, H);
+    const belief = generateRange(80, 120, numBuckets, lowerBound, upperBound);
     assertValidBelief(belief, 'range');
     // Values in the range should be roughly equal
-    const lowIdx = Math.round(((80 - L) / (H - L)) * K);
-    const highIdx = Math.round(((120 - L) / (H - L)) * K);
+    const lowIdx = Math.round(((80 - lowerBound) / (upperBound - lowerBound)) * numBuckets);
+    const highIdx = Math.round(((120 - lowerBound) / (upperBound - lowerBound)) * numBuckets);
     const rangeValues = belief.slice(lowIdx, highIdx + 1);
     const avg = rangeValues.reduce((a, b) => a + b, 0) / rangeValues.length;
     for (const v of rangeValues) {
@@ -71,8 +71,8 @@ describe('Backward compatibility', () => {
   });
 
   it('generateBelief with plain PointRegion (no skew/inverted) matches generateGaussian', () => {
-    const viaL1 = generateBelief([{ type: 'point', center: CENTER, spread: SPREAD }], K, L, H);
-    const viaL2 = generateGaussian(CENTER, SPREAD, K, L, H);
+    const viaL1 = generateBelief([{ type: 'point', center: CENTER, spread: SPREAD }], numBuckets, lowerBound, upperBound);
+    const viaL2 = generateGaussian(CENTER, SPREAD, numBuckets, lowerBound, upperBound);
     expect(viaL1).toEqual(viaL2);
   });
 });
@@ -81,13 +81,13 @@ describe('Backward compatibility', () => {
 
 describe('Gaussian shape', () => {
   it('produces valid belief vector', () => {
-    const belief = generateGaussian(CENTER, SPREAD, K, L, H);
+    const belief = generateGaussian(CENTER, SPREAD, numBuckets, lowerBound, upperBound);
     assertValidBelief(belief, 'gaussian');
   });
 
   it('peak is near center', () => {
-    const belief = generateGaussian(CENTER, SPREAD, K, L, H);
-    const expectedIdx = Math.round(((CENTER - L) / (H - L)) * K);
+    const belief = generateGaussian(CENTER, SPREAD, numBuckets, lowerBound, upperBound);
+    const expectedIdx = Math.round(((CENTER - lowerBound) / (upperBound - lowerBound)) * numBuckets);
     expect(peakIndex(belief)).toBe(expectedIdx);
   });
 });
@@ -95,13 +95,13 @@ describe('Gaussian shape', () => {
 describe('Spike shape', () => {
   it('produces valid belief vector', () => {
     // Spike = gaussian with spread * 0.2 (widget applies the multiplier)
-    const belief = generateGaussian(CENTER, SPREAD * 0.2, K, L, H);
+    const belief = generateGaussian(CENTER, SPREAD * 0.2, numBuckets, lowerBound, upperBound);
     assertValidBelief(belief, 'spike');
   });
 
   it('is narrower than gaussian with same base spread', () => {
-    const gaussian = generateGaussian(CENTER, SPREAD, K, L, H);
-    const spike = generateGaussian(CENTER, SPREAD * 0.2, K, L, H);
+    const gaussian = generateGaussian(CENTER, SPREAD, numBuckets, lowerBound, upperBound);
+    const spike = generateGaussian(CENTER, SPREAD * 0.2, numBuckets, lowerBound, upperBound);
     // Spike peak should be higher (more concentrated)
     expect(Math.max(...spike)).toBeGreaterThan(Math.max(...gaussian));
   });
@@ -109,14 +109,14 @@ describe('Spike shape', () => {
 
 describe('Range shape', () => {
   it('produces valid belief vector', () => {
-    const belief = generateRange(80, 120, K, L, H);
+    const belief = generateRange(80, 120, numBuckets, lowerBound, upperBound);
     assertValidBelief(belief, 'range');
   });
 
   it('has roughly flat values within the range', () => {
-    const belief = generateRange(80, 120, K, L, H);
-    const lowIdx = Math.round(((80 - L) / (H - L)) * K);
-    const highIdx = Math.round(((120 - L) / (H - L)) * K);
+    const belief = generateRange(80, 120, numBuckets, lowerBound, upperBound);
+    const lowIdx = Math.round(((80 - lowerBound) / (upperBound - lowerBound)) * numBuckets);
+    const highIdx = Math.round(((120 - lowerBound) / (upperBound - lowerBound)) * numBuckets);
     const rangeValues = belief.slice(lowIdx, highIdx + 1);
     const avg = rangeValues.reduce((a, b) => a + b, 0) / rangeValues.length;
     for (const v of rangeValues) {
@@ -131,7 +131,7 @@ describe('Bimodal shape', () => {
     const belief = generateBelief([
       { type: 'point', center: 75, spread: SPREAD * 0.8, weight: 0.5 },
       { type: 'point', center: 125, spread: SPREAD * 0.8, weight: 0.5 },
-    ], K, L, H);
+    ], numBuckets, lowerBound, upperBound);
     assertValidBelief(belief, 'bimodal');
   });
 
@@ -139,10 +139,10 @@ describe('Bimodal shape', () => {
     const belief = generateBelief([
       { type: 'point', center: 75, spread: SPREAD * 0.8, weight: 0.5 },
       { type: 'point', center: 125, spread: SPREAD * 0.8, weight: 0.5 },
-    ], K, L, H);
+    ], numBuckets, lowerBound, upperBound);
     // Check that the two expected peak zones are local maxima
-    const idx75 = Math.round(((75 - L) / (H - L)) * K);
-    const idx125 = Math.round(((125 - L) / (H - L)) * K);
+    const idx75 = Math.round(((75 - lowerBound) / (upperBound - lowerBound)) * numBuckets);
+    const idx125 = Math.round(((125 - lowerBound) / (upperBound - lowerBound)) * numBuckets);
     // Each peak should be higher than its neighbors a few indices away
     expect(belief[idx75]).toBeGreaterThan(belief[idx75 - 5]);
     expect(belief[idx75]).toBeGreaterThan(belief[idx75 + 5]);
@@ -154,36 +154,36 @@ describe('Bimodal shape', () => {
     const leftHeavy = generateBelief([
       { type: 'point', center: 75, spread: SPREAD * 0.8, weight: 0.8 },
       { type: 'point', center: 125, spread: SPREAD * 0.8, weight: 0.2 },
-    ], K, L, H);
-    const idx75 = Math.round(((75 - L) / (H - L)) * K);
-    const idx125 = Math.round(((125 - L) / (H - L)) * K);
+    ], numBuckets, lowerBound, upperBound);
+    const idx75 = Math.round(((75 - lowerBound) / (upperBound - lowerBound)) * numBuckets);
+    const idx125 = Math.round(((125 - lowerBound) / (upperBound - lowerBound)) * numBuckets);
     expect(leftHeavy[idx75]).toBeGreaterThan(leftHeavy[idx125]);
   });
 });
 
 describe('Dip shape', () => {
   it('produces valid belief vector', () => {
-    const belief = generateDip(CENTER, SPREAD, K, L, H);
+    const belief = generateDip(CENTER, SPREAD, numBuckets, lowerBound, upperBound);
     assertValidBelief(belief, 'dip');
   });
 
   it('center value is lower than edge values', () => {
-    const belief = generateDip(CENTER, SPREAD, K, L, H);
-    const centerIdx = Math.round(((CENTER - L) / (H - L)) * K);
+    const belief = generateDip(CENTER, SPREAD, numBuckets, lowerBound, upperBound);
+    const centerIdx = Math.round(((CENTER - lowerBound) / (upperBound - lowerBound)) * numBuckets);
     // Edges (first and last elements)
     expect(belief[0]).toBeGreaterThan(belief[centerIdx]);
-    expect(belief[K]).toBeGreaterThan(belief[centerIdx]);
+    expect(belief[numBuckets]).toBeGreaterThan(belief[centerIdx]);
   });
 
   it('trough is near center', () => {
-    const belief = generateDip(CENTER, SPREAD, K, L, H);
-    const expectedIdx = Math.round(((CENTER - L) / (H - L)) * K);
-    // Allow ±3 index tolerance — the 1.5x spread widening + normalization can shift the minimum slightly
+    const belief = generateDip(CENTER, SPREAD, numBuckets, lowerBound, upperBound);
+    const expectedIdx = Math.round(((CENTER - lowerBound) / (upperBound - lowerBound)) * numBuckets);
+    // Allow ±3 index tolerance  -- the 1.5x spread widening + normalization can shift the minimum slightly
     expect(Math.abs(troughIndex(belief) - expectedIdx)).toBeLessThanOrEqual(3);
   });
 
   it('no values are zero (0.02 floor)', () => {
-    const belief = generateDip(CENTER, SPREAD, K, L, H);
+    const belief = generateDip(CENTER, SPREAD, numBuckets, lowerBound, upperBound);
     for (const v of belief) {
       expect(v).toBeGreaterThan(0);
     }
@@ -192,13 +192,13 @@ describe('Dip shape', () => {
 
 describe('Left Skew shape', () => {
   it('produces valid belief vector', () => {
-    const belief = generateLeftSkew(CENTER, SPREAD, K, L, H);
+    const belief = generateLeftSkew(CENTER, SPREAD, numBuckets, lowerBound, upperBound);
     assertValidBelief(belief, 'leftskew');
   });
 
   it('left tail is wider than right tail', () => {
-    const belief = generateLeftSkew(CENTER, SPREAD, K, L, H);
-    const centerIdx = Math.round(((CENTER - L) / (H - L)) * K);
+    const belief = generateLeftSkew(CENTER, SPREAD, numBuckets, lowerBound, upperBound);
+    const centerIdx = Math.round(((CENTER - lowerBound) / (upperBound - lowerBound)) * numBuckets);
     // Sum of left half vs right half (excluding center)
     const leftSum = belief.slice(0, centerIdx).reduce((a, b) => a + b, 0);
     const rightSum = belief.slice(centerIdx + 1).reduce((a, b) => a + b, 0);
@@ -206,8 +206,8 @@ describe('Left Skew shape', () => {
   });
 
   it('peak is near center', () => {
-    const belief = generateLeftSkew(CENTER, SPREAD, K, L, H);
-    const expectedIdx = Math.round(((CENTER - L) / (H - L)) * K);
+    const belief = generateLeftSkew(CENTER, SPREAD, numBuckets, lowerBound, upperBound);
+    const expectedIdx = Math.round(((CENTER - lowerBound) / (upperBound - lowerBound)) * numBuckets);
     // Peak should be at or very near center
     expect(Math.abs(peakIndex(belief) - expectedIdx)).toBeLessThanOrEqual(1);
   });
@@ -215,21 +215,21 @@ describe('Left Skew shape', () => {
 
 describe('Right Skew shape', () => {
   it('produces valid belief vector', () => {
-    const belief = generateRightSkew(CENTER, SPREAD, K, L, H);
+    const belief = generateRightSkew(CENTER, SPREAD, numBuckets, lowerBound, upperBound);
     assertValidBelief(belief, 'rightskew');
   });
 
   it('right tail is wider than left tail', () => {
-    const belief = generateRightSkew(CENTER, SPREAD, K, L, H);
-    const centerIdx = Math.round(((CENTER - L) / (H - L)) * K);
+    const belief = generateRightSkew(CENTER, SPREAD, numBuckets, lowerBound, upperBound);
+    const centerIdx = Math.round(((CENTER - lowerBound) / (upperBound - lowerBound)) * numBuckets);
     const leftSum = belief.slice(0, centerIdx).reduce((a, b) => a + b, 0);
     const rightSum = belief.slice(centerIdx + 1).reduce((a, b) => a + b, 0);
     expect(rightSum).toBeGreaterThan(leftSum);
   });
 
   it('peak is near center', () => {
-    const belief = generateRightSkew(CENTER, SPREAD, K, L, H);
-    const expectedIdx = Math.round(((CENTER - L) / (H - L)) * K);
+    const belief = generateRightSkew(CENTER, SPREAD, numBuckets, lowerBound, upperBound);
+    const expectedIdx = Math.round(((CENTER - lowerBound) / (upperBound - lowerBound)) * numBuckets);
     expect(Math.abs(peakIndex(belief) - expectedIdx)).toBeLessThanOrEqual(1);
   });
 });
@@ -237,13 +237,13 @@ describe('Right Skew shape', () => {
 describe('Uniform shape', () => {
   it('produces valid belief vector', () => {
     // Uniform = full-range generateRange
-    const belief = generateRange(L, H, K, L, H);
+    const belief = generateRange(lowerBound, upperBound, numBuckets, lowerBound, upperBound);
     assertValidBelief(belief, 'uniform');
   });
 
   it('all values are roughly equal', () => {
-    const belief = generateRange(L, H, K, L, H);
-    const expected = 1 / (K + 1);
+    const belief = generateRange(lowerBound, upperBound, numBuckets, lowerBound, upperBound);
+    const expected = 1 / (numBuckets + 1);
     for (const v of belief) {
       expect(v).toBeCloseTo(expected, 2);
     }
@@ -254,16 +254,16 @@ describe('Uniform shape', () => {
 
 describe('generateRange', () => {
   it('single-range produces valid belief vector', () => {
-    const belief = generateRange(80, 120, K, L, H, 0.5);
+    const belief = generateRange(80, 120, numBuckets, lowerBound, upperBound, 0.5);
     assertValidBelief(belief, 'single-range');
   });
 
   it('single-range with sharpness=1 produces hard edges', () => {
-    const belief = generateRange(80, 120, K, L, H, 1);
+    const belief = generateRange(80, 120, numBuckets, lowerBound, upperBound, 1);
     assertValidBelief(belief, 'single-range-sharp');
     // Values inside range should be elevated vs outside
-    const insideIdx = Math.round(((100 - L) / (H - L)) * K);
-    const outsideIdx = Math.round(((60 - L) / (H - L)) * K);
+    const insideIdx = Math.round(((100 - lowerBound) / (upperBound - lowerBound)) * numBuckets);
+    const outsideIdx = Math.round(((60 - lowerBound) / (upperBound - lowerBound)) * numBuckets);
     expect(belief[insideIdx]).toBeGreaterThan(belief[outsideIdx]);
   });
 
@@ -271,7 +271,7 @@ describe('generateRange', () => {
     const belief = generateRange([
       { low: 60, high: 80 },
       { low: 120, high: 140 },
-    ], K, L, H);
+    ], numBuckets, lowerBound, upperBound);
     assertValidBelief(belief, 'multi-range-2');
   });
 
@@ -280,7 +280,7 @@ describe('generateRange', () => {
       { low: 55, high: 70 },
       { low: 90, high: 110 },
       { low: 130, high: 145 },
-    ], K, L, H);
+    ], numBuckets, lowerBound, upperBound);
     assertValidBelief(belief, 'multi-range-3');
   });
 
@@ -288,11 +288,11 @@ describe('generateRange', () => {
     const belief = generateRange([
       { low: 60, high: 80, sharpness: 1 },
       { low: 120, high: 140, sharpness: 1 },
-    ], K, L, H);
+    ], numBuckets, lowerBound, upperBound);
     // Indices for range midpoints
-    const mid1 = Math.round(((70 - L) / (H - L)) * K);   // ~10
-    const mid2 = Math.round(((130 - L) / (H - L)) * K);  // ~40
-    const gap = Math.round(((100 - L) / (H - L)) * K);    // ~25 (between ranges)
+    const mid1 = Math.round(((70 - lowerBound) / (upperBound - lowerBound)) * numBuckets);   // ~10
+    const mid2 = Math.round(((130 - lowerBound) / (upperBound - lowerBound)) * numBuckets);  // ~40
+    const gap = Math.round(((100 - lowerBound) / (upperBound - lowerBound)) * numBuckets);    // ~25 (between ranges)
     // Both ranges should be elevated relative to the gap
     expect(belief[mid1]).toBeGreaterThan(belief[gap]);
     expect(belief[mid2]).toBeGreaterThan(belief[gap]);
@@ -303,12 +303,12 @@ describe('generateRange', () => {
     const belief = generateRange([
       { low: 80, high: 100, sharpness: 1 },
       { low: 100, high: 120, sharpness: 1 },
-    ], K, L, H);
+    ], numBuckets, lowerBound, upperBound);
     assertValidBelief(belief, 'adjacent');
     // The boundary at x=100 (index 25) should have significant probability,
     // not a dip to near-zero
-    const boundaryIdx = Math.round(((100 - L) / (H - L)) * K);
-    const insideIdx = Math.round(((90 - L) / (H - L)) * K);
+    const boundaryIdx = Math.round(((100 - lowerBound) / (upperBound - lowerBound)) * numBuckets);
+    const insideIdx = Math.round(((90 - lowerBound) / (upperBound - lowerBound)) * numBuckets);
     // Boundary should be at least 50% of interior value (no gap)
     expect(belief[boundaryIdx]).toBeGreaterThan(belief[insideIdx] * 0.5);
   });
@@ -317,9 +317,9 @@ describe('generateRange', () => {
     const belief = generateRange([
       { low: 60, high: 80, weight: 3, sharpness: 1 },
       { low: 120, high: 140, weight: 1, sharpness: 1 },
-    ], K, L, H);
-    const mid1 = Math.round(((70 - L) / (H - L)) * K);
-    const mid2 = Math.round(((130 - L) / (H - L)) * K);
+    ], numBuckets, lowerBound, upperBound);
+    const mid1 = Math.round(((70 - lowerBound) / (upperBound - lowerBound)) * numBuckets);
+    const mid2 = Math.round(((130 - lowerBound) / (upperBound - lowerBound)) * numBuckets);
     // First range has 3x weight → higher probability
     expect(belief[mid1]).toBeGreaterThan(belief[mid2]);
   });
@@ -327,15 +327,15 @@ describe('generateRange', () => {
   it('multi-range: sharpness per-range is respected', () => {
     const sharp = generateRange([
       { low: 80, high: 120, sharpness: 1 },
-    ], K, L, H);
+    ], numBuckets, lowerBound, upperBound);
     const smooth = generateRange([
       { low: 80, high: 120, sharpness: 0 },
-    ], K, L, H);
+    ], numBuckets, lowerBound, upperBound);
     assertValidBelief(sharp, 'sharp');
     assertValidBelief(smooth, 'smooth');
     // Just outside the range: smooth has taper, sharp drops to EPS
     // Use a point 1 bucket-width outside the range boundary
-    const justOutside = Math.round(((78 - L) / (H - L)) * K);  // ~14, just below low=80
+    const justOutside = Math.round(((78 - lowerBound) / (upperBound - lowerBound)) * numBuckets);  // ~14, just below low=80
     expect(sharp[justOutside]).toBeLessThan(smooth[justOutside]);
   });
 
@@ -343,11 +343,11 @@ describe('generateRange', () => {
     const viaL2 = generateRange([
       { low: 60, high: 80, sharpness: 1 },
       { low: 120, high: 140, sharpness: 0.5 },
-    ], K, L, H);
+    ], numBuckets, lowerBound, upperBound);
     const viaL1 = generateBelief([
       { type: 'range', low: 60, high: 80, sharpness: 1 },
       { type: 'range', low: 120, high: 140, sharpness: 0.5 },
-    ], K, L, H);
+    ], numBuckets, lowerBound, upperBound);
     expect(viaL2).toEqual(viaL1);
   });
 });
@@ -356,8 +356,8 @@ describe('generateRange', () => {
 
 describe('Skew symmetry', () => {
   it('left skew and right skew are mirror images', () => {
-    const left = generateLeftSkew(CENTER, SPREAD, K, L, H);
-    const right = generateRightSkew(CENTER, SPREAD, K, L, H);
+    const left = generateLeftSkew(CENTER, SPREAD, numBuckets, lowerBound, upperBound);
+    const right = generateRightSkew(CENTER, SPREAD, numBuckets, lowerBound, upperBound);
     // Reversing the right skew should roughly match left skew
     const rightReversed = [...right].reverse();
     for (let i = 0; i < left.length; i++) {
@@ -401,15 +401,15 @@ describe('SHAPE_DEFINITIONS', () => {
 describe('Custom shape (spline)', () => {
   it('produces valid belief vector from bell-shaped control values', () => {
     const controlValues = [0.1, 0.3, 0.6, 1.0, 1.5, 1.8, 1.5, 1.0, 0.6, 0.2];
-    const belief = generateCustomShape(controlValues, K, L, H);
+    const belief = generateCustomShape(controlValues, numBuckets, lowerBound, upperBound);
     assertValidBelief(belief, 'custom-bell');
   });
 
   it('uniform control values produce roughly uniform belief', () => {
     const controlValues = new Array(20).fill(1.0);
-    const belief = generateCustomShape(controlValues, K, L, H);
+    const belief = generateCustomShape(controlValues, numBuckets, lowerBound, upperBound);
     assertValidBelief(belief, 'custom-uniform');
-    const expected = 1 / (K + 1);
+    const expected = 1 / (numBuckets + 1);
     for (const v of belief) {
       expect(v).toBeCloseTo(expected, 1);
     }
@@ -422,38 +422,38 @@ describe('Custom shape (spline)', () => {
       const d = (i - mid) / 3;
       return Math.max(0.1, 2.0 * Math.exp(-0.5 * d * d));
     });
-    const belief = generateCustomShape(controlValues, K, L, H);
+    const belief = generateCustomShape(controlValues, numBuckets, lowerBound, upperBound);
     assertValidBelief(belief, 'custom-peaked');
-    const centerIdx = Math.round(K / 2);
+    const centerIdx = Math.round(numBuckets / 2);
     expect(Math.abs(peakIndex(belief) - centerIdx)).toBeLessThanOrEqual(3);
   });
 
   it('generateCustomShape matches generateBelief with equivalent SplineRegion', () => {
     const controlValues = [0.2, 0.5, 1.0, 1.5, 1.0, 0.5, 0.2];
     const N = controlValues.length;
-    const controlX = controlValues.map((_, i) => L + (i / (N - 1)) * (H - L));
-    const viaL2 = generateCustomShape(controlValues, K, L, H);
+    const controlX = controlValues.map((_, i) => lowerBound + (i / (N - 1)) * (upperBound - lowerBound));
+    const viaL2 = generateCustomShape(controlValues, numBuckets, lowerBound, upperBound);
     const viaL1 = generateBelief(
       [{ type: 'spline', controlX, controlY: controlValues }],
-      K, L, H,
+      numBuckets, lowerBound, upperBound,
     );
     expect(viaL2).toEqual(viaL1);
   });
 
   it('handles minimum control points (2)', () => {
-    const belief = generateCustomShape([0.5, 1.5], K, L, H);
+    const belief = generateCustomShape([0.5, 1.5], numBuckets, lowerBound, upperBound);
     assertValidBelief(belief, 'custom-2pts');
   });
 
   it('handles maximum control points (25)', () => {
     const controlValues = new Array(25).fill(0).map((_, i) => 0.5 + Math.sin(i / 4) * 0.5);
-    const belief = generateCustomShape(controlValues, K, L, H);
+    const belief = generateCustomShape(controlValues, numBuckets, lowerBound, upperBound);
     assertValidBelief(belief, 'custom-25pts');
   });
 
   it('negative interpolation values are clamped', () => {
     const controlValues = [2.0, 0.0, 2.0, 0.0, 2.0];
-    const belief = generateCustomShape(controlValues, K, L, H);
+    const belief = generateCustomShape(controlValues, numBuckets, lowerBound, upperBound);
     assertValidBelief(belief, 'custom-oscillating');
     for (const v of belief) {
       expect(v).toBeGreaterThanOrEqual(0);
@@ -461,7 +461,7 @@ describe('Custom shape (spline)', () => {
   });
 
   it('single control point produces uniform-ish belief', () => {
-    const belief = generateCustomShape([1.0], K, L, H);
+    const belief = generateCustomShape([1.0], numBuckets, lowerBound, upperBound);
     assertValidBelief(belief, 'custom-1pt');
   });
 });

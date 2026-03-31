@@ -1,4 +1,5 @@
 // @ts-check
+require('dotenv').config();
 const { themes: prismThemes } = require('prism-react-renderer');
 
 /** @type {import('@docusaurus/types').Config} */
@@ -15,8 +16,7 @@ const config = {
 
   // Custom fields accessible via useDocusaurusContext().siteConfig.customFields
   customFields: {
-    fsBaseUrl: 'https://fs-core-api.onrender.com',
-    // fsBaseUrl: 'http://localhost:8000',
+    fsBaseUrl: process.env.FS_BASE_URL,
   },
 
   i18n: {

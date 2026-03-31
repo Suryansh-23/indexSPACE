@@ -50,7 +50,7 @@ export const SHAPE_DEFINITIONS: ShapeDefinition[] = [
   {
     id: 'dip',
     name: 'The Dip',
-    description: 'Inverted gaussian — high at edges, low at center',
+    description: 'Inverted gaussian  -- high at edges, low at center',
     parameters: ['targetOutcome', 'confidence'],
     svgPath: 'M 5,15 Q 35,15 50,55 Q 65,15 95,15',
   },

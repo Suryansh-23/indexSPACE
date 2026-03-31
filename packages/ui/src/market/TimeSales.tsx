@@ -13,7 +13,7 @@ export interface TimeSalesProps {
 }
 
 const formatCurrency = (value: number | null | undefined): string => {
-  if (value === null || value === undefined) return '—';
+  if (value === null || value === undefined) return '--';
   return `$${Math.abs(value).toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
