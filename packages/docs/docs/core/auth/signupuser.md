@@ -1,6 +1,7 @@
 ---
 title: "signupUser"
 sidebar_position: 2
+description: "Register a new user account with optional access code."
 ---
 
 # signupUser

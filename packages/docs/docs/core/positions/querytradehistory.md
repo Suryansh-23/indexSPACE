@@ -1,6 +1,7 @@
 ---
 title: "queryTradeHistory"
 sidebar_position: 5
+description: "Convenience function composing queryMarketPositions + positionsToTradeEntries in a single call."
 ---
 
 # queryTradeHistory

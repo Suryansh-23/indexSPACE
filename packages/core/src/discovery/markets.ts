@@ -1,34 +1,57 @@
 import type { FSClient } from '../client.js';
-import type { MarketState } from '../types.js';
+import type { MarketState, MarketDiscoveryOptions } from '../types.js';
+import { filterMarkets } from './filters.js';
 
 /**
- * List available markets.
- * Wraps: GET /api/markets
+ * List available markets with optional filtering, sorting, and limiting.
+ * Wraps: GET /api/views/markets/list
+ *
+ * Category: Discovery | Layer: L1
  */
 export async function discoverMarkets(
   client: FSClient,
-  options?: { signal?: AbortSignal },
+  options?: MarketDiscoveryOptions,
 ): Promise<MarketState[]> {
-  const data = await client.get<any[]>('/api/markets', undefined, options?.signal);
+  const data = await client.get<any>('/api/views/markets/list', undefined, options?.signal);
+  const items = Array.isArray(data.markets) ? data.markets : [];
 
-  return data.map((item: any) => {
+  const mapped: MarketState[] = items.map((item: any) => {
+    if (item.alpha_vector == null) throw new Error('Missing alpha_vector in market list item');
     const alphaVector: number[] = item.alpha_vector;
     const totalMass = alphaVector.reduce((a: number, b: number) => a + b, 0);
-    const consensus = alphaVector.map((a: number) => a / totalMass);
-    const mp = item.market_params;
+    const consensus = totalMass > 0
+      ? alphaVector.map((a: number) => a / totalMass)
+      : alphaVector.map(() => 0);
+    const mp = item.market_model_params;
+    if (!mp) throw new Error('Missing market_model_params in market list item');
+
+    const numBuckets = item.num_buckets;
+    if (numBuckets == null) throw new Error('Missing num_buckets in market list item');
+    const lowerBound = item.lower_bound;
+    if (lowerBound == null) throw new Error('Missing lower_bound in market list item');
+    const upperBound = item.upper_bound;
+    if (upperBound == null) throw new Error('Missing upper_bound in market list item');
+
+    const n = consensus.length - 1;
+    const consensusMean = n > 0
+      ? lowerBound + (upperBound - lowerBound) * consensus.reduce((sum: number, c: number, k: number) => sum + (k / n) * c, 0)
+      : lowerBound;
 
     return {
       alpha: alphaVector,
       consensus,
       totalMass,
       poolBalance: item.current_pool,
-      participantCount: item.num_positions,
-      totalVolume: item.total_volume,
-      positionsOpen: item.positions_currently_open,
+      participantCount: item.total_positions,
+      totalVolume: (item.total_deposited ?? 0) + (item.total_withdrawn ?? 0),
+      positionsOpen: item.open_positions ?? 0,
       config: {
-        K: mp.K,
-        L: mp.L,
-        H: mp.H,
+        numBuckets,
+        lowerBound,
+        upperBound,
+        K: numBuckets,      // deprecated alias
+        L: lowerBound,      // deprecated alias
+        H: upperBound,      // deprecated alias
         P0: mp.P0,
         mu: mp.mu,
         epsAlpha: mp.eps_alpha,
@@ -38,10 +61,36 @@ export async function discoverMarkets(
         lambdaD: mp.lambda_d,
       },
       title: item.title,
-      xAxisUnits: item.x_axis_units,
-      decimals: item.decimals,
+      xAxisUnits: item.metadata?.x_axis_units ?? '',
+      decimals: item.metadata?.decimals ?? 0,
+      // TODO: Add 'voided' mapping when API provides the field. Currently only is_settled boolean maps to 'resolved'/'open'.
       resolutionState: item.is_settled ? 'resolved' : 'open',
       resolvedOutcome: item.settlement_outcome ?? null,
+      marketId: item.market_id,
+      createdAt: item.created_at ?? null,
+      expiresAt: item.expires_at ?? null,
+      resolvedAt: item.resolved_at ?? null,
+      marketType: item.market_type ?? 'standard',
+      marketSubtype: item.market_subtype ?? null,
+      metadata: item.metadata ?? {},
+      consensusMean,
     };
   });
+
+  // Apply client-side filtering, sorting, and limiting if any options provided
+  const hasFilterOptions = options && (
+    options.state !== undefined ||
+    options.titleContains !== undefined ||
+    options.categories !== undefined ||
+    options.filters !== undefined ||
+    options.sortBy !== undefined ||
+    options.limit !== undefined
+  );
+
+  if (hasFilterOptions) {
+    const { signal: _signal, ...filterOptions } = options!;
+    return filterMarkets(mapped, filterOptions);
+  }
+
+  return mapped;
 }

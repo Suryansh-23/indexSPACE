@@ -1,6 +1,7 @@
 ---
 title: "Categories"
 sidebar_position: 2
+description: "All SDK functions organized by category: transactions, generators, previews, queries, auth, and math."
 ---
 
 # Categories
@@ -63,6 +64,12 @@ Every SDK function belongs to a **category** that determines its functional doma
 | L1 | `fetchCurrentUser()` | Fetch authenticated user profile |
 | L1 | `passwordlessLoginUser()` | Login or auto-signup by username |
 | L1 | `silentReAuth()` | Re-authenticate stored session |
+
+### Validation
+
+| Layer | Function | Purpose |
+|-------|----------|---------|
+| L0 | `validateBeliefVector()` | Client-side belief vector validation |
 
 ### Pure Math (L0)
 

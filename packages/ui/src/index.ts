@@ -7,8 +7,8 @@ export { TradePanel, ShapeCutter, BinaryPanel, BucketRangeSelector, BucketTradeP
 export type { TradePanelProps, ShapeCutterProps, BinaryPanelProps, BucketRangeSelectorProps, BucketTradePanelProps, CustomShapeEditorProps, XPointMode, TradeInputBaseProps } from './trading/index.js';
 
 // Market
-export { MarketStats, PositionTable, TimeSales } from './market/index.js';
-export type { MarketStatsProps, PositionTableProps, PositionTabId, TimeSalesProps } from './market/index.js';
+export { MarketStats, MarketCard, MarketCardGrid, MarketList, MarketFilterBar, MarketExplorer, PositionTable, TimeSales } from './market/index.js';
+export type { MarketStatsProps, MarketCardProps, MarketCardGridProps, MarketListProps, MarketExplorerProps, MarketExplorerView, PositionTableProps, PositionTabId, TimeSalesProps } from './market/index.js';
 
 // Auth
 export { AuthWidget, PasswordlessAuthWidget } from './auth/index.js';

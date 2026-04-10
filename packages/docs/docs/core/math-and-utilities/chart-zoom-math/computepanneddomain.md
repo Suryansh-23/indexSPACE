@@ -1,6 +1,7 @@
 ---
 title: "computePannedDomain"
 sidebar_position: 3
+description: "Compute a shifted X domain after a drag-to-pan gesture, clamped to boundaries."
 ---
 
 # computePannedDomain

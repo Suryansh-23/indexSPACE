@@ -53,7 +53,7 @@ Description: A TypeScript SDK for embedding prediction market trading widgets in
 
 ### 1.2 What This Package Does
 
-The `@functionspace/ui` package provides pre-built React widgets for prediction market trading: chart components (ConsensusChart, DistributionChart, TimelineChart, MarketCharts), trading panels (TradePanel, ShapeCutter, BinaryPanel, BucketRangeSelector, BucketTradePanel, CustomShapeEditor), data display components (PositionTable, TimeSales, MarketStats), and auth widgets (AuthWidget, PasswordlessAuthWidget). All widgets are fully themed and self-contained.
+The `@functionspace/ui` package provides pre-built React widgets for prediction market trading: chart components (ConsensusChart, DistributionChart, TimelineChart, MarketCharts), trading panels (TradePanel, ShapeCutter, BinaryPanel, BucketRangeSelector, BucketTradePanel, CustomShapeEditor), data display components (PositionTable, TimeSales, MarketStats, MarketCard, MarketCardGrid, MarketFilterBar, MarketExplorer), and auth widgets (AuthWidget, PasswordlessAuthWidget). All widgets are fully themed and self-contained.
 
 ### 1.3 Package Dependency Chain
 
@@ -89,10 +89,7 @@ The `@functionspace/ui` package provides pre-built React widgets for prediction 
 
 | # | Limitation | Impact | Workaround |
 |---|-----------|--------|------------|
-| 1 | **No query caching or request deduplication.** Each hook instance fires its own independent API request. | Redundant API traffic scales linearly with the number of mounted hooks. | Accept the redundant requests. Do not attempt to add TanStack Query or SWR. |
 | 2 | **No real-time transport (WebSocket/SSE).** All data freshness depends on explicit refetch calls or polling. | Market state goes stale between manual refetches. | Use `useTradeHistory` with `pollInterval` for live feeds. Call `ctx.invalidate(marketId)` after trades. |
-| 3 | **No mutation hooks.** `buy()` and `sell()` are imported from `@functionspace/core`, not `@functionspace/react`. | Custom trade UIs must import from two packages. | Pre-built trading components handle mutation lifecycle internally. |
-| 5 | **Global invalidation only.** `ctx.invalidate(marketId)` triggers global refetch regardless of which market. | Multi-market dashboards refetch all hooks on any trade. | Accept the global refetch behavior. |
 | 6 | **Only one trading component at a time.** Multiple trading components cause conflicting preview writes. | Unpredictable chart overlays. | Use tabs, modals, or conditional rendering. Only one trading component mounted at a time. |
 | 7 | **Settlement not yet implemented.** | Positions in resolved markets cannot be settled through the SDK. | Monitor `resolutionState` field. |
 
@@ -419,6 +416,7 @@ import { TradePanel } from '@functionspace/ui';
 | `marketId` | `string \| number` | required | Market to trade on |
 | `modes` | `('gaussian' \| 'range')[]` | `['gaussian', 'range']` | Which shape modes to offer |
 | `onBuy` | `(result: BuyResult) => void` | -- | Called after successful trade |
+| `onError` | `(error: Error) => void` | -- | Called on trade failure |
 
 ### `BinaryPanel`
 
@@ -497,6 +495,7 @@ import { BucketRangeSelector } from '@functionspace/ui';
 | `defaultAutoMode` | `boolean` | `false` | Start in auto mode (crops to 95% CI) |
 | `showCustomRange` | `boolean` | `true` | Show custom min/max range input |
 | `onBuy` | `(result: BuyResult) => void` | -- | Called after successful trade |
+| `onError` | `(error: Error) => void` | -- | Called on trade failure |
 
 ### `BucketTradePanel`
 
@@ -512,7 +511,10 @@ import { BucketTradePanel } from '@functionspace/ui';
 | `defaultBucketCount` | `number` | `12` | Shared initial bucket count |
 | `chartHeight` | `number` | `300` | Distribution chart height |
 | `maxSelections` | `number` | -- | Forwarded to `BucketRangeSelector` |
+| `defaultAutoMode` | `boolean` | `false` | Initial auto-mode state for bucket selection. Forwarded to inner BucketRangeSelector. |
+| `showCustomRange` | `boolean` | `true` | Whether to show the custom range input. Forwarded to inner BucketRangeSelector. |
 | `onBuy` | `(result: BuyResult) => void` | -- | Called after successful trade |
+| `onError` | `(error: Error) => void` | -- | Called on trade failure |
 
 ---
 
@@ -529,10 +531,14 @@ import { PositionTable } from '@functionspace/ui';
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `marketId` | `string \| number` | required | Market to display positions for |
-| `username` | `string` | required | Authenticated username. Pass `""` for unauthenticated views. |
 | `tabs` | `PositionTabId[]` | `['open-orders', 'trade-history']` | Which tabs to show |
 | `pageSize` | `number` | `20` | Rows per page |
+| `selectedPositionId` | `number \| null` | -- | Controlled selection state -- highlights a specific position row. |
+| `onSelectPosition` | `(id: number \| null) => void` | -- | Callback fired when a position row is clicked. |
 | `onSell` | `(result: SellResult) => void` | -- | Called after successful sell |
+| `onError` | `(error: Error) => void` | -- | Called on sell failure |
+
+> PositionTable reads the authenticated user from context automatically. No `username` prop is needed.
 
 `PositionTabId` values: `'open-orders'`, `'trade-history'`, `'market-positions'`
 
@@ -571,6 +577,76 @@ import { MarketStats } from '@functionspace/ui';
 | `marketId` | `string \| number` | required | Market to display stats for |
 
 Displays: Total Volume, Current Liquidity, Open Positions, Market Status.
+
+### `MarketCard`
+
+Presentational card displaying a single market summary. Receives `MarketState` as a prop -- does not fetch data internally.
+
+```tsx
+import { MarketCard } from '@functionspace/ui';
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `market` | `MarketState` | required | Market state object containing all display fields |
+| `onSelect` | `(marketId: number) => void` | -- | Called when the card or Trade button is clicked |
+
+Displays: Title, consensus mean with units, outcome range, volume, liquidity, traders, status badge, resolution date.
+
+### `MarketCardGrid`
+
+Responsive grid of MarketCard components with loading, error, and empty states. Presentational -- receives data as props. Replaces the previous `MarketList`.
+
+```tsx
+import { MarketCardGrid } from '@functionspace/ui';
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `markets` | `MarketState[]` | required | Array of market state objects |
+| `onSelect` | `(marketId: number) => void` | -- | Called when any card is clicked |
+| `loading` | `boolean` | `false` | Shows skeleton cards when true |
+| `error` | `Error \| null` | -- | Displays error message when provided |
+| `emptyMessage` | `string` | `'No markets found'` | Custom empty state text |
+
+Wire `onSelect` to state (`setSelectedMarketId`) for embedded widgets or to a router (`navigate`) for multi-page apps. See Market Discovery Navigation patterns below.
+
+### `MarketExplorer`
+
+Multi-view market discovery widget with tabbed view switching (cards, pulse, compact, gauge, split, table, heatmap, charts), integrated filter bar, and optional overlay panel for inline trading. Uses `useMarketFilters` internally. When `children` is provided, clicking a market opens an overlay; otherwise fires `onSelect`. Category colors are resolved from the theme via `ctx.chartColors.categoryColors`.
+
+```tsx
+import { MarketExplorer } from '@functionspace/ui';
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `views` | `MarketExplorerView[]` | `['cards']` | View tabs to show. Tab bar hidden when only one view. |
+| `children` | `(marketId: number) => React.ReactNode` | -- | Render prop for overlay panel content |
+| `onSelect` | `(marketId: number) => void` | -- | Called when a market is selected (when children is not provided) |
+| `state` | `string?` | -- | Filter by resolution state (e.g., `'open'`) |
+| `categories` | `string[]?` | -- | Fixed list of available categories |
+| `pollInterval` | `number?` | -- | Polling interval in ms for refreshing market data |
+| `emptyMessage` | `string` | `'No markets found'` | Custom empty state text |
+| `showFilterBar` | `boolean` | `true` | Show or hide the MarketFilterBar |
+| `featuredCategories` | `string[]?` | -- | Categories to display first in filter chips |
+| `sortOptions` | `SortOption[]?` | 5 defaults | Custom sort options |
+| `searchPlaceholder` | `string?` | `'Search markets...'` | Search input placeholder |
+| `filterBarMaxWidth` | `string?` | -- | CSS max-width for the filter bar |
+
+`MarketExplorerView`: `'cards' | 'pulse' | 'compact' | 'gauge' | 'split' | 'table' | 'heatmap' | 'charts'`
+
+If you need full-page navigation instead of an overlay, use `MarketCardGrid` directly with state-driven or route-driven patterns.
+
+### `MarketFilterBar`
+
+Presentational filter bar providing search input, category filter chips, sort dropdown, and result count. Driven by `useMarketFilters` -- spread the hook's `filterBarProps` directly.
+
+```tsx
+import { MarketFilterBar } from '@functionspace/ui';
+```
+
+Props: `searchText`, `onSearchChange`, `onSearchClear`, `searchPlaceholder?`, `availableCategories`, `selectedCategories`, `onToggleCategory`, `featuredCategories?`, `sortOptions`, `activeSortField`, `sortOrder`, `onSortFieldChange`, `onSortOrderToggle`, `resultCount`, `loading?`, `onReset`, `maxWidth?`. All required props are provided by `filterBarProps` from `useMarketFilters`.
 
 ### `AuthWidget`
 
@@ -729,7 +805,6 @@ function App() {
         <div style={{ flex: 7, minWidth: 0 }}>
           <PositionTable
             marketId={MARKET_ID}
-            username="trader1"
             tabs={['open-orders', 'trade-history', 'market-positions']}
           />
         </div>
@@ -747,6 +822,12 @@ Layout notes:
 - `minWidth: 0` on flex children is mandatory. Without it, Recharts SVG elements overflow.
 - `ShapeCutter` and `MarketCharts` coordinate automatically through context.
 - `AuthWidget` takes no props -- it reads all auth state from context.
+
+### Browse-to-Trade
+
+**Browse-to-Trade:** Use `useMarkets` to fetch, `MarketCardGrid` to display, and `onSelect` to switch between grid and trading views. `FunctionSpaceProvider` wraps above the navigation boundary.
+
+Alternatively, use `MarketExplorer` for a self-contained browse-and-trade experience with multiple view modes and an optional overlay panel that handles market fetching, display, and overlay management internally.
 
 ---
 
@@ -839,7 +920,6 @@ export default function App() {
         </div>
         <PositionTable
           marketId={MARKET_ID}
-          username={config.username}
           tabs={['open-orders', 'trade-history', 'market-positions']}
         />
       </div>
@@ -961,7 +1041,7 @@ type ShapeId = 'gaussian' | 'spike' | 'range' | 'bimodal' | 'dip' | 'leftskew' |
 
 ### Key Core Types Used by UI
 
-- **`MarketState`** -- Contains `config` (K, L, H), `consensus`, `title`, `xAxisUnits`, `resolutionState`.
+- **`MarketState`** -- Contains `config` (numBuckets, lowerBound, upperBound), `consensus`, `title`, `xAxisUnits`, `resolutionState`.
 - **`BuyResult`** -- Returned by `buy()`. Contains `positionId`, `belief`, `claims`, `collateral`.
 - **`SellResult`** -- Returned by `sell()`. Contains `positionId`, `collateralReturned`.
 - **`Position`** -- Contains `positionId`, `belief`, `collateral`, `claims`, `status`, `prediction`.

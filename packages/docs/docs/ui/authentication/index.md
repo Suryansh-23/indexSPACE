@@ -1,6 +1,7 @@
 ---
 title: "Authentication"
 sidebar_position: 1
+description: "Authentication widgets: AuthWidget for username/password and PasswordlessAuthWidget for auto-signup."
 ---
 
 # Authentication

@@ -1,6 +1,7 @@
 ---
 title: "Transactions"
 sidebar_position: 1
+description: "State-mutating functions (buy and sell) that require an authenticated FSClient."
 ---
 
 # Transactions

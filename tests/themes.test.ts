@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { FS_DARK, FS_LIGHT, NATIVE_DARK, NATIVE_LIGHT, THEME_PRESETS, resolveChartColors, getPresetChartColors } from '../packages/react/src/themes.js';
+import { FS_DARK, FS_LIGHT, NATIVE_DARK, NATIVE_LIGHT, THEME_PRESETS, resolveChartColors, getPresetChartColors, DEFAULT_CATEGORY_COLORS, FALLBACK_CATEGORY_COLOR } from '../packages/react/src/themes.js';
 import { resolveTheme } from '../packages/react/src/FunctionSpaceProvider.js';
 import type { FSTheme } from '../packages/react/src/themes.js';
 
@@ -200,5 +200,84 @@ describe('resolveChartColors', () => {
     const overrides = { consensus: '#ff0000' };
     const colors = resolveChartColors(FS_DARK, overrides);
     expect(colors.fanBands.mean).toBe('#ff0000');
+  });
+});
+
+describe('Custom Theme Brightness Detection', () => {
+  it('dark background custom theme gets dark category colors', () => {
+    const darkCustomTheme = {
+      ...FS_DARK,
+      background: '#1a1a2e',
+    };
+    // No presetId -- forces brightness detection from background
+    const colors = resolveChartColors(darkCustomTheme);
+    for (const [cat, color] of Object.entries(DEFAULT_CATEGORY_COLORS.dark)) {
+      expect(colors.categoryColors[cat], `${cat} should match dark variant`).toBe(color);
+    }
+  });
+
+  it('light background custom theme gets light category colors', () => {
+    const lightCustomTheme = {
+      ...FS_LIGHT,
+      background: '#ffffff',
+    };
+    // No presetId -- forces brightness detection from background
+    const colors = resolveChartColors(lightCustomTheme);
+    for (const [cat, color] of Object.entries(DEFAULT_CATEGORY_COLORS.light)) {
+      expect(colors.categoryColors[cat], `${cat} should match light variant`).toBe(color);
+    }
+  });
+});
+
+describe('Category Colors', () => {
+  const EXPECTED_CATEGORIES = ['General', 'Sports', 'Crypto', 'Finance', 'Tech', 'Culture', 'Politics', 'Macro'];
+
+  it('resolveChartColors output includes categoryColors field', () => {
+    const colors = resolveChartColors(FS_DARK);
+    expect(colors.categoryColors).toBeDefined();
+    expect(typeof colors.categoryColors).toBe('object');
+    expect(Object.keys(colors.categoryColors).length).toBeGreaterThan(0);
+  });
+
+  it('dark theme presets resolve dark category color variants', () => {
+    const fsDarkColors = resolveChartColors(FS_DARK, undefined, undefined, 'fs-dark');
+    const nativeDarkColors = resolveChartColors(NATIVE_DARK, undefined, undefined, 'native-dark');
+
+    for (const cat of EXPECTED_CATEGORIES) {
+      expect(fsDarkColors.categoryColors[cat]).toBe(DEFAULT_CATEGORY_COLORS.dark[cat]);
+      expect(nativeDarkColors.categoryColors[cat]).toBe(DEFAULT_CATEGORY_COLORS.dark[cat]);
+    }
+  });
+
+  it('light theme presets resolve light category color variants', () => {
+    const fsLightColors = resolveChartColors(FS_LIGHT, undefined, undefined, 'fs-light');
+    const nativeLightColors = resolveChartColors(NATIVE_LIGHT, undefined, undefined, 'native-light');
+
+    for (const cat of EXPECTED_CATEGORIES) {
+      expect(fsLightColors.categoryColors[cat]).toBe(DEFAULT_CATEGORY_COLORS.light[cat]);
+      expect(nativeLightColors.categoryColors[cat]).toBe(DEFAULT_CATEGORY_COLORS.light[cat]);
+    }
+  });
+
+  it('categoryColors includes all 8 default categories', () => {
+    const colors = resolveChartColors(FS_DARK);
+    for (const cat of EXPECTED_CATEGORIES) {
+      expect(colors.categoryColors[cat], `missing category: ${cat}`).toBeDefined();
+    }
+  });
+
+  it('fallback color constants are defined with dark and light variants', () => {
+    expect(FALLBACK_CATEGORY_COLOR.dark).toBeDefined();
+    expect(FALLBACK_CATEGORY_COLOR.light).toBeDefined();
+    expect(typeof FALLBACK_CATEGORY_COLOR.dark).toBe('string');
+    expect(typeof FALLBACK_CATEGORY_COLOR.light).toBe('string');
+  });
+
+  it('category colors are concrete hex strings (not CSS variables)', () => {
+    const colors = resolveChartColors(FS_DARK);
+    for (const [cat, color] of Object.entries(colors.categoryColors)) {
+      expect(color).toMatch(/^#[0-9A-Fa-f]{6}$/);
+      expect(color).not.toMatch(/^var\(/);
+    }
   });
 });

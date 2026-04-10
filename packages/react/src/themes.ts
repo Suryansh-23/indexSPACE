@@ -12,13 +12,13 @@ export interface FSTheme {
   textSecondary: string;
   border: string;
 
-  // ── Tier 1 (optional — defaults derived from core 9) ──
+  // ── Tier 1 (optional  -- defaults derived from core 9) ──
   bgSecondary?: string;
   surfaceHover?: string;
   borderSubtle?: string;
   textMuted?: string;
 
-  // ── Tier 2 (optional — consumed by components) ──
+  // ── Tier 2 (optional  -- consumed by components) ──
   navFrom?: string;
   navTo?: string;
   overlay?: string;
@@ -31,7 +31,7 @@ export interface FSTheme {
   badgeText?: string;
   logoFilter?: string;
 
-  // ── Tier 3 (optional — shape/personality) ──
+  // ── Tier 3 (optional  -- shape/personality) ──
   fontFamily?: string;
   radiusSm?: string;
   radiusMd?: string;
@@ -40,12 +40,12 @@ export interface FSTheme {
   transitionSpeed?: string;
 }
 
-/** Fully resolved theme — every token guaranteed present */
+/** Fully resolved theme  -- every token guaranteed present */
 export type ResolvedFSTheme = Required<FSTheme>;
 
 // ── Chart Colors ──
 
-/** Chart color values — concrete hex/rgba for Recharts SVG rendering */
+/** Chart color values  -- concrete hex/rgba for Recharts SVG rendering */
 export interface ChartColors {
   /** CartesianGrid stroke */
   grid: string;
@@ -69,6 +69,8 @@ export interface ChartColors {
   positions: string[];
   /** Fan band colors (opacity variants of consensus) */
   fanBands: FanBandColors;
+  /** Category-to-color mapping for heatmap/discovery views */
+  categoryColors: Record<string, string>;
 }
 
 /** Fan chart band colors for TimelineChart */
@@ -79,6 +81,41 @@ export interface FanBandColors {
   band75: string;
   band95: string;
 }
+
+// ── Category Colors ──
+
+/** Map of category name to hex color string */
+export type CategoryColors = Record<string, string>;
+
+/** Default category colors with dark and light variants */
+export const DEFAULT_CATEGORY_COLORS: { dark: CategoryColors; light: CategoryColors } = {
+  dark: {
+    General:  '#6B7280',
+    Sports:   '#10B981',
+    Crypto:   '#F59E0B',
+    Finance:  '#3B82F6',
+    Tech:     '#8B5CF6',
+    Culture:  '#EC4899',
+    Politics: '#EF4444',
+    Macro:    '#14B8A6',
+  },
+  light: {
+    General:  '#4B5563',
+    Sports:   '#059669',
+    Crypto:   '#D97706',
+    Finance:  '#2563EB',
+    Tech:     '#7C3AED',
+    Culture:  '#DB2777',
+    Politics: '#DC2626',
+    Macro:    '#0D9488',
+  },
+};
+
+/** Fallback color used for categories not in the default map */
+export const FALLBACK_CATEGORY_COLOR: { dark: string; light: string } = {
+  dark:  '#6B7280',
+  light: '#4B5563',
+};
 
 // ── Preset ID ──
 
@@ -134,7 +171,7 @@ const PRESET_CHART_COLORS: Record<ThemePresetId, Partial<ChartColors>> = {
     tooltipBorder: '#333333',
     tooltipText: '#E0E0E0',
     crosshair: '#333333',
-    consensus: '#6B7280',      // Gray, not brand blue — native is de-branded
+    consensus: '#6B7280',      // Gray, not brand blue  -- native is de-branded
     previewLine: '#9CA3AF',
     fanBands: {
       mean: '#6B7280',
@@ -305,6 +342,42 @@ export function getPresetChartColors(presetId: ThemePresetId): Partial<ChartColo
 }
 
 /**
+ * Detect whether a theme is dark based on its background color.
+ * Parses hex (#RRGGBB or #RGB) and returns true if perceived luminance is low.
+ */
+function isDarkBackground(bg: string): boolean {
+  let hex = bg.replace('#', '');
+  if (hex.length === 3) {
+    hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+  }
+  if (hex.length !== 6) return true; // default to dark for non-hex (rgba, etc.)
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  // Perceived luminance formula (ITU-R BT.709)
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return luminance < 0.5;
+}
+
+/** Resolve category colors for the given preset or theme brightness */
+function resolveCategoryColors(
+  theme: ResolvedFSTheme,
+  presetId?: ThemePresetId,
+): Record<string, string> {
+  // Determine variant from preset or brightness detection
+  let useDark: boolean;
+  if (presetId === 'fs-dark' || presetId === 'native-dark') {
+    useDark = true;
+  } else if (presetId === 'fs-light' || presetId === 'native-light') {
+    useDark = false;
+  } else {
+    useDark = isDarkBackground(theme.background);
+  }
+
+  return useDark ? { ...DEFAULT_CATEGORY_COLORS.dark } : { ...DEFAULT_CATEGORY_COLORS.light };
+}
+
+/**
  * Resolve chart colors for a theme.
  *
  * For named presets: merges preset-specific overrides with smart defaults.
@@ -315,6 +388,7 @@ export function resolveChartColors(
   theme: ResolvedFSTheme,
   presetOverrides?: Partial<ChartColors>,
   customOverrides?: Partial<ChartColors>,
+  presetId?: ThemePresetId,
 ): ChartColors {
   const defaultFanBands: FanBandColors = {
     mean: theme.primary,
@@ -336,12 +410,15 @@ export function resolveChartColors(
     payout:      theme.positive,
     positions:   [theme.positive, theme.negative, '#8b5cf6', '#f97316', '#14b8a6', '#ec4899', '#06b6d4'],
     fanBands:    defaultFanBands,
+    categoryColors: resolveCategoryColors(theme, presetId),
   };
 
   // Merge: base → preset overrides → custom overrides
-  // fanBands needs special merging since it's nested
+  // fanBands and categoryColors need special merging since they're nested/object-valued
   const presetFanBands = presetOverrides?.fanBands;
   const customFanBands = customOverrides?.fanBands;
+  const presetCategoryColors = presetOverrides?.categoryColors;
+  const customCategoryColors = customOverrides?.categoryColors;
 
   const merged: ChartColors = {
     ...base,
@@ -351,6 +428,11 @@ export function resolveChartColors(
       ...base.fanBands,
       ...(presetFanBands ?? {}),
       ...(customFanBands ?? {}),
+    },
+    categoryColors: {
+      ...base.categoryColors,
+      ...(presetCategoryColors ?? {}),
+      ...(customCategoryColors ?? {}),
     },
   };
 

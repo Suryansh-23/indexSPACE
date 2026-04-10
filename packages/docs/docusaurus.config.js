@@ -1,4 +1,5 @@
 // @ts-check
+require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 const { themes: prismThemes } = require('prism-react-renderer');
 
 /** @type {import('@docusaurus/types').Config} */
@@ -15,13 +16,28 @@ const config = {
 
   // Custom fields accessible via useDocusaurusContext().siteConfig.customFields
   customFields: {
-    fsBaseUrl: 'https://fs-core-api.onrender.com',
+    fsBaseUrl: process.env.FS_BASE_URL,
   },
 
   i18n: {
     defaultLocale: 'en',
     locales: ['en'],
   },
+
+  themes: [
+    [
+      require.resolve('@easyops-cn/docusaurus-search-local'),
+      /** @type {import("@easyops-cn/docusaurus-search-local").PluginOptions} */
+      ({
+        hashed: true,
+        language: ['en'],
+        docsRouteBasePath: '/',
+        indexBlog: false,
+        indexDocs: true,
+        docsDir: 'docs',
+      }),
+    ],
+  ],
 
   plugins: [
     require.resolve('./src/plugins/sdk-webpack-plugin'),

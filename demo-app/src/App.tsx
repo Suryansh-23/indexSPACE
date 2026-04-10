@@ -10,7 +10,7 @@ export const config = {
 export const MARKET_ID = import.meta.env.VITE_FS_MARKET_ID;
 
 // ── Theme Options ──
-export const widgetTheme: FSThemeInput = "native-light";
+export const widgetTheme: FSThemeInput = "fs-dark";
 // export const widgetTheme: FSThemeInput = {
 //   preset: 'fs-dark',           // Start from a preset base
 //   primary: '#ff00ff',          // Magenta - main accent color

@@ -1,6 +1,7 @@
 ---
 title: "Data Infrastructure"
 sidebar_position: 3
+description: "Built-in indexer, GraphQL API, and real-time subscriptions for market and position data."
 ---
 
 # Data Infrastructure

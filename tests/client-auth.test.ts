@@ -60,11 +60,11 @@ describe('Stage 1: FSClient authentication', () => {
 });
 
 describe('Stage 1: FSClient API calls', () => {
-  it('GET /api/market/state returns data', async () => {
+  it('GET /api/views/markets/{id} returns data', async () => {
     const client = new FSClient({ baseUrl: BASE_URL, username: USERNAME, password: PASSWORD });
-    const data = await client.get<any>('/api/market/state', { market_id: MARKET_ID });
+    const data = await client.get<any>(`/api/views/markets/${MARKET_ID}`);
     expect(data.alpha_vector).toBeDefined();
-    expect(data.market_params).toBeDefined();
+    expect(data.market_model_params).toBeDefined();
     expect(data.title).toBeDefined();
     expect(Array.isArray(data.alpha_vector)).toBe(true);
   });
@@ -72,11 +72,11 @@ describe('Stage 1: FSClient API calls', () => {
   it('retries on 401 (auto-reauth)', async () => {
     const client = new FSClient({ baseUrl: BASE_URL, username: USERNAME, password: PASSWORD });
     // First call authenticates
-    await client.get<any>('/api/market/state', { market_id: MARKET_ID });
-    // Manually invalidate token by calling private field — simulate expiry
+    await client.get<any>(`/api/views/markets/${MARKET_ID}`);
+    // Manually invalidate token by calling private field -- simulate expiry
     (client as any).token = 'expired_token';
     // Second call should auto-reauth and succeed
-    const data = await client.get<any>('/api/market/state', { market_id: MARKET_ID });
+    const data = await client.get<any>(`/api/views/markets/${MARKET_ID}`);
     expect(data.alpha_vector).toBeDefined();
   });
 });
@@ -92,7 +92,7 @@ describe('calculateBucketDistribution', () => {
     expect(result).toHaveLength(10);
   });
 
-  it('bucket ranges cover [L, H] exactly', () => {
+  it('bucket ranges cover [lowerBound, upperBound] exactly', () => {
     const points = [
       { x: 0, y: 1.0 },
       { x: 100, y: 1.0 },
@@ -135,7 +135,7 @@ describe('calculateBucketDistribution', () => {
     expect(calculateBucketDistribution([{ x: 50, y: 1 }], 0, 100, 10, 0)).toEqual([]);
   });
 
-  it('returns empty array when H <= L', () => {
+  it('returns empty array when upperBound <= lowerBound', () => {
     const points = [{ x: 0, y: 1 }, { x: 100, y: 1 }];
     expect(calculateBucketDistribution(points, 100, 0, 10, 0)).toEqual([]);
     expect(calculateBucketDistribution(points, 50, 50, 10, 0)).toEqual([]);
@@ -191,9 +191,9 @@ describe('calculateBucketDistribution', () => {
 
 describe('computePercentiles', () => {
   it('returns evenly spaced percentiles for uniform coefficients', () => {
-    // Uniform: all coefficients equal → flat density
-    const K = 60;
-    const uniform = new Array(K + 1).fill(1 / (K + 1));
+    // Uniform: all coefficients equal -> flat density (K+2 elements, sum=1 consensus-like)
+    const numBuckets = 60;
+    const uniform = new Array(numBuckets + 2).fill(1 / (numBuckets + 2));
     const p = computePercentiles(uniform, 0, 100);
     // p50 should be near 50
     expect(p.p50).toBeCloseTo(50, 0);
@@ -204,11 +204,11 @@ describe('computePercentiles', () => {
   });
 
   it('returns tight inner bands for peaked distribution', () => {
-    // Peaked at center: Gaussian-like
-    const K = 60;
-    const peaked = new Array(K + 1).fill(0);
-    for (let i = 0; i <= K; i++) {
-      const u = i / K;
+    // Peaked at center: Gaussian-like (K+2 elements)
+    const numBuckets = 60;
+    const peaked = new Array(numBuckets + 2).fill(0);
+    for (let i = 0; i <= numBuckets + 1; i++) {
+      const u = i / (numBuckets + 1);
       peaked[i] = Math.exp(-Math.pow((u - 0.5) * 10, 2));
     }
     const sum = peaked.reduce((a: number, b: number) => a + b, 0);
@@ -221,8 +221,8 @@ describe('computePercentiles', () => {
   });
 
   it('produces monotonically ordered percentiles', () => {
-    const K = 60;
-    const uniform = new Array(K + 1).fill(1 / (K + 1));
+    const numBuckets = 60;
+    const uniform = new Array(numBuckets + 2).fill(1 / (numBuckets + 2));
     const p = computePercentiles(uniform, 0, 100);
     expect(p.p2_5).toBeLessThanOrEqual(p.p12_5);
     expect(p.p12_5).toBeLessThanOrEqual(p.p25);
@@ -234,9 +234,9 @@ describe('computePercentiles', () => {
     expect(p.p87_5).toBeLessThanOrEqual(p.p97_5);
   });
 
-  it('all values within [L, H]', () => {
-    const K = 60;
-    const uniform = new Array(K + 1).fill(1 / (K + 1));
+  it('all values within [lowerBound, upperBound]', () => {
+    const numBuckets = 60;
+    const uniform = new Array(numBuckets + 2).fill(1 / (numBuckets + 2));
     const p = computePercentiles(uniform, 10, 90);
     const values = [p.p2_5, p.p12_5, p.p25, p.p37_5, p.p50, p.p62_5, p.p75, p.p87_5, p.p97_5];
     for (const v of values) {
@@ -253,7 +253,7 @@ describe('transformHistoryToFanChart', () => {
       tradeId: 1,
       side: 'buy',
       positionId: '1',
-      alphaVector: new Array(61).fill(1),
+      alphaVector: new Array(62).fill(1),
       totalDeposits: 10,
       totalWithdrawals: 0,
       totalVolume: 10,
@@ -318,9 +318,9 @@ describe('transformHistoryToFanChart', () => {
 
   it('filters out snapshots with all-zero alpha', () => {
     const snaps = [
-      makeSnapshot({ snapshotId: 1, alphaVector: new Array(61).fill(1) }),
-      makeSnapshot({ snapshotId: 2, alphaVector: new Array(61).fill(0) }), // bad
-      makeSnapshot({ snapshotId: 3, alphaVector: new Array(61).fill(2) }),
+      makeSnapshot({ snapshotId: 1, alphaVector: new Array(62).fill(1) }),
+      makeSnapshot({ snapshotId: 2, alphaVector: new Array(62).fill(0) }), // bad
+      makeSnapshot({ snapshotId: 3, alphaVector: new Array(62).fill(2) }),
     ];
     const result = transformHistoryToFanChart(snaps, 0, 100);
     expect(result).toHaveLength(2);

@@ -1,9 +1,11 @@
 ---
-title: "Positions"
+title: "Positions - UI Components"
+sidebar_label: "Positions"
 sidebar_position: 1
+description: "Position display widgets: PositionTable for managing positions and TimeSales for live trades."
 ---
 
-# Positions
+# Positions - UI Components
 
 Widgets for displaying position data and trade activity. All require `FunctionSpaceProvider`.
 

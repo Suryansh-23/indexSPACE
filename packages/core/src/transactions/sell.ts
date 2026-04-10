@@ -3,21 +3,24 @@ import type { SellResult } from '../types.js';
 
 /**
  * Close a position, receive collateral back.
- * Wraps: POST /api/sell/execute/{positionId}?market_id=X
+ * Wraps: POST /api/market/trading/sell/{marketId}/{positionId}
  */
 export async function sell(
   client: FSClient,
-  positionId: number,
+  positionId: string | number,
   marketId: string | number,
 ): Promise<SellResult> {
   const data = await client.post<any>(
-    `/api/sell/execute/${positionId}`,
+    `/api/market/trading/sell/${marketId}/${positionId}`,
     undefined,
-    { market_id: String(marketId) },
   );
+
+  if (data.payout == null) throw new Error('Missing payout in sell response');
+  if (data.position_id == null) throw new Error('Missing position_id in sell response');
 
   return {
     positionId: data.position_id,
-    collateralReturned: data.collateral_paid_t_star,
+    collateralReturned: data.payout,
+    creditedTo: data.credited_to,
   };
 }

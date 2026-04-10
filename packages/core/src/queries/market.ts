@@ -4,21 +4,35 @@ import { evaluateDensityPiecewise, evaluateDensityCurve, computeStatistics } fro
 
 /**
  * Returns complete market state.
- * Wraps: GET /api/market/state?market_id=X
+ * Wraps: GET /api/views/markets/{market_id}
  */
 export async function queryMarketState(
   client: FSClient,
   marketId: string | number,
   options?: { signal?: AbortSignal },
 ): Promise<MarketState> {
-  const data = await client.get<any>('/api/market/state', {
-    market_id: String(marketId),
-  }, options?.signal);
+  const data = await client.get<any>(`/api/views/markets/${marketId}`, undefined, options?.signal);
 
+  if (data.alpha_vector == null) throw new Error('Missing alpha_vector in market response');
   const alphaVector: number[] = data.alpha_vector;
   const totalMass = alphaVector.reduce((a: number, b: number) => a + b, 0);
-  const consensus = alphaVector.map((a: number) => a / totalMass);
-  const mp = data.market_params;
+  const consensus = totalMass > 0
+    ? alphaVector.map((a: number) => a / totalMass)
+    : alphaVector.map(() => 0);
+  const mp = data.market_model_params;
+  if (!mp) throw new Error('Missing market_model_params in market response');
+
+  const numBuckets = data.num_buckets;
+  if (numBuckets == null) throw new Error('Missing num_buckets in market response');
+  const lowerBound = data.lower_bound;
+  if (lowerBound == null) throw new Error('Missing lower_bound in market response');
+  const upperBound = data.upper_bound;
+  if (upperBound == null) throw new Error('Missing upper_bound in market response');
+
+  const n = consensus.length - 1;
+  const consensusMean = n > 0
+    ? lowerBound + (upperBound - lowerBound) * consensus.reduce((sum: number, c: number, k: number) => sum + (k / n) * c, 0)
+    : lowerBound;
 
   return {
     alpha: alphaVector,
@@ -26,12 +40,15 @@ export async function queryMarketState(
     totalMass,
     poolBalance: data.current_pool,
     participantCount: data.num_positions,
-    totalVolume: data.total_volume,
-    positionsOpen: data.positions_currently_open,
+    totalVolume: (data.total_deposited ?? 0) + (data.total_withdrawn ?? 0),
+    positionsOpen: data.positions_currently_open ?? 0,
     config: {
-      K: mp.K,
-      L: mp.L,
-      H: mp.H,
+      numBuckets,
+      lowerBound,
+      upperBound,
+      K: numBuckets,      // deprecated alias
+      L: lowerBound,      // deprecated alias
+      H: upperBound,      // deprecated alias
       P0: mp.P0,
       mu: mp.mu,
       epsAlpha: mp.eps_alpha,
@@ -41,10 +58,19 @@ export async function queryMarketState(
       lambdaD: mp.lambda_d,
     },
     title: data.title,
-    xAxisUnits: data.x_axis_units,
-    decimals: data.decimals,
+    xAxisUnits: data.metadata?.x_axis_units ?? '',
+    decimals: data.metadata?.decimals ?? 0,
+    // TODO: Add 'voided' mapping when API provides the field. Currently only is_settled boolean maps to 'resolved'/'open'.
     resolutionState: data.is_settled ? 'resolved' : 'open',
     resolvedOutcome: data.settlement_outcome ?? null,
+    marketId: data.market_id,
+    createdAt: data.created_at ?? null,
+    expiresAt: data.expires_at ?? null,
+    resolvedAt: data.resolved_at ?? null,
+    marketType: data.market_type ?? 'standard',
+    marketSubtype: data.market_subtype ?? null,
+    metadata: data.metadata ?? {},
+    consensusMean,
   };
 }
 
@@ -61,8 +87,8 @@ export async function getConsensusCurve(
   const market = await queryMarketState(client, marketId, options);
   const points = evaluateDensityCurve(
     market.consensus,
-    market.config.L,
-    market.config.H,
+    market.config.lowerBound,
+    market.config.upperBound,
     numPoints,
   );
   return { points, config: market.config };
@@ -78,7 +104,7 @@ export async function queryConsensusSummary(
   options?: { signal?: AbortSignal },
 ): Promise<ConsensusSummary> {
   const market = await queryMarketState(client, marketId, options);
-  return computeStatistics(market.consensus, market.config.L, market.config.H);
+  return computeStatistics(market.consensus, market.config.lowerBound, market.config.upperBound);
 }
 
 /**
@@ -94,8 +120,8 @@ export async function queryDensityAt(
   const density = evaluateDensityPiecewise(
     market.consensus,
     x,
-    market.config.L,
-    market.config.H,
+    market.config.lowerBound,
+    market.config.upperBound,
   );
   return { x, density };
 }

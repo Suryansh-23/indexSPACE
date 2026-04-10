@@ -46,14 +46,14 @@ export function useCustomShape(market: MarketState | null): UseCustomShapeReturn
 
   const pVector = useMemo<BeliefVector | null>(() => {
     if (!market) return null;
-    const { K, L, H } = market.config;
-    return generateCustomShape(controlValues, K, L, H);
+    const { numBuckets, lowerBound, upperBound } = market.config;
+    return generateCustomShape(controlValues, numBuckets, lowerBound, upperBound);
   }, [controlValues, market]);
 
   const prediction = useMemo<number | null>(() => {
     if (!pVector || !market) return null;
-    const { L, H } = market.config;
-    const stats = computeStatistics(pVector, L, H);
+    const { lowerBound, upperBound } = market.config;
+    const stats = computeStatistics(pVector, lowerBound, upperBound);
     return stats.mode;
   }, [pVector, market]);
 

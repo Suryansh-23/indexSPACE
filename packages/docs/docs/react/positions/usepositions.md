@@ -1,6 +1,7 @@
 ---
 title: "usePositions"
 sidebar_position: 1
+description: "Fetches all positions for a market and optionally filters client-side by username."
 ---
 
 # usePositions
@@ -13,11 +14,13 @@ Fetches all positions for a market. When `username` is provided, filters the res
 function usePositions(
   marketId: string | number,
   username?: string,
+  options?: QueryOptions,
 ): {
   positions: Position[] | null;
   loading: boolean;
+  isFetching: boolean;
   error: Error | null;
-  refetch: () => void;
+  refetch: () => Promise<void>;
 }
 ```
 
@@ -25,11 +28,14 @@ function usePositions(
 | ---------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | `marketId` | `string \| number` | Market identifier                                                                                                       |
 | `username` | `string?`          | If provided, filters to positions where `position.owner === username`. If omitted, returns all positions in the market. |
+| `options.pollInterval` | `number?` | Polling interval in milliseconds. Default: `0` (no polling). |
+| `options.enabled` | `boolean?` | When `false`, suppresses fetching. Default: `true`. |
 
 **Behavior:**
 
-* Filtering by `username` happens client-side after the full fetch. The API call always fetches all market positions regardless of the `username` parameter.
-* Re-fetches automatically when `marketId`, `username`, or the provider's `invalidationCount` changes.
+* Filtering by `username` happens client-side after the cache returns data. The API call always fetches all market positions regardless of the `username` parameter. This means multiple `usePositions` calls with different usernames for the same market share one cache entry and one API request.
+* Re-fetches automatically when `marketId` changes or when the market's cache entry is invalidated via `ctx.invalidate(marketId)`.
+* `loading` is `true` only on the first fetch. Background refetches set `isFetching` to `true`.
 * Throws `"usePositions must be used within FunctionSpaceProvider"` if rendered outside the provider.
 
 **Delegates to:** `queryMarketPositions(client, marketId)` from core.

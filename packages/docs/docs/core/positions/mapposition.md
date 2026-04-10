@@ -1,6 +1,7 @@
 ---
 title: "mapPosition"
 sidebar_position: 3
+description: "Pure transform that converts raw snake_case API position data to typed camelCase Position objects."
 ---
 
 # mapPosition

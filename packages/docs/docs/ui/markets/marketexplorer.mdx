@@ -1,0 +1,157 @@
+---
+title: "MarketExplorer"
+sidebar_position: 4
+description: "MarketExplorer widget providing multi-view market discovery with tabbed views, filter bar, and optional overlay panel for inline trading."
+---
+
+import { MarketExplorer } from '@functionspace/ui';
+import WidgetDemo from '@site/src/components/WidgetDemo';
+import { DEMO_MARKET_ID } from '@site/src/constants';
+
+# MarketExplorer
+
+**`MarketExplorer`**
+
+Multi-view market discovery widget with tabbed view switching, integrated filter bar, and optional overlay panel for inline trading. Replaces the previous `MarketOverlay` with a more flexible architecture that supports eight different view modes.
+
+```tsx
+import { MarketExplorer } from '@functionspace/ui';
+```
+
+<WidgetDemo title="Live Demo" height="600px">
+  <MarketExplorer state="open" views={['cards', 'pulse', 'compact', 'gauge', 'split', 'table', 'heatmap', 'charts']} />
+</WidgetDemo>
+
+**CSS class:** `fs-market-explorer`
+
+**Props:**
+
+| Prop | Type | Default | Description |
+| ---- | ---- | ------- | ----------- |
+| `views` | `MarketExplorerView[]` | `['cards']` | Which view tabs to show. Tab bar hidden when only one view. |
+| `children` | `(marketId: number) => React.ReactNode` | -- | Render prop for overlay panel content. When provided, clicking a market opens an overlay. |
+| `onSelect` | `(marketId: number) => void` | -- | Called when a market is selected (used when `children` is not provided). |
+| `state` | `string?` | -- | Filter by resolution state (e.g., `'open'`) |
+| `categories` | `string[]?` | -- | Fixed list of available categories |
+| `pollInterval` | `number?` | -- | Polling interval in ms for refreshing market data |
+| `emptyMessage` | `string` | `'No markets found'` | Custom message when no markets match |
+| `showFilterBar` | `boolean` | `true` | Show or hide the `MarketFilterBar` |
+| `featuredCategories` | `string[]?` | -- | Categories to display first in the filter chip row |
+| `sortOptions` | `SortOption[]?` | 5 defaults | Custom sort options for the filter bar |
+| `searchPlaceholder` | `string?` | `'Search markets...'` | Placeholder text for the search input |
+| `filterBarMaxWidth` | `string?` | -- | CSS max-width for the filter bar |
+
+**MarketExplorerView type:**
+
+```typescript
+type MarketExplorerView =
+  | 'cards'    // MarketCardGrid (default)
+  | 'pulse'    // Horizontal split cards with inline consensus PDF sparkline
+  | 'compact'  // Glass gradient cards with status dot and bottom stats strip
+  | 'gauge'    // Circular gauge visualization per market
+  | 'split'    // 70/30 split layout with hero consensus value (no sparkline)
+  | 'table'    // Sortable table layout
+  | 'heatmap'  // Treemap-based heatmap (uses treemapLayout from core)
+  | 'charts'   // Horizontal bar chart comparing markets by metric (Volume, Liquidity, Traders)
+```
+
+**How It Works:**
+
+1. `MarketExplorer` always uses `useMarketFilters` internally, providing search, category filtering, and sorting.
+2. When `showFilterBar` is `true` (default), the `MarketFilterBar` renders above the content area.
+3. When `views` contains more than one entry, a tab bar appears below the filter bar. The first entry is initially active.
+4. Each view renders a different market layout using the filtered data from `useMarketFilters`.
+5. **Overlay mode:** When `children` is provided, clicking a market opens a slide-over `Overlay` with the render prop content. The overlay title shows the selected market's name.
+6. **Callback mode:** When `children` is omitted, clicking a market fires `onSelect(marketId)` for external navigation.
+7. The overlay auto-dismisses if the selected market disappears from the filtered results.
+
+**Developer-configurable tabs pattern:** `MarketExplorer` uses the same tab pattern as `MarketCharts` and `PositionTable` -- an optional array prop controls which tabs appear, the first entry is initially active, and a single entry hides the tab bar.
+
+**Example: Single view (cards only, no tabs)**
+
+```tsx
+<FunctionSpaceProvider config={config} theme="fs-dark">
+  <MarketExplorer
+    state="open"
+    onSelect={(id) => console.log('Selected:', id)}
+  />
+</FunctionSpaceProvider>
+```
+
+**Example: Multi-view with tabs**
+
+```tsx
+<FunctionSpaceProvider config={config} theme="fs-dark">
+  <MarketExplorer
+    state="open"
+    views={['cards', 'pulse', 'compact', 'table', 'heatmap']}
+    featuredCategories={['sports', 'crypto', 'politics']}
+    onSelect={(id) => setSelectedMarketId(id)}
+  />
+</FunctionSpaceProvider>
+```
+
+**Example: Inline trade with overlay panel**
+
+```tsx
+import { FunctionSpaceProvider } from '@functionspace/react';
+import { MarketExplorer, MarketCharts, TradePanel } from '@functionspace/ui';
+
+function App() {
+  return (
+    <FunctionSpaceProvider config={config} theme="fs-dark">
+      <MarketExplorer
+        state="open"
+        views={['cards', 'compact', 'heatmap']}
+        featuredCategories={['sports', 'crypto']}
+      >
+        {(marketId) => (
+          <>
+            <MarketCharts marketId={marketId} />
+            <TradePanel marketId={marketId} />
+          </>
+        )}
+      </MarketExplorer>
+    </FunctionSpaceProvider>
+  );
+}
+```
+
+**Example: Custom filtering with no filter bar**
+
+```tsx
+<FunctionSpaceProvider config={config} theme="fs-dark">
+  <MarketExplorer
+    state="open"
+    views={['table']}
+    showFilterBar={false}
+    categories={['crypto']}
+  />
+</FunctionSpaceProvider>
+```
+
+**Migration from MarketOverlay:**
+
+`MarketExplorer` replaces `MarketOverlay`. The props are largely the same -- the key difference is the addition of multi-view support via the `views` prop. To migrate:
+
+1. Replace `<MarketOverlay>` with `<MarketExplorer>`.
+2. All existing props (`state`, `categories`, `pollInterval`, `emptyMessage`, `showFilterBar`, `featuredCategories`, `sortOptions`, `searchPlaceholder`, `filterBarMaxWidth`, `children`) work identically.
+3. Optionally add `views` to enable multiple view modes. Without `views`, `MarketExplorer` defaults to the `'cards'` view (equivalent to the previous `MarketOverlay` behavior).
+
+```tsx
+// Before (MarketOverlay)
+<MarketOverlay state="open" featuredCategories={['sports']}>
+  {(marketId) => <TradePanel marketId={marketId} />}
+</MarketOverlay>
+
+// After (MarketExplorer)
+<MarketExplorer state="open" featuredCategories={['sports']}>
+  {(marketId) => <TradePanel marketId={marketId} />}
+</MarketExplorer>
+```
+
+**Layout swapping:** If you need full-page navigation instead of an overlay panel, use the state-driven or route-driven patterns described in [Composition and Usage](../composition-and-usage#market-discovery-patterns) with `MarketCardGrid` directly.
+
+**Related:** `MarketCardGrid` (grid used by the `'cards'` view), `MarketFilterBar` (filter UI rendered internally), `MarketCard` (individual card), `useMarketFilters` (filter state hook used internally), `useMarkets` (data hook for market listing), `treemapLayout` (used by the `'heatmap'` view)
+
+---

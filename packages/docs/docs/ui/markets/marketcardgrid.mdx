@@ -1,0 +1,104 @@
+---
+title: "MarketCardGrid"
+sidebar_position: 3
+description: "MarketCardGrid widget displaying a responsive grid of MarketCard components with loading, error, and empty states."
+---
+
+import { MarketCardGrid, MarketExplorer } from '@functionspace/ui';
+import WidgetDemo from '@site/src/components/WidgetDemo';
+import { DEMO_MARKET_ID } from '@site/src/constants';
+
+# MarketCardGrid
+
+**`MarketCardGrid`**
+
+Presentational grid component that renders a responsive grid of `MarketCard` components. Receives an array of `MarketState` objects as props -- does not fetch data internally. Handles loading, error, and empty states. Replaces the previous `MarketList` component with the same API.
+
+```tsx
+import { MarketCardGrid } from '@functionspace/ui';
+```
+
+<WidgetDemo title="Live Demo (via MarketExplorer cards view)" height="500px">
+  <MarketExplorer state="open" views={['cards']} />
+</WidgetDemo>
+
+**CSS class:** `fs-market-card-grid`
+
+**Props:**
+
+| Prop           | Type                          | Default              | Description                                        |
+| -------------- | ----------------------------- | -------------------- | -------------------------------------------------- |
+| `markets`      | `MarketState[]`               | required             | Array of market state objects to display            |
+| `onSelect`     | `(marketId: number) => void`  | --                   | Called when a card or its Trade button is clicked   |
+| `loading`      | `boolean`                     | `false`              | Shows skeleton loading cards when true              |
+| `error`        | `Error \| null`               | --                   | Displays error message when provided               |
+| `emptyMessage` | `string`                      | `'No markets found'` | Custom message when the markets array is empty      |
+
+**States:**
+
+| State    | Condition                   | Render                                |
+| -------- | --------------------------- | ------------------------------------- |
+| Loading  | `loading=\{true\}`          | 6 skeleton placeholder cards          |
+| Error    | `error` is truthy           | Error message text                    |
+| Empty    | `markets.length === 0`      | Empty state message                   |
+| Data     | `markets.length > 0`        | Grid of `MarketCard` components       |
+
+**Behavior:**
+
+* Each card receives the `onSelect` callback, so clicking any card bubbles to the parent.
+* Requires `FunctionSpaceProvider` ancestor (throws if missing).
+* Loading skeletons match the `MarketCard` layout structure.
+
+**Migration from MarketList:** `MarketCardGrid` is a drop-in replacement for `MarketList`. The props interface is identical. Update your imports:
+
+```tsx
+// Before
+import { MarketList } from '@functionspace/ui';
+<MarketList markets={markets} onSelect={handleSelect} />
+
+// After
+import { MarketCardGrid } from '@functionspace/ui';
+<MarketCardGrid markets={markets} onSelect={handleSelect} />
+```
+
+**Handling Selection:**
+
+Wire `onSelect` to your app's navigation:
+
+- **State-driven:** `onSelect=\{(id) => setSelectedMarketId(id)\}`
+- **Route-driven:** `onSelect=\{(id) => navigate('/trade/' + id)\}`
+
+See [Market Discovery Patterns](../composition-and-usage#market-discovery-patterns) for complete browse-to-trade examples with both approaches.
+
+**Example:**
+
+```tsx
+import { FunctionSpaceProvider, useMarkets } from '@functionspace/react';
+import { MarketCardGrid } from '@functionspace/ui';
+
+function MarketDashboard() {
+  const { markets, loading, error } = useMarkets({ state: 'open', sortBy: 'totalVolume' });
+
+  return (
+    <MarketCardGrid
+      markets={markets ?? []}
+      loading={loading}
+      error={error}
+      onSelect={(id) => console.log('Navigate to market:', id)}
+      emptyMessage="No open markets available"
+    />
+  );
+}
+
+function App() {
+  return (
+    <FunctionSpaceProvider config={{ baseUrl: 'https://api.example.com' }} theme="fs-dark">
+      <MarketDashboard />
+    </FunctionSpaceProvider>
+  );
+}
+```
+
+**Related:** `MarketCard` (individual card), `MarketExplorer` (uses `MarketCardGrid` for the `'cards'` view), `useMarkets` (data hook for market listing)
+
+---

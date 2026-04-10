@@ -1,6 +1,7 @@
 ---
 title: "Getting Started"
 sidebar_position: 3
+description: "Installation, quick start examples, provider configuration, and authentication setup."
 ---
 
 # Getting Started
@@ -14,11 +15,11 @@ npm install @functionspace/core
 # React hooks (optional, for React apps)
 npm install @functionspace/react
 
-# UI components (optional)
-npm install @functionspace/ui
+# UI components (optional, recharts is a required peer dependency)
+npm install @functionspace/ui recharts
 ```
 
-No additional peer dependencies are required. Each package depends only on its lower layer (`@functionspace/ui` depends on `@functionspace/react`, which depends on `@functionspace/core`).
+Each package depends only on its lower layer (`@functionspace/ui` depends on `@functionspace/react`, which depends on `@functionspace/core`). The UI package requires `recharts` as a peer dependency for chart components.
 
 ### Quick Start
 
@@ -37,15 +38,36 @@ const stats = await queryConsensusSummary(client, 42);
 console.log(`Market expects: ${stats.mean} ± ${stats.stdDev}`);
 ```
 
+**Browse markets (React):**
+
+```tsx
+import { FunctionSpaceProvider, useMarkets } from '@functionspace/react';
+import { MarketCardGrid } from '@functionspace/ui';
+
+function MarketBrowser() {
+  const { markets, loading, error } = useMarkets({ state: 'open' });
+  return (
+    <MarketCardGrid
+      markets={markets}
+      loading={loading}
+      error={error}
+      onSelect={(id) => console.log('Selected market:', id)}
+    />
+  );
+}
+```
+
+To build a complete browse-to-trade app, see [Market Discovery Patterns](/ui/composition-and-usage#market-discovery-patterns).
+
 **Generate a belief shape:**
 
 ```typescript
 import { generateGaussian } from '@functionspace/core';
 
-const { K, L, H } = market.config;
+const { numBuckets, lowerBound, upperBound } = market.config;
 
 // Create a bell curve belief centered at 50 with spread of 10
-const belief = generateGaussian(50, 10, K, L, H);
+const belief = generateGaussian(50, 10, numBuckets, lowerBound, upperBound);
 ```
 
 ### Configuration
@@ -94,7 +116,8 @@ const { user, token } = await loginUser(client, 'trader1', 'password');
 client.setToken(token);
 
 // Now authenticated -- transaction functions will include the token
-await buy(client, marketId, belief, collateral);
+const { numBuckets } = market.config;
+await buy(client, marketId, belief, collateral, numBuckets);
 ```
 
 For passwordless authentication, use `passwordlessLoginUser` which handles login or auto-signup with just a username. See the [Auth](/core/auth) docs for details.

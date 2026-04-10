@@ -1,6 +1,7 @@
 ---
 title: "rechartsPlotArea"
 sidebar_position: 2
+description: "Factory function that computes Recharts plot area pixel boundaries from margins and Y-axis width."
 ---
 
 # rechartsPlotArea

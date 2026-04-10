@@ -1,6 +1,7 @@
 ---
 title: "Architecture"
 sidebar_position: 2
+description: "Layer model (L0-L3), category organization, and package dependency structure of the SDK."
 ---
 
 # Architecture
@@ -22,10 +23,10 @@ The SDK uses a layered architecture where higher layers compose lower layers. De
 
 | Layer | Name | Description | Example |
 | --- | --- | --- | --- |
-| L0 | Pure Math | Protocol-agnostic mathematical operations. No awareness of markets or positions. | `evaluateDensity()`, `evaluatePotential()` |
+| L0 | Pure Math | Protocol-agnostic mathematical operations and validation. No awareness of markets or positions. | `evaluateDensityCurve()`, `computeStatistics()`, `validateBeliefVector()` |
 | L1 | Core | Direct protocol interactions with full parameter control. Unopinionated and explicit. | `buy()`, `queryMarketState()`, `generateBelief()` |
-| L2 | Convenience | Higher-level wrappers with sensible defaults. Named concepts that map to common use cases. | `generateGaussian()`, `previewBuy()`, `queryClaimShare()` |
-| L3 | Intent | Domain-specific functions driven by user intent. May reference live market state and orchestrate across categories. | `generateBinary()`, `claimAll()`, `discoverTrending()` |
+| L2 | Convenience | Higher-level wrappers with sensible defaults. Named concepts that map to common use cases. | `generateGaussian()`, `previewPayoutCurve()`, `previewSell()` |
+| L3 | Intent | Domain-specific functions driven by user intent. May reference live market state and orchestrate across categories. | Composed workflows, multi-step operations |
 
 
 
@@ -38,24 +39,27 @@ Categories group functions by what they do, independent of their abstraction lay
 
 | Category | What It Does | Examples | Notes |
 | --- | --- | --- | --- |
-| **Transactions** | Writes to the chain; state-changing operations | `buy()`, `sell()`, `createMarket()`, `updatePosition()` | Require wallet signature |
-| **Positions** | Pure computation; transforms inputs into protocol-ready formats | `generateGaussian()`, `generateRange()`, `generateBelief()` | No chain interaction; human interface to compose beliefs |
-| **Previews** | Computes hypothetical outcomes without chain interaction | `previewBuy()`, `previewPayout()`, `previewSell()` | Read current state, simulate results |
-| **Queries** | Reads and interprets current protocol state | `queryMarketState()`, `queryClaimShare()`, `queryConsensusSummary()` | On-chain reads |
-| **Discovery** | Find and filter markets or positions | `discoverMarkets()`, `discoverTrending()`, `discoverUserPositions()` | Requires indexer |
+| **Transactions** | State-changing operations | `buy()`, `sell()` | Require authentication |
+| **Positions** | Pure computation; transforms inputs into protocol-ready formats | `generateGaussian()`, `generateRange()`, `generateBelief()` | No network calls; human interface to compose beliefs |
+| **Previews** | Computes hypothetical outcomes without modifying state | `previewPayoutCurve()`, `previewSell()` | Read current state, simulate results |
+| **Queries** | Reads and interprets current server state | `queryMarketState()`, `queryMarketPositions()`, `queryConsensusSummary()` | Server reads |
+| **Discovery** | Find and filter markets | `discoverMarkets()` | List available markets |
+| **Validation** | Input correctness checks before network calls | `validateBeliefVector()` | Read-only, no network |
 
 
 #### Category Behaviour Patterns
 
-**Transactions** are the only category that modifies on-chain state. They require a wallet connection and user signature. All other categories are read-only or pure computation.
+**Transactions** are the only category that modifies server state. They require authentication. All other categories are read-only or pure computation.
 
-**Position** generators are entirely local, they transform human-readable parameters into valid belief expression  vectors without any network calls. Their may output feeds into Transactions and Previews.
+**Position** generators are entirely local -- they transform human-readable parameters into valid belief vectors without any network calls. Their output feeds into Transactions and Previews.
 
 **Previews** read current state and compute hypothetical outcomes. They answer "what if" questions: what happens if I buy, what do I receive if I sell, what is my payout at outcome X. They never modify state.
 
-**Queries** read current on-chain state directly. They return facts about markets and positions as they exist now. With the potential to power unique and dynamic interaction points
+**Queries** read current server state directly. They return facts about markets and positions as they exist now.
 
-**Discovery** functions query an off-chain indexer rather than the blockchain directly. They enable filtering, sorting, and pagination across markets and positions. Operations that are impractical on-chain.
+**Discovery** functions list available markets from the server, enabling filtering and browsing.
+
+**Validation** functions check input correctness before network calls. `validateBeliefVector()` verifies length, finite values, non-negative values, and sum constraints before sending to the server.
 
 
 
@@ -107,7 +111,7 @@ User interaction
 
 The following illustrates how a payout-targeted trade crosses multiple categories and layers.
 
-This is one of many complex scenarios that the SDK abstracts away, developers simply pass the user input and the system will convert it to a viable belief vector ready for on chain submission.
+This is one of many complex scenarios that the SDK abstracts away, developers simply pass the user input and the system will convert it to a viable belief vector ready for submission.
 
 The diagram shows a concrete example of layer interaction when a developer wants to create a position targeting a minimum payout. This workflow crosses multiple categories (Positions, Previews, Transactions) and multiple layers (L1, L2, L3).
 
@@ -119,7 +123,7 @@ The diagram shows a concrete example of layer interaction when a developer wants
 
 **Iterative Refinement Loop** The grey arrow labeled "Return Iterative Values (Confirm Validity)" shows the feedback loop. Preview results return to Payout Design for validation. If the computed payout doesn't meet the target, L3 adjusts parameters (typically collateral amount) and repeats the preview. This continues until the goal is met or determined impossible.
 
-**Transaction Submission (Layer 1)** Once a valid configuration is found, the flow descends to Core layer. The arrow labeled "If Values Are Acceptable" leads to "Submit Buy" at L1, which writes the position to the blockchain.
+**Transaction Submission (Layer 1)** Once a valid configuration is found, the flow descends to Core layer. The arrow labeled "If Values Are Acceptable" leads to "Submit Buy" at L1, which submits the position to the server.
 
-**Cache Integration** The Cache box at top provides market state to the preview calculations without requiring fresh chain reads on each iteration. This makes the iterative refinement process performant.
+**Cache Integration** The Cache box at top provides market state to the preview calculations without requiring fresh server reads on each iteration. This makes the iterative refinement process performant.
 

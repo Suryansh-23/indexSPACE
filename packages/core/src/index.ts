@@ -24,6 +24,9 @@ export type {
   SignupResult,
   SignupOptions,
   PasswordlessLoginResult,
+  FilterAction,
+  MarketFilter,
+  MarketDiscoveryOptions,
 } from './types.js';
 export { PASSWORD_REQUIRED } from './types.js';
 
@@ -55,6 +58,9 @@ export { sell } from './transactions/sell.js';
 export { previewSell } from './previews/previewSell.js';
 export { previewPayoutCurve } from './previews/previewPayoutCurve.js';
 
+// Validation
+export { validateBeliefVector } from './validation.js';
+
 // Auth
 export { loginUser, signupUser, fetchCurrentUser, validateUsername, passwordlessLoginUser, silentReAuth } from './auth/auth.js';
 
@@ -64,3 +70,7 @@ export type { ZoomParams, PanParams } from './chart/zoom.js';
 
 // Discovery
 export { discoverMarkets } from './discovery/markets.js';
+export { filterMarkets } from './discovery/filters.js';
+export { discoverPopularMarkets, discoverActiveMarkets, discoverMarketsByCategory } from './discovery/convenience.js';
+export { treemapLayout } from './discovery/treemap.js';
+export type { TreemapItem, TreemapRect } from './discovery/treemap.js';

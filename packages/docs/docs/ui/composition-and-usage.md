@@ -1,11 +1,12 @@
 ---
 title: "Composition and Usage"
 sidebar_position: 2
+description: "How UI components communicate through context and compose together without prop wiring."
 ---
 
 # Composition and Usage
 
-The SDK is designed around **composition through context**. Any combination of UI components works together automatically when placed inside the same `FunctionSpaceProvider` — no prop-passing, no manual wiring, no event bus.
+The SDK is designed around **composition through context**. Any combination of UI components works together automatically when placed inside the same `FunctionSpaceProvider`  -- no prop-passing, no manual wiring, no event bus.
 
 #### How Components Communicate
 
@@ -26,9 +27,9 @@ FunctionSpaceProvider
 1. **Any chart + any trade panel = working preview.** Place a `ConsensusChart` and a `TradePanel` in the same provider tree. Moving sliders on the trade panel instantly shows a dashed preview curve on the chart.
 2. **Any chart + `PositionTable` = position visualization.** Clicking a position row highlights that position's belief on the chart.
 3. **Any trade panel can stand alone.** Each trading widget handles its own loading, error states, and submission. You can use a `ShapeCutter` without any chart.
-4. **Charts can stand alone.** A `ConsensusChart` without a trade panel simply shows the market consensus — no preview overlay.
+4. **Charts can stand alone.** A `ConsensusChart` without a trade panel simply shows the market consensus  -- no preview overlay.
 5. **`DistributionState` syncs chart and selector.** Pass the same `useDistributionState()` result to both `MarketCharts` (or `DistributionChart`) and `BucketRangeSelector`. Changing the bucket count in one updates the other.
-6. **Mix and match freely — with one constraint.** Want a `TimelineChart` above a `BinaryPanel`? A `ConsensusChart` next to a `CustomShapeEditor`? A `MarketStats` bar above a `BucketTradePanel`? All valid. All automatic. **However, only one trading component should be mounted at a time.** Mounting multiple trading components simultaneously causes conflicting `previewBelief` and `previewPayout` writes to context, resulting in flickering previews.
+6. **Mix and match freely  -- with one constraint.** Want a `TimelineChart` above a `BinaryPanel`? A `ConsensusChart` next to a `CustomShapeEditor`? A `MarketStats` bar above a `BucketTradePanel`? All valid. All automatic. **However, only one trading component should be mounted at a time.** Mounting multiple trading components simultaneously causes conflicting `previewBelief` and `previewPayout` writes to context, resulting in flickering previews.
 
 #### Composition Examples
 
@@ -61,23 +62,197 @@ FunctionSpaceProvider
     <MarketCharts marketId={1} views={['consensus', 'distribution', 'timeline']} zoomable />
     <ShapeCutter marketId={1} />
   
-  <PositionTable marketId={1} username={user.username} />
+  <PositionTable marketId={1} />
 </FunctionSpaceProvider>
 ```
 
 **Distribution Trading: Synced chart + bucket selector**
 
 ```tsx
-function DistRangeLayout({ marketId }) {
+function DistRangeContent({ marketId }) {
   const distState = useDistributionState(marketId);
   return (
-    <FunctionSpaceProvider config={config} theme="fs-dark">
+    <>
       <MarketCharts marketId={marketId} views={['consensus', 'distribution']} distributionState={distState} />
       <BucketRangeSelector marketId={marketId} distributionState={distState} />
+    </>
+  );
+}
+
+// useDistributionState requires provider context -- wrap above
+<FunctionSpaceProvider config={config} theme="fs-dark">
+  <DistRangeContent marketId={1} />
+</FunctionSpaceProvider>
+```
+
+#### Market Discovery Patterns
+
+All three discovery patterns use `MarketExplorer` for browsing markets. They differ in what happens when the user selects a market: a state-driven page swap, route-based navigation, or an overlay panel that keeps the browse page visible.
+
+**Pattern 1: State-Driven Navigation (no router)**
+
+Use this when building single-page apps, embedded widgets, or when the host app already has a router.
+
+```tsx
+import { useState } from 'react';
+import { FunctionSpaceProvider } from '@functionspace/react';
+import { MarketExplorer, MarketCharts, TradePanel, PositionTable } from '@functionspace/ui';
+
+const config = { apiBase: 'https://api.example.com' };
+
+export default function App() {
+  const [selectedMarketId, setSelectedMarketId] = useState<number | null>(null);
+
+  return (
+    <FunctionSpaceProvider config={config} theme="fs-dark">
+      {selectedMarketId !== null ? (
+        <>
+          <button onClick={() => setSelectedMarketId(null)}>Back to Markets</button>
+          <MarketCharts marketId={selectedMarketId} />
+          <TradePanel marketId={selectedMarketId} />
+          <PositionTable marketId={selectedMarketId} />
+        </>
+      ) : (
+        <MarketExplorer state="open" onSelect={setSelectedMarketId} />
+      )}
     </FunctionSpaceProvider>
   );
 }
 ```
+
+- **Pros:** Zero extra dependencies, simpler, embeddable in existing apps, no URL conflicts.
+- **Cons:** No shareable URLs, no browser back/forward, no bookmarking.
+
+**Pattern 2: Route-Driven Navigation (React Router)**
+
+Use this for standalone multi-page apps where you need shareable/bookmarkable URLs and browser back/forward navigation.
+
+```tsx
+import { BrowserRouter, Routes, Route, useParams, useNavigate } from 'react-router-dom';
+import { FunctionSpaceProvider } from '@functionspace/react';
+import { MarketExplorer, MarketCharts, TradePanel, PositionTable } from '@functionspace/ui';
+
+const config = { apiBase: 'https://api.example.com' };
+
+function MarketBrowsePage() {
+  const navigate = useNavigate();
+  return <MarketExplorer state="open" onSelect={(id) => navigate(`/trade/${id}`)} />;
+}
+
+function TradingPage() {
+  const { marketId } = useParams<{ marketId: string }>();
+  const navigate = useNavigate();
+  const numericId = Number(marketId);
+  if (isNaN(numericId)) return <p>Invalid market ID. <button onClick={() => navigate('/')}>Back</button></p>;
+
+  return (
+    <>
+      <button onClick={() => navigate('/')}>Back to Markets</button>
+      <MarketCharts marketId={numericId} />
+      <TradePanel marketId={numericId} />
+      <PositionTable marketId={numericId} />
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <FunctionSpaceProvider config={config} theme="fs-dark">
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<MarketBrowsePage />} />
+          <Route path="/trade/:marketId" element={<TradingPage />} />
+        </Routes>
+      </BrowserRouter>
+    </FunctionSpaceProvider>
+  );
+}
+```
+
+- **Pros:** Shareable URLs, browser back/forward navigation, bookmarkable.
+- **Cons:** Requires `react-router-dom`, can conflict with host router, more setup.
+
+**Pattern 3: Embedded Discovery (Overlay)**
+
+`MarketExplorer` provides a self-contained browse-and-trade flow with multiple view modes and an optional overlay panel. It manages search, category, and sort state internally via `useMarketFilters`, renders a `MarketFilterBar` and the active view, and opens a slide-over panel when a card is clicked (when a `children` render prop is provided). You supply the trading UI via a render prop:
+
+```tsx
+<FunctionSpaceProvider config={config} theme="fs-dark">
+  <MarketExplorer state="open" featuredCategories={['sports', 'crypto']} views={['cards', 'pulse', 'compact', 'gauge', 'split', 'table', 'heatmap', 'charts']}>
+    {(marketId) => (
+      <>
+        <MarketCharts marketId={marketId} />
+        <TradePanel marketId={marketId} />
+      </>
+    )}
+  </MarketExplorer>
+</FunctionSpaceProvider>
+```
+
+- **Pros:** User stays on the browse page, zero extra dependencies, self-contained.
+- **Cons:** No shareable URLs, no browser back/forward.
+
+**Trade-off comparison**
+
+| Consideration | State-Driven | Route-Driven | Overlay |
+|---|---|---|---|
+| Shareable URLs | No | Yes | No |
+| Browser back/forward | No | Yes | No |
+| User stays on browse page | No | No | Yes |
+| Extra dependencies | None | react-router-dom | None |
+| Embeddable in existing apps | Yes -- no router conflicts | May conflict with host router | Yes |
+
+**Provider Placement Rule**
+
+`FunctionSpaceProvider` MUST wrap above the navigation boundary -- above the router or above the `useState`. This ensures auth, cache, and theme persist across navigation.
+
+```tsx
+// Correct: provider outside navigation
+<FunctionSpaceProvider config={config} theme="fs-dark">
+  {/* State-driven or Router-driven navigation inside */}
+</FunctionSpaceProvider>
+```
+
+Never create a second provider for nested routes.
+
+See [MarketCard](./markets/marketcard) and [MarketCardGrid](./markets/marketcardgrid) for props reference.
+
+All three patterns use `MarketExplorer` for browsing. For fully custom browse UIs without `MarketExplorer`, use `useMarketFilters` + `MarketFilterBar` + `MarketCardGrid` directly -- see the individual component docs.
+
+See [MarketExplorer](./markets/marketexplorer) for props reference.
+
+#### Market Filter Bar
+
+`MarketFilterBar` is a presentational filter component providing search, category chips, and sort controls. It is driven by the `useMarketFilters` hook, which manages all filter state and returns a `filterBarProps` bundle that can be spread directly onto the component.
+
+This pattern is useful when you want filter controls without the `MarketExplorer` wrapper -- for example, in a custom page layout or alongside your own list rendering.
+
+```tsx
+import { useMarketFilters } from '@functionspace/react';
+import { MarketFilterBar, MarketCardGrid } from '@functionspace/ui';
+
+function CustomMarketBrowser() {
+  const { markets, loading, error, filterBarProps } = useMarketFilters({
+    state: 'open',
+    featuredCategories: ['sports', 'crypto', 'politics'],
+    pollInterval: 10000,
+  });
+
+  return (
+    <div>
+      <MarketFilterBar {...filterBarProps} searchPlaceholder="Find a market..." />
+      <MarketCardGrid
+        markets={markets}
+        loading={loading}
+        error={error}
+        onSelect={(id) => console.log('Selected:', id)}
+      />
+    </div>
+  );
+}
+```
+
+The hook also exposes individual filter actions (`setSearchText`, `toggleCategory`, `setSortField`, etc.) for building fully custom filter UIs without `MarketFilterBar`. See [useMarketFilters](../react/markets/usemarketfilters) and [MarketFilterBar](./markets/marketfilterbar) for full API reference.
 
 #### Three-Phase Trade Pattern
 
@@ -86,8 +261,8 @@ Every trading widget follows the same execution pattern:
 | Phase          | Timing                              | What Happens                                            | Chart Effect                              |
 | -------------- | ----------------------------------- | ------------------------------------------------------- | ----------------------------------------- |
 | **1. Preview** | Instant (on every input change)     | `generateBelief()` → `ctx.setPreviewBelief(belief)`     | Dashed overlay appears on consensus chart |
-| **2. Payout**  | Debounced (500ms after last change) | `previewPayoutCurve()` → `ctx.setPreviewPayout(result)` | Payout column appears in chart tooltip    |
-| **3. Submit**  | On button click                     | `buy()` → `ctx.invalidate(marketId)`                    | Preview clears, all data refreshes        |
+| **2. Payout**  | Debounced (500ms after last change) | `usePreviewPayout`'s `execute()` → `ctx.setPreviewPayout(result)` | Payout column appears in chart tooltip    |
+| **3. Submit**  | On button click                     | `useBuy`'s `execute()` → auto-invalidates cache                   | Preview clears, all data refreshes        |
 
 This pattern ensures responsive feedback (phase 1 is synchronous) while avoiding excessive API calls (phase 2 is debounced).
 

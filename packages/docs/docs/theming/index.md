@@ -1,6 +1,7 @@
 ---
 title: "Theming"
 sidebar_position: 1
+description: "30-token theme system reference with core tokens, presets, ChartColors, and CSS custom properties."
 ---
 
 # Theming

@@ -60,7 +60,7 @@ export default function WidgetDemo({ children, height, maxWidth, fitContent, tit
       )}
       <div style={{
         padding: '1rem',
-        background: 'var(--fs-background)',
+        background: 'var(--fs-background, transparent)',
         minHeight: height || 'auto',
       }}>
         <BrowserOnly fallback={<div style={{ color: 'var(--ifm-color-emphasis-600)' }}>Loading widget...</div>}>

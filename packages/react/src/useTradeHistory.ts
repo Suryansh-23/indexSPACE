@@ -1,54 +1,32 @@
-import { useState, useEffect, useCallback, useContext, useRef } from 'react';
+import { useContext, useCallback, useMemo } from 'react';
 import { queryTradeHistory } from '@functionspace/core';
 import type { TradeEntry } from '@functionspace/core';
+import type { CacheKey } from './cache/index.js';
 import { FunctionSpaceContext } from './context.js';
+import { useQueryCache } from './QueryCacheContext.js';
+import { useCacheSubscription } from './useCacheSubscription.js';
 
 export function useTradeHistory(
   marketId: string | number,
-  options?: { limit?: number; pollInterval?: number },
+  options?: { limit?: number; pollInterval?: number; enabled?: boolean },
 ) {
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('useTradeHistory must be used within FunctionSpaceProvider');
 
+  const cache = useQueryCache();
+  const normalizedId = String(marketId);
   const limit = options?.limit ?? 100;
-  const pollInterval = options?.pollInterval ?? 0;
+  const key: CacheKey = useMemo(
+    () => ['tradeHistory', normalizedId, String(limit)],
+    [normalizedId, limit],
+  );
 
-  const [trades, setTrades] = useState<TradeEntry[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const mountedRef = useRef(true);
+  const queryFn = useCallback(
+    (signal: AbortSignal) => queryTradeHistory(ctx.client, marketId, { limit, signal }),
+    [ctx.client, marketId, limit],
+  );
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => { mountedRef.current = false; };
-  }, []);
+  const { data, loading, isFetching, error, refetch } = useCacheSubscription<TradeEntry[]>(cache, key, queryFn, options);
 
-  const fetch = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await queryTradeHistory(ctx.client, marketId, { limit });
-      if (!mountedRef.current) return;
-      setTrades(result);
-    } catch (err) {
-      if (!mountedRef.current) return;
-      setError(err instanceof Error ? err : new Error(String(err)));
-    } finally {
-      if (mountedRef.current) setLoading(false);
-    }
-  }, [ctx.client, marketId, limit]);
-
-  // Fetch on mount and when invalidationCount changes
-  useEffect(() => {
-    fetch();
-  }, [fetch, ctx.invalidationCount]);
-
-  // Optional polling
-  useEffect(() => {
-    if (pollInterval <= 0) return;
-    const interval = setInterval(fetch, pollInterval);
-    return () => clearInterval(interval);
-  }, [fetch, pollInterval]);
-
-  return { trades, loading, error, refetch: fetch };
+  return { trades: data, loading, isFetching, error, refetch };
 }

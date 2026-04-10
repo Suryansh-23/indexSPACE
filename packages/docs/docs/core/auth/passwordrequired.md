@@ -1,6 +1,7 @@
 ---
 title: "PASSWORD_REQUIRED"
 sidebar_position: 7
+description: "Exported constant for identifying password-protected accounts in passwordless auth flows."
 ---
 
 # PASSWORD_REQUIRED

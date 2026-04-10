@@ -1,6 +1,7 @@
 ---
 title: "generateEvenTicks"
 sidebar_position: 5
+description: "Generate evenly-spaced tick values across a domain for custom axis rendering."
 ---
 
 # generateEvenTicks

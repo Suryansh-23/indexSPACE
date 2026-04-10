@@ -1,13 +1,14 @@
 ---
 title: "Gas Abstraction"
 sidebar_position: 2
+description: "Gas abstraction strategies so users can trade without holding native tokens."
 ---
 
 # Gas Abstraction
 
 **Purpose:** Enable users to transact without holding native chain tokens (ETH, MATIC, etc.).
 
-**The Problem:** A user wants to trade. They have USDC but no ETH. In a normal flow, they must acquire ETH first—a massive friction point.
+**The Problem:** A user wants to trade. They have USDC but no ETH. In a normal flow, they must acquire ETH first -- a massive friction point.
 
 **Our Solution:** Multiple gas abstraction strategies that developers can configure.
 

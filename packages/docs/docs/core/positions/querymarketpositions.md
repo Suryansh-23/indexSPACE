@@ -1,11 +1,12 @@
 ---
 title: "queryMarketPositions"
 sidebar_position: 1
+description: "Fetch all positions for a market, returning typed Position objects with belief and status."
 ---
 
 # queryMarketPositions
 
-**`queryMarketPositions(client, marketId)`**
+**`queryMarketPositions(client, marketId, options?)`**
 
 **Layer:** L1. Fetches all positions for a given market. This is the primary way to get position data and is the underlying call used by `queryPositionState` and `queryTradeHistory`.
 
@@ -13,6 +14,7 @@ sidebar_position: 1
 async function queryMarketPositions(
   client: FSClient,
   marketId: string | number,
+  options?: { signal?: AbortSignal },
 ): Promise<Position[]>
 ```
 
@@ -20,14 +22,16 @@ async function queryMarketPositions(
 
 ```typescript
 interface Position {
-  positionId: number;
+  positionId: string | number;                   // Unique position identifier
   belief: number[];                              // The belief vector that was traded
   collateral: number;                            // Amount of currency locked
   claims: number;                                // Claim tokens minted
   owner: string;                                 // Username of the position holder
   status: 'open' | 'sold' | 'settled' | 'closed';
-  prediction: number;                            // Center-of-mass hint from the trade
-  stdDev: number;                                // Standard deviation of the belief
+  prediction?: number | null;                    // Center-of-mass hint from the trade
+  stdDev?: number | null;                        // Standard deviation of the belief
+  positionType?: string;                         // Position type ("raw", "normal", etc.)
+  positionParams?: Record<string, unknown>;      // Type-specific parameters
   createdAt: string;                             // ISO 8601 timestamp
   closedAt: string | null;                       // When the position was closed (null if open)
   soldPrice: number | null;                      // Collateral returned on sell (null if not sold)

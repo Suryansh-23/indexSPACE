@@ -1,0 +1,8 @@
+{
+  "label": "Discovery",
+  "position": 4,
+  "link": {
+    "type": "generated-index",
+    "description": "Pure math functions for market discovery layouts."
+  }
+}

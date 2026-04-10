@@ -11,8 +11,8 @@ import { computePercentiles, computeStatistics } from './density.js';
  */
 export function transformHistoryToFanChart(
   snapshots: MarketSnapshot[],
-  L: number,
-  H: number,
+  lowerBound: number,
+  upperBound: number,
   maxPoints: number = 200,
 ): FanChartPoint[] {
   if (snapshots.length === 0) return [];
@@ -40,8 +40,8 @@ export function transformHistoryToFanChart(
     // Normalize to probability vector
     const consensus = alpha.map(a => a / totalMass);
 
-    const percentiles = computePercentiles(consensus, L, H);
-    const stats = computeStatistics(consensus, L, H);
+    const percentiles = computePercentiles(consensus, lowerBound, upperBound);
+    const stats = computeStatistics(consensus, lowerBound, upperBound);
 
     results.push({
       timestamp: new Date(snap.createdAt).getTime(),

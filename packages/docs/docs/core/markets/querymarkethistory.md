@@ -1,6 +1,7 @@
 ---
 title: "queryMarketHistory"
 sidebar_position: 6
+description: "Fetch paginated time-series snapshots of a market's alpha vector after each trade."
 ---
 
 # queryMarketHistory
@@ -47,5 +48,5 @@ interface MarketSnapshot {
 ```typescript
 const history = await queryMarketHistory(ctx.client, marketId, 100);
 // Pass to transformHistoryToFanChart() from the math utilities to get chart-ready data
-const fanData = transformHistoryToFanChart(history.snapshots, L, H);
+const fanData = transformHistoryToFanChart(history.snapshots, lowerBound, upperBound);
 ```

@@ -1,9 +1,11 @@
 ---
-title: "Positions"
+title: "Positions - React"
+sidebar_label: "Positions"
 sidebar_position: 1
+description: "Data-fetching hook for retrieving market positions with optional username filtering."
 ---
 
-# Positions
+# Positions - React
 
 Data-fetching hook for market positions. Requires `FunctionSpaceProvider`.
 

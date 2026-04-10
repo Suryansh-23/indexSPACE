@@ -1,6 +1,7 @@
 ---
 title: "fetchCurrentUser"
 sidebar_position: 3
+description: "Fetch the authenticated user's profile including wallet balance and role."
 ---
 
 # fetchCurrentUser

@@ -4,10 +4,10 @@
 
 This document is the third reference alongside `CLAUDE.md` (architecture rules) and `PLAYBOOK.md` (implementation patterns). It defines **what the React layer needs to become** and serves two roles:
 
-1. **Roadmap** — tiered improvements ranked by what unblocks multi-user testing first, then general SDK maturity.
-2. **Review checklist** — when reviewing any hook, provider, or component change, verify against the checklists here.
+1. **Roadmap**  -- tiered improvements ranked by what unblocks multi-user testing first, then general SDK maturity.
+2. **Review checklist**  -- when reviewing any hook, provider, or component change, verify against the checklists here.
 
-The React layer currently passes data through. Its job is to become the **value layer** — where caching, freshness, coordination, and mutation lifecycle are managed — so that core stays pure and UI stays presentation-only.
+The React layer currently passes data through. Its job is to become the **value layer**  -- where caching, freshness, coordination, and mutation lifecycle are managed  -- so that core stays pure and UI stays presentation-only.
 
 ---
 
@@ -15,15 +15,15 @@ The React layer currently passes data through. Its job is to become the **value 
 
 | Capability | Status |
 |------------|--------|
-| Data fetching via hooks | Thin wrappers — fetch on mount, refetch on global invalidation counter |
-| Caching | None at any layer |
-| Request deduplication | None — `useMarket` + `useConsensus` both hit `/api/market/state` independently |
-| Polling | Only `useTradeHistory` supports `pollInterval`, hand-wired |
-| Mutation hooks | None — UI components import `buy`/`sell`/`previewPayoutCurve` from core directly |
-| Invalidation | Global — `marketId` parameter is accepted but ignored, all hooks refetch |
-| Stale-while-revalidate | None — every refetch sets `loading: true`, causing UI flicker |
-| Request cancellation | None — unmounted components may receive stale async responses |
-| Retry logic | None — single attempt, fail immediately |
+| Data fetching via hooks | Cache subscription via `useCacheSubscription` (wraps `useSyncExternalStore`) -- hooks subscribe to QueryCache entries, no local `useState` for data |
+| Caching | QueryCache class with key-based storage, subscriber tracking, staleness, and garbage collection |
+| Request deduplication | Implemented -- same cache key from multiple hook instances produces one network request |
+| Polling | All data-fetching hooks accept `pollInterval` via `QueryOptions`; visibility-aware (pauses when tab hidden) |
+| Mutation hooks | Implemented -- `useBuy`, `useSell` wrap core transaction functions with managed state and auto-invalidation; `usePreviewPayout`, `usePreviewSell` wrap core preview functions with managed state (no auto-invalidation) |
+| Invalidation | Targeted -- `ctx.invalidate(marketId)` marks only that market's cache entries as stale; `ctx.invalidateAll()` for global refresh |
+| Stale-while-revalidate | Implemented -- `loading` true only on first fetch; background refetches return cached data with `isFetching: true` |
+| Request cancellation | Implemented -- `AbortController` per in-flight request; aborts on re-fetch, parameter change, or cleanup |
+| Retry logic | Implemented -- exponential backoff with configurable retry count and delay; error classification (4xx no retry, 5xx/network retry); abort-aware delays |
 
 ---
 
@@ -35,7 +35,7 @@ These are required before concurrent users can meaningfully test on the same mar
 
 ### 1.1 Query Cache with Request Deduplication
 
-**Problem:** Every hook instance fires its own API request. Mounting `MarketStats`, `ConsensusChart`, and `PositionTable` for one market produces at least 3 requests per invalidation cycle — and `useMarket` + `useConsensus` both call the same endpoint, so it is effectively 4. Add a second market or duplicate a widget and it multiplies further. There is no shared cache.
+**Problem:** Every hook instance fires its own API request. Mounting `MarketStats`, `ConsensusChart`, and `PositionTable` for one market produces at least 3 requests per invalidation cycle  -- and `useMarket` + `useConsensus` both call the same endpoint, so it is effectively 4. Add a second market or duplicate a widget and it multiplies further. There is no shared cache.
 
 **What it should do:**
 
@@ -44,12 +44,12 @@ These are required before concurrent users can meaningfully test on the same mar
 - Cache entries have a configurable staleness window. Within that window, new subscribers get cached data instantly (no loading state, no request).
 - When a cache entry is invalidated or expires, a single refetch updates all subscribers.
 
-**Where it lives:** React layer. A `QueryCache` (or equivalent) owned by the Provider. Core functions remain pure `async (client, ...params) => data` with no caching opinion. UI components call hooks as before — the cache is invisible to them.
+**Where it lives:** React layer. A `QueryCache` (or equivalent) owned by the Provider. Core functions remain pure `async (client, ...params) => data` with no caching opinion. UI components call hooks as before  -- the cache is invisible to them.
 
 **Key design decisions:**
 
 - **Cache key structure:** Must uniquely identify a query. Standard pattern is a tuple: `[functionName, ...params]`. TanStack Query calls these "query keys" (e.g., `['market', marketId]`). SWR uses a single string key. The tuple approach is more composable for targeted invalidation.
-- **Subscriber model:** Each hook instance registers as a subscriber to a cache key. The cache tracks subscriber count — when it drops to zero, the entry can be garbage collected (after an optional `gcTime`).
+- **Subscriber model:** Each hook instance registers as a subscriber to a cache key. The cache tracks subscriber count  -- when it drops to zero, the entry can be garbage collected (after an optional `gcTime`).
 - **Single source of truth:** All data-fetching hooks read from the cache, never from local `useState`. This eliminates the current pattern where each hook has its own copy of the data.
 
 **Established practice:**
@@ -66,11 +66,11 @@ These are required before concurrent users can meaningfully test on the same mar
 
 **Checklist:**
 
-- [ ] Cache class with key-based storage, subscriber tracking, and garbage collection
-- [ ] All data-fetching hooks migrate from local `useState` to cache subscription
-- [ ] Duplicate hook instances produce one network request, not N
-- [ ] Cache is scoped to the Provider instance (no global singletons — supports multiple Providers on one page)
-- [ ] `gcTime` is configurable at Provider level
+- [x] Cache class with key-based storage, subscriber tracking, and garbage collection
+- [x] All data-fetching hooks migrate from local `useState` to cache subscription
+- [x] Duplicate hook instances produce one network request, not N
+- [x] Cache is scoped to the Provider instance (no global singletons -- supports multiple Providers on one page)
+- [x] `gcTime` is configurable at Provider level
 
 ---
 
@@ -86,7 +86,7 @@ These are required before concurrent users can meaningfully test on the same mar
 - Provider accepts a `defaultPollInterval` for all queries, overridable per hook.
 - Polling pauses when no subscribers are mounted (cache entry has zero subscribers).
 
-**Critical requirement — visibility-aware polling:**
+**Critical requirement  -- visibility-aware polling:**
 
 Polling must pause when the browser tab is hidden or the component is unmounted. Without this, a multi-market dashboard with 5 markets polling at 3-second intervals generates continuous background traffic. This is wasteful and will drain mobile batteries.
 
@@ -110,13 +110,13 @@ Standard approach: listen to `document.visibilitychange`. When `document.hidden`
 
 **Checklist:**
 
-- [ ] All data-fetching hooks accept `pollInterval` option
-- [ ] Poll timers are per cache key, not per hook instance
-- [ ] Provider accepts `defaultPollInterval` configuration
-- [ ] Polling pauses when `document.hidden === true`
-- [ ] Polling pauses when subscriber count drops to zero
-- [ ] Polling resumes on visibility change or new subscriber
-- [ ] Poll-triggered refetches do not set `loading: true` (see Tier 2.1 — stale-while-revalidate)
+- [x] All data-fetching hooks accept `pollInterval` option
+- [x] Poll timers are per cache key, not per hook instance
+- [x] Provider accepts `defaultPollInterval` configuration
+- [x] Polling pauses when `document.hidden === true`
+- [x] Polling pauses when subscriber count drops to zero
+- [x] Polling resumes on visibility change or new subscriber
+- [x] Poll-triggered refetches do not set `loading: true` (see Tier 2.1 -- stale-while-revalidate)
 
 ---
 
@@ -124,7 +124,7 @@ Standard approach: listen to `document.visibilitychange`. When `document.hidden`
 
 **Problem:** UI components import `buy`, `sell`, `previewPayoutCurve`, and `previewSell` directly from core. Each component manages its own `submitting`/`error` state via `useState`, manually calls `ctx.invalidate()`, and manually refreshes the user's wallet balance. This boilerplate is repeated across every trading component. Consumers building custom trade UIs must import from two packages and know the invalidation protocol.
 
-Auth already set the precedent — `useAuth` wraps core's `loginUser`/`signupUser` with managed state and side effects. Trade mutations should follow the same pattern.
+Auth already set the precedent  -- `useAuth` wraps core's `loginUser`/`signupUser` with managed state and side effects. Trade mutations should follow the same pattern.
 
 **What it should do:**
 
@@ -147,40 +147,40 @@ On failure, the hook sets the error and does not invalidate.
 |------|-------|-------------------|
 | `useBuy` | `buy()` from core | Invalidate market, refresh wallet |
 | `useSell` | `sell()` from core | Invalidate market, refresh wallet |
-| `usePreviewPayout` | `previewPayoutCurve()` from core | Set `previewPayout` on context |
-| `usePreviewSell` | `previewSell()` from core | None — returns value for display |
+| `usePreviewPayout` | `previewPayoutCurve()` from core | None -- returns `PayoutCurve` for caller to use (caller sets context if desired) |
+| `usePreviewSell` | `previewSell()` from core | None  -- returns value for display |
 
 **Where it lives:** React layer. Each hook wraps a core function, adds state management, and triggers cache-level side effects.
 
 **Established practice:**
 
 - **TanStack Query:** `useMutation` with `onSuccess` callback for cache invalidation. `mutate()` / `mutateAsync()` for fire-and-forget vs awaitable. `isLoading`, `error`, `reset` on the return.
-- **SWR:** `useSWRMutation` — trigger-based, not automatic. Returns `{ trigger, isMutating, error }`.
+- **SWR:** `useSWRMutation`  -- trigger-based, not automatic. Returns `{ trigger, isMutating, error }`.
 - **Apollo Client:** `useMutation` returns `[mutateFunction, { loading, error, data }]`. Supports `refetchQueries` and `update` for cache manipulation.
 
 **Layer implications:**
 
 - **Core:** No changes. `buy()`, `sell()`, preview functions remain pure.
 - **React:** New hooks added. Mutation hooks use the cache's invalidation API rather than the raw context counter.
-- **UI:** Trading components replace direct core imports with hook calls. Removes per-component state management for submission loading/error. The three-phase trade pattern (PLAYBOOK.md) remains — Phase 1 (instant preview) and Phase 2 (debounced preview) still live in the component. Phase 3 (submit) delegates to the mutation hook.
+- **UI:** Trading components replace direct core imports with hook calls. Removes per-component state management for submission loading/error. The three-phase trade pattern (PLAYBOOK.md) remains  -- Phase 1 (instant preview) and Phase 2 (debounced preview) still live in the component. Phase 3 (submit) delegates to the mutation hook.
 
 **Checklist:**
 
-- [ ] `useBuy` hook with `execute`, `loading`, `error`, `reset`
-- [ ] `useSell` hook with same shape
-- [ ] `usePreviewPayout` hook — debounce is caller's responsibility, hook handles the request
-- [ ] `usePreviewSell` hook
-- [ ] All mutation hooks auto-invalidate affected market on success
-- [ ] All mutation hooks auto-refresh user wallet on success
-- [ ] Error state is clearable via `reset()`
-- [ ] UI trading components refactored to use mutation hooks instead of direct core imports
-- [ ] Consumers building custom UIs only import from `@functionspace/react`
+- [x] `useBuy` hook with `execute`, `loading`, `error`, `reset`
+- [x] `useSell` hook with same shape
+- [x] `usePreviewPayout` hook -- debounce is caller's responsibility, hook handles the request. Added beyond original scope.
+- [x] `usePreviewSell` hook -- added beyond original scope.
+- [x] All mutation hooks auto-invalidate affected market on success (useBuy, useSell call targeted `ctx.invalidate(marketId)`)
+- [x] All mutation hooks auto-refresh user wallet on success (via targeted invalidation cycle)
+- [x] Error state is clearable via `reset()`
+- [x] UI trading components refactored to use mutation hooks instead of direct core imports
+- [ ] Consumers building custom UIs only import from `@functionspace/react` -- aspirational, consumers can still use core directly for advanced use cases
 
 ---
 
 ### 1.4 Targeted Invalidation
 
-**Problem:** `invalidate(marketId)` ignores the `marketId` parameter — it increments a global counter and every hook for every market refetches. With multiple markets mounted (dashboards, market lists), a trade on market A triggers unnecessary refetches for markets B, C, D.
+**Problem:** `invalidate(marketId)` ignores the `marketId` parameter  -- it increments a global counter and every hook for every market refetches. With multiple markets mounted (dashboards, market lists), a trade on market A triggers unnecessary refetches for markets B, C, D.
 
 **What it should do:**
 
@@ -188,26 +188,26 @@ On failure, the hook sets the error and does not invalidate.
 - Only subscribers to those entries refetch.
 - Support `invalidateAll()` for cases where a global refresh is needed (e.g., logout).
 
-**Where it lives:** React layer, as part of the query cache. Cache keys already contain the `marketId` — the invalidation function walks the cache and matches.
+**Where it lives:** React layer, as part of the query cache. Cache keys already contain the `marketId`  -- the invalidation function walks the cache and matches.
 
 **Established practice:**
 
-- **TanStack Query:** `queryClient.invalidateQueries({ queryKey: ['market', marketId] })` — partial key matching invalidates all queries that start with the given prefix.
+- **TanStack Query:** `queryClient.invalidateQueries({ queryKey: ['market', marketId] })`  -- partial key matching invalidates all queries that start with the given prefix.
 - **Apollo Client:** `refetchQueries` accepts query names or variable filters.
-- **RTK Query:** Tag-based invalidation — mutations declare which tags they invalidate, queries declare which tags they provide.
+- **RTK Query:** Tag-based invalidation  -- mutations declare which tags they invalidate, queries declare which tags they provide.
 
 **Layer implications:**
 
 - **Core:** No changes.
-- **React:** Cache keys must include `marketId` as a prefix segment. `invalidate(marketId)` filters cache entries by key prefix. The global `invalidationCount` is removed or relegated to `invalidateAll()`.
+- **React:** Cache keys include `marketId` as a prefix segment. `invalidate(marketId)` filters cache entries by key prefix. The global `invalidationCount` was removed and replaced by QueryCache-based targeted invalidation via `invalidate(marketId)` and `invalidateAll()`.
 - **UI:** No changes. Components already pass `marketId` to `ctx.invalidate()`.
 
 **Checklist:**
 
-- [ ] Cache keys are structured as `[queryName, marketId, ...otherParams]`
-- [ ] `invalidate(marketId)` only marks matching cache entries as stale
-- [ ] `invalidateAll()` available for global refresh (logout, reconnect)
-- [ ] Mutation hooks (1.3) call targeted invalidation, not global
+- [x] Cache keys are structured as `[queryName, marketId, ...otherParams]`
+- [x] `invalidate(marketId)` only marks matching cache entries as stale
+- [x] `invalidateAll()` available for global refresh (logout, reconnect)
+- [x] Mutation hooks (1.3) call targeted invalidation, not global
 
 ---
 
@@ -242,17 +242,17 @@ With multiple sites embedding the SDK and thousands of users per site, connectiv
 
 **Checklist:**
 
-- [ ] Provider registers `visibilitychange` listener, refetches stale active entries on tab focus
-- [ ] Provider registers `online` listener, refetches all active entries on network reconnect
-- [ ] Both behaviors configurable at Provider level (`revalidateOnFocus`, `revalidateOnReconnect`)
-- [ ] Revalidation respects cache deduplication -- multiple entries triggering simultaneously do not produce duplicate requests
-- [ ] Event listeners are cleaned up on Provider unmount
+- [x] Provider registers `visibilitychange` listener, refetches stale active entries on tab focus
+- [x] Provider registers `online` listener, refetches all active entries on network reconnect
+- [x] Both behaviors configurable at Provider level (`revalidateOnFocus`, `revalidateOnReconnect`)
+- [x] Revalidation respects cache deduplication -- multiple entries triggering simultaneously do not produce duplicate requests
+- [x] Event listeners are cleaned up on Provider unmount
 
 ---
 
 ## Tier 2: Production Quality
 
-These make the SDK feel solid. Without them the SDK works but feels rough — loading flickers on polls, failed requests don't retry, unmounted components leak. These should be in place before external developers consume the SDK.
+These make the SDK feel solid. Without them the SDK works but feels rough  -- loading flickers on polls, failed requests don't retry, unmounted components leak. These should be in place before external developers consume the SDK.
 
 ---
 
@@ -276,14 +276,14 @@ These make the SDK feel solid. Without them the SDK works but feels rough — lo
 | `data` | Cached data (may be stale during background refetch) |
 | `error` | Last error (cleared on successful refetch) |
 
-**Established practice:** SWR is literally named after this pattern (Stale-While-Revalidate, RFC 5861). TanStack Query implements it via `staleTime` (how long data is fresh) and `placeholderData` / `keepPreviousData`. This is not optional for any SDK with polling — it's the reason polling feels smooth rather than jarring.
+**Established practice:** SWR is literally named after this pattern (Stale-While-Revalidate, RFC 5861). TanStack Query implements it via `staleTime` (how long data is fresh) and `placeholderData` / `keepPreviousData`. This is not optional for any SDK with polling  -- it's the reason polling feels smooth rather than jarring.
 
 **Checklist:**
 
-- [ ] All data-fetching hooks return `isFetching` alongside `loading`
-- [ ] `loading` is `true` only when no cached data exists
-- [ ] Background refetches (poll, invalidation) do not set `loading: true`
-- [ ] UI components that currently check `if (loading)` continue to work without changes (backward-compatible — `loading` is still `true` on first fetch)
+- [x] All data-fetching hooks return `isFetching` alongside `loading`. Note: `useBucketDistribution` (a derived hook) does not return `isFetching` since it composes `useConsensus` + `useMarket` rather than subscribing to cache directly.
+- [x] `loading` is `true` only when no cached data exists
+- [x] Background refetches (poll, invalidation) do not set `loading: true`
+- [x] UI components that currently check `if (loading)` continue to work without changes (backward-compatible -- `loading` is still `true` on first fetch)
 
 ---
 
@@ -303,13 +303,13 @@ This means one API call serves both `useMarket` and `useConsensus`. Any other ho
 
 **Where it lives:** React layer. Core's `getConsensusCurve` still exists for standalone use, but the hook bypasses it in favor of derivation.
 
-**General maturity note:** This pattern — "query A derives from query B's cache entry" — is fundamental to avoiding request waterfalls. TanStack Query supports it via `select` (transform cached data without a new fetch). SWR supports it with dependent keys.
+**General maturity note:** This pattern  -- "query A derives from query B's cache entry"  -- is fundamental to avoiding request waterfalls. TanStack Query supports it via `select` (transform cached data without a new fetch). SWR supports it with dependent keys.
 
 **Checklist:**
 
-- [ ] `useConsensus` reads from market cache entry + client-side transform
-- [ ] Mounting `useMarket` + `useConsensus` for the same market produces one API call, not two
-- [ ] Other derived hooks (`useBucketDistribution` already derives from `useMarket` + `useConsensus`) continue to work
+- [x] `useConsensus` reads from market cache entry + client-side transform
+- [x] Mounting `useMarket` + `useConsensus` for the same market produces one API call, not two
+- [x] Other derived hooks (`useBucketDistribution` already derives from `useMarket` + `useConsensus`) continue to work
 
 ---
 
@@ -322,7 +322,7 @@ This means one API call serves both `useMarket` and `useConsensus`. Any other ho
 - Failed queries retry automatically with exponential backoff (e.g., 1s, 2s, 4s).
 - Configurable max retries (default 3).
 - Only retry on transient errors (network failures, 5xx). Do not retry on 4xx (auth failures, bad requests).
-- Retries are transparent — `loading` stays true during retries on initial fetch. `isFetching` stays true during retries on background refetch.
+- Retries are transparent  -- `loading` stays true during retries on initial fetch. `isFetching` stays true during retries on background refetch.
 - Mutations do NOT retry by default (a retried `buy` could double-execute). Mutation retry must be explicitly opted in.
 
 **Established practice:**
@@ -338,11 +338,11 @@ This means one API call serves both `useMarket` and `useConsensus`. Any other ho
 
 **Checklist:**
 
-- [ ] Failed queries retry with exponential backoff (default: 3 retries)
-- [ ] Retry only on transient errors (network, 5xx), not on 4xx
-- [ ] Configurable at Provider level (`defaultRetryCount`, `defaultRetryDelay`) and per hook
-- [ ] Mutation hooks do NOT retry by default
-- [ ] Retry state is transparent — consumers see `loading`/`isFetching`, not individual retry attempts
+- [x] Failed queries retry with exponential backoff (default: 0 retries, opt-in via `cache={{ defaultRetry: 3 }}`)
+- [x] Retry only on transient errors (network, 5xx), not on 4xx
+- [x] Configurable at Provider level (`defaultRetry`, `defaultRetryDelay`) and per hook via `QueryOptions`
+- [x] Mutation hooks do NOT retry by default
+- [x] Retry state is transparent  -- consumers see `loading`/`isFetching`, not individual retry attempts
 
 ---
 
@@ -368,16 +368,16 @@ This means one API call serves both `useMarket` and `useConsensus`. Any other ho
 
 **Checklist:**
 
-- [ ] `FSClient.get()` and `FSClient.post()` accept optional `signal: AbortSignal`
-- [ ] Cache creates `AbortController` per fetch and aborts on re-fetch or cleanup
-- [ ] Aborted requests do not update cache entries or trigger error states
-- [ ] Parameter changes (e.g., `marketId` change) abort the previous request before starting a new one
+- [x] `FSClient.get()` and `FSClient.post()` accept optional `signal: AbortSignal`
+- [x] Cache creates `AbortController` per fetch and aborts on re-fetch or cleanup
+- [x] Aborted requests do not update cache entries or trigger error states
+- [x] Parameter changes (e.g., `marketId` change) abort the previous request before starting a new one
 
 ---
 
 ## Tier 3: SDK Maturity
 
-These differentiate a good SDK from a great one. They are not blockers for multi-user testing but should be designed for now — architectural decisions in Tiers 1 and 2 should not make these harder to add later.
+These differentiate a good SDK from a great one. They are not blockers for multi-user testing but should be designed for now  -- architectural decisions in Tiers 1 and 2 should not make these harder to add later.
 
 ---
 
@@ -401,7 +401,7 @@ Replace polling with push-based updates. When another user trades, the server pu
 
 **Critical architectural point:** The hook API does not change. Whether data arrives via poll or push, the consumer calls `useConsensus(marketId)` and gets `{ consensus, loading, error }`. The transport is an implementation detail of the cache layer.
 
-**Design for this now:** Ensure the cache's "refetch" mechanism is abstract enough that a WebSocket message can write directly to a cache entry and notify subscribers — without going through the fetch → response → update cycle. TanStack Query supports this via `queryClient.setQueryData()`. The cache should expose an equivalent.
+**Design for this now:** Ensure the cache's "refetch" mechanism is abstract enough that a WebSocket message can write directly to a cache entry and notify subscribers  -- without going through the fetch → response → update cycle. TanStack Query supports this via `queryClient.setQueryData()`. The cache should expose an equivalent.
 
 **Where it lives:** React layer. A transport adapter (polling vs WebSocket vs SSE) feeds the cache. Core provides the WebSocket client if needed. UI is unaware.
 
@@ -423,10 +423,10 @@ These are cross-cutting concerns that apply to all components regardless of tier
 
 **Checklist:**
 
-- [ ] No hardcoded `id` attributes in any component
-- [ ] `useId()` used for all DOM identifiers that need uniqueness
-- [ ] `htmlFor` / `aria-*` attributes reference the generated ID
-- [ ] Verified by mounting two instances of the same component
+- [x] No hardcoded `id` attributes in any component
+- [x] `useId()` used for all DOM identifiers that need uniqueness
+- [x] `htmlFor` / `aria-*` attributes reference the generated ID
+- [x] Verified by mounting two instances of the same component
 
 ---
 
@@ -438,14 +438,14 @@ These are cross-cutting concerns that apply to all components regardless of tier
 
 **When to apply:** Required when polling (Tier 1.2) is implemented. The cache's poll timer should only run when at least one subscriber is both mounted and visible.
 
-**Design consideration:** `MarketCharts` already handles this partially — `TimelineChartContent` only fetches when the timeline tab is active. This pattern should be generalized at the cache level rather than implemented per component.
+**Design consideration:** `MarketCharts` already handles this partially  -- `TimelineChartContent` only fetches when the timeline tab is active. This pattern should be generalized at the cache level rather than implemented per component.
 
 **Checklist:**
 
-- [ ] Poll timers pause when subscriber components are hidden
-- [ ] No network traffic for tabs/widgets not currently visible
-- [ ] CSS side effects (if any) are toggled on mount/unmount
-- [ ] `document.visibilitychange` listener pauses all polling when tab is hidden
+- [x] Poll timers pause when subscriber components are hidden
+- [x] No network traffic for tabs/widgets not currently visible
+- [x] CSS side effects (if any) are toggled on mount/unmount
+- [x] `document.visibilitychange` listener pauses all polling when tab is hidden
 
 ---
 
@@ -462,9 +462,9 @@ These are cross-cutting concerns that apply to all components regardless of tier
 
 **Checklist:**
 
-- [ ] Theme variables are accessible to portaled components
-- [ ] A utility or wrapper exists for portal use cases
-- [ ] Multiple Providers with different themes on one page do not conflict
+- [x] Theme variables are accessible to portaled components (via `portalSupport` prop + `useThemeClass()` hook)
+- [x] A utility or wrapper exists for portal use cases (`useThemeClass()` returns scoped class name)
+- [x] Multiple Providers with different themes on one page do not conflict (scoped class per instance)
 
 ---
 
@@ -474,15 +474,15 @@ These are cross-cutting concerns that apply to all components regardless of tier
 
 **Rule:** Cache storage must use `useState`, `useRef`, or an external store (`useSyncExternalStore`). Never `useMemo` for data that must persist across renders.
 
-Existing hooks like `useBucketDistribution` use `useMemo` for derived computations — this is fine because the computation is pure and re-derivable. The distinction is: `useMemo` for derivations (recomputable), `useState`/`useRef`/external store for source data (must persist).
+Existing hooks like `useBucketDistribution` use `useMemo` for derived computations  -- this is fine because the computation is pure and re-derivable. The distinction is: `useMemo` for derivations (recomputable), `useState`/`useRef`/external store for source data (must persist).
 
-**Recommended approach for the cache:** `useSyncExternalStore` is the React-blessed way to subscribe to an external store. The cache is an external store — it lives outside React's state tree and notifies subscribers on updates. This is how TanStack Query, Zustand, and Redux connect to React.
+**Recommended approach for the cache:** `useSyncExternalStore` is the React-blessed way to subscribe to an external store. The cache is an external store  -- it lives outside React's state tree and notifies subscribers on updates. This is how TanStack Query, Zustand, and Redux connect to React.
 
 **Checklist:**
 
-- [ ] Query cache uses `useSyncExternalStore` or `useRef` — not `useMemo`
-- [ ] Derived computations (pure transforms of cached data) may use `useMemo`
-- [ ] No correctness dependency on `useMemo` cache persistence
+- [x] Query cache uses `useSyncExternalStore` or `useRef`  -- not `useMemo`
+- [x] Derived computations (pure transforms of cached data) may use `useMemo`
+- [x] No correctness dependency on `useMemo` cache persistence
 
 ---
 
@@ -490,11 +490,11 @@ Existing hooks like `useBucketDistribution` use `useMemo` for derived computatio
 
 ### Build vs Adopt
 
-**Option A — Lightweight internal cache:** A focused query cache class (~300-400 lines) that handles keyed storage, deduplication, staleness, polling, and subscriber management. Zero external dependencies. Full control over the API surface.
+**Option A  -- Lightweight internal cache:** A focused query cache class (~300-400 lines) that handles keyed storage, deduplication, staleness, polling, and subscriber management. Zero external dependencies. Full control over the API surface.
 
-**Option B — Adopt TanStack Query internally:** Gets everything in Tiers 1-3 out of the box. But adds a dependency, requires its own `QueryClientProvider` (nested inside yours), and creates conflicts if consumers already use TanStack Query in their app (two cache instances, two DevTools).
+**Option B  -- Adopt TanStack Query internally:** Gets everything in Tiers 1-3 out of the box. But adds a dependency, requires its own `QueryClientProvider` (nested inside yours), and creates conflicts if consumers already use TanStack Query in their app (two cache instances, two DevTools).
 
-**Recommendation for an embeddable SDK:** Option A. Dependency conflicts are a support burden for SDK maintainers, and consumers of an embeddable SDK are more likely to already have their own data layer. TanStack Query is the reference for **what** to build — its API design, default behaviors, and terminology are the standard. The implementation can be focused on the subset the SDK actually needs.
+**Recommendation for an embeddable SDK:** Option A. Dependency conflicts are a support burden for SDK maintainers, and consumers of an embeddable SDK are more likely to already have their own data layer. TanStack Query is the reference for **what** to build  -- its API design, default behaviors, and terminology are the standard. The implementation can be focused on the subset the SDK actually needs.
 
 ### Implementation Order
 
@@ -512,8 +512,8 @@ The tiers are ordered by priority, but within Tier 1 there is a dependency chain
 
 **Tier 2 depends on Tier 1:**
 
-- 2.1 Stale-While-Revalidate requires the cache (1.1) — it is a cache behavior.
-- 2.2 Derived Query Optimization requires the cache — it reads from another entry.
+- 2.1 Stale-While-Revalidate requires the cache (1.1)  -- it is a cache behavior.
+- 2.2 Derived Query Optimization requires the cache  -- it reads from another entry.
 - 2.3 Retry with Backoff lives in the cache's fetch orchestration.
 - 2.4 Request Cancellation touches core (`FSClient` signal support) and the cache.
 
@@ -526,7 +526,7 @@ Build the cache first. Everything else layers on top.
 When reviewing any PR that touches the React layer, verify:
 
 ### Hook Changes
-- [ ] Hook returns `{ <named>, loading, error, refetch }` (data-fetching) or `{ execute, loading, error, reset }` (mutation)
+- [ ] Hook returns `{ <named>, loading, isFetching, error, refetch }` (data-fetching) or `{ execute, loading, error, reset }` (mutation)
 - [ ] Hook checks for `FunctionSpaceContext` and throws a descriptive error if missing
 - [ ] Data-fetching hooks subscribe to the query cache, not local `useState`
 - [ ] Data-fetching hooks accept optional `pollInterval`
@@ -536,15 +536,15 @@ When reviewing any PR that touches the React layer, verify:
 
 ### Cache Changes
 - [ ] Cache keys are structured tuples: `[queryName, marketId, ...params]`
-- [ ] No `useMemo` for cache storage — use `useSyncExternalStore` or `useRef`
+- [ ] No `useMemo` for cache storage  -- use `useSyncExternalStore` or `useRef`
 - [ ] Deduplication works: same key from two components = one request
 - [ ] Stale data returned immediately on background refetch (no loading flicker)
 - [ ] Garbage collection respects `gcTime`
 - [ ] Poll timers are visibility-aware
 
 ### Component Changes
-- [ ] No hardcoded DOM `id` attributes — use `useId()` if identifiers needed
-- [ ] No direct imports from `@functionspace/core` for mutations — use mutation hooks
+- [ ] No hardcoded DOM `id` attributes  -- use `useId()` if identifiers needed
+- [ ] No direct imports from `@functionspace/core` for mutations  -- use mutation hooks
 - [ ] Pure math imports from core are allowed (generators, density evaluation)
 - [ ] Loading/error states handled per existing patterns
 - [ ] CSS uses `var(--fs-*)` variables only
@@ -552,7 +552,7 @@ When reviewing any PR that touches the React layer, verify:
 ### Layer Boundary Enforcement
 - [ ] Core does not import from React or UI
 - [ ] React does not import from UI
-- [ ] UI does not make API calls directly — data via hooks, mutations via mutation hooks
+- [ ] UI does not make API calls directly  -- data via hooks, mutations via mutation hooks
 - [ ] UI may import pure math functions from core (generators, density evaluation, statistics)
 
 ---
@@ -565,5 +565,5 @@ When reviewing any PR that touches the React layer, verify:
 | [SWR](https://swr.vercel.sh/) | Stale-while-revalidate pattern, focus revalidation, deduplication window, minimal API surface for data fetching |
 | [Apollo Client](https://www.apollographql.com/docs/react/) | Normalized cache, `useMutation` with `refetchQueries`, optimistic responses, polling |
 | [useSyncExternalStore](https://react.dev/reference/react/useSyncExternalStore) | React-blessed pattern for subscribing to external stores (the query cache) |
-| [RFC 5861](https://datatracker.ietf.org/doc/html/rfc5861) | HTTP stale-while-revalidate semantics — the origin of the SWR pattern |
+| [RFC 5861](https://datatracker.ietf.org/doc/html/rfc5861) | HTTP stale-while-revalidate semantics  -- the origin of the SWR pattern |
 | [Bulletproof React Components](https://shud.in/thoughts/build-bulletproof-react-components) | Instance-proof (`useId`), activity-proof (visibility cleanup), portal-proof (`ownerDocument`), future-proof (`useMemo` is not semantic) |

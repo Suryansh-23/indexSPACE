@@ -1,6 +1,7 @@
 ---
 title: "ConsensusChart"
 sidebar_position: 2
+description: "ConsensusChart rendering probability density with trade preview and position overlays from context."
 ---
 
 import { ConsensusChart } from '@functionspace/ui';
@@ -34,11 +35,11 @@ import { ConsensusChart } from '@functionspace/ui';
 
 **Renders (bottom to top):**
 
-1. **Consensus area** -- `type="monotone"`, solid stroke, gradient fill (40% to 5% opacity). No animation.
+1. **Consensus area** -- `type="linear"`, solid stroke, gradient fill (40% to 5% opacity). No animation.
 2. **Trade preview area** -- `type="linear"` (sharp edges for shape accuracy), dashed stroke (5 5), gradient fill, 300ms animation. Appears when any trading component writes `ctx.previewBelief`.
-3. **Selected position area** -- `type="monotone"`, solid stroke, gradient fill, 300ms animation. Appears when a `PositionTable` row is clicked.
+3. **Selected position area** -- `type="linear"`, solid stroke, gradient fill, 300ms animation. Appears when a `PositionTable` row is clicked.
 4. **Payout data** -- Invisible area on a hidden right Y-axis (tooltip only). Shows "Potential Payout: $X.XX" in tooltip when payout data exists.
-5. **Overlay curves** -- `type="monotone"`, custom colors, gradient fills, 300ms animation.
+5. **Overlay curves** -- `type="linear"`, custom colors, gradient fills, 300ms animation.
 
 **Behavior:**
 

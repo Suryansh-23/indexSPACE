@@ -1,8 +1,14 @@
 // ── Market Types ──
 
 export interface MarketConfig {
+  numBuckets: number;
+  lowerBound: number;
+  upperBound: number;
+  /** @deprecated Use numBuckets. Will be removed in next major. */
   K: number;
+  /** @deprecated Use lowerBound. Will be removed in next major. */
   L: number;
+  /** @deprecated Use upperBound. Will be removed in next major. */
   H: number;
   P0: number;
   mu: number;
@@ -27,6 +33,14 @@ export interface MarketState {
   decimals: number;
   resolutionState: 'open' | 'resolved' | 'voided';
   resolvedOutcome: number | null;
+  marketId: number;
+  createdAt: string | null;
+  expiresAt: string | null;
+  resolvedAt: string | null;
+  marketType: string;
+  marketSubtype: string | null;
+  metadata: Record<string, unknown>;
+  consensusMean: number;
 }
 
 export interface ConsensusSummary {
@@ -42,17 +56,49 @@ export interface ConsensusCurve {
   config: MarketConfig;
 }
 
+// ── Filter & Discovery Types ──
+
+export type FilterAction =
+  | 'equals'
+  | 'notEquals'
+  | 'greaterThan'
+  | 'greaterThanOrEqual'
+  | 'lessThan'
+  | 'lessThanOrEqual'
+  | 'contains'
+  | 'in'
+  | 'between';
+
+export interface MarketFilter {
+  field: string;
+  value: unknown;
+  action: FilterAction;
+}
+
+export interface MarketDiscoveryOptions {
+  state?: string;
+  titleContains?: string;
+  categories?: string[];
+  filters?: MarketFilter[];
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  limit?: number;
+  signal?: AbortSignal;
+}
+
 // ── Position Types ──
 
 export interface Position {
-  positionId: number;
+  positionId: string | number;
   belief: number[];
   collateral: number;
   claims: number;
   owner: string;
   status: 'open' | 'sold' | 'settled' | 'closed';
-  prediction: number;
-  stdDev: number;
+  prediction?: number | null;
+  stdDev?: number | null;
+  positionType?: string;
+  positionParams?: Record<string, unknown>;
   createdAt: string;
   closedAt: string | null;
   soldPrice: number | null;
@@ -74,20 +120,23 @@ export interface TradeEntry {
 // ── Trading Types ──
 
 export interface BuyResult {
-  positionId: number;
+  positionId: string | number;
   belief: number[];
   claims: number;
   collateral: number;
+  positionType?: string;
+  positionParams?: Record<string, unknown>;
 }
 
 export interface SellResult {
-  positionId: number;
+  positionId: string | number;
   collateralReturned: number;
+  creditedTo?: string;
 }
 
 export interface PreviewSellResult {
   collateralReturned: number;
-  iterations: number;
+  positionId: string | number;
 }
 
 export interface PayoutCurve {

@@ -7,7 +7,7 @@ import { useMarket } from './useMarket.js';
 
 /**
  * Hook that computes probability bucket distribution from consensus data.
- * Derives from useConsensus + useMarket — no additional API calls.
+ * Derives from useConsensus + useMarket  -- no additional API calls.
  */
 export function useBucketDistribution(
   marketId: string | number,
@@ -22,15 +22,15 @@ export function useBucketDistribution(
 
   const buckets = useMemo<BucketData[] | null>(() => {
     if (!consensus || !market) return null;
-    const { L, H } = market.config;
+    const { lowerBound, upperBound } = market.config;
     return calculateBucketDistribution(
       consensus.points,
-      L,
-      H,
+      lowerBound,
+      upperBound,
       numBuckets,
       market.decimals,
     );
-  }, [consensus, market, numBuckets, ctx.invalidationCount]);
+  }, [consensus, market, numBuckets]);
 
   return { buckets, loading, error, refetch };
 }

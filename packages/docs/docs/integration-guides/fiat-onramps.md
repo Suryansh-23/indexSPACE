@@ -1,13 +1,14 @@
 ---
 title: "Fiat OnRamps"
 sidebar_position: 2
+description: "Integrating fiat onramp providers (MoonPay, Transak, Coinbase Pay) for in-app USDC purchase."
 ---
 
 # Fiat OnRamps
 
 **Purpose:** Enable users to go from bank account to trading without leaving the app.
 
-**The Problem:** A new user wants to participate. They have dollars in their bank account but no USDC. Steps 1-4 of acquiring crypto happen outside our app—we lose the user.
+**The Problem:** A new user wants to participate. They have dollars in their bank account but no USDC. Steps 1-4 of acquiring crypto happen outside our app -- we lose the user.
 
 **Our Solution:** Integration points for fiat onramp providers that keep users in-app.
 

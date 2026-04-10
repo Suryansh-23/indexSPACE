@@ -46,7 +46,7 @@ Widget (UI) → Hook (React) → Query/Transaction (Core) → Backend API
 - **Server state** flows through hooks: `useMarket`, `useConsensus`, `usePositions`, etc.
 - **Preview state** flows through context: `previewBelief`, `previewPayout` (ephemeral, set by trade inputs)
 - **Coordination state** flows through context: `selectedPosition` (syncs chart overlays with table selection)
-- **Cache invalidation** uses `ctx.invalidate(marketId)` after mutations, which increments `invalidationCount` and triggers all hooks to refetch
+- **Cache invalidation** uses `ctx.invalidate(marketId)` after mutations, which marks that market's cache entries as stale and triggers subscribed hooks to refetch
 
 ---
 
@@ -59,10 +59,10 @@ Pure TypeScript with zero dependencies. Use this layer directly if you don't nee
 **API Client** -- `FSClient` handles authentication (token-based with auto-retry on 401), request building, and guest mode for unauthenticated browsing.
 
 **Math / Position Generation** -- Two-layer architecture for constructing belief vectors:
-- **L1**: `generateBelief(regions, K, L, H)` -- universal constructor. All belief vectors route through this single normalization path.
+- **L1**: `generateBelief(regions, numBuckets, lowerBound, upperBound)` -- universal constructor. All belief vectors route through this single normalization path.
 - **L2**: Convenience generators -- `generateGaussian`, `generateRange`, `generateDip`, `generateLeftSkew`, `generateRightSkew`. Thin wrappers that construct Region arrays and delegate to L1.
 
-**Density Evaluation** -- `evaluateDensityCurve` (multi-point for charts) and `evaluateDensityPiecewise` (single-point) use piecewise-linear interpolation over Bernstein coefficient arrays.
+**Density Evaluation** -- `evaluateDensityCurve` (multi-point for charts) and `evaluateDensityPiecewise` (single-point) use quadratic B-spline evaluation over Bernstein coefficient arrays.
 
 **Queries** -- `queryMarketState`, `queryMarketPositions`, `queryTradeHistory`, `queryMarketHistory`, `getConsensusCurve`, `queryDensityAt`.
 
@@ -79,8 +79,8 @@ import { FSClient, queryMarketState, generateGaussian, buy } from '@functionspac
 
 const client = new FSClient({ baseUrl: 'https://api.example.com', username: 'alice', password: 'secret' });
 const market = await queryMarketState(client, 1);
-const belief = generateGaussian(50, 5, market.config.K, market.config.L, market.config.H);
-const result = await buy(client, 1, belief, 100);
+const belief = generateGaussian(50, 5, market.config.numBuckets, market.config.lowerBound, market.config.upperBound);
+const result = await buy(client, 1, belief, 100, market.config.numBuckets);
 ```
 
 ### `@functionspace/react`
@@ -100,7 +100,7 @@ import { FunctionSpaceProvider } from '@functionspace/react';
 </FunctionSpaceProvider>
 ```
 
-**Hooks** -- Each returns `{ <named>, loading, error, refetch }` and reacts to `invalidationCount` for automatic cache busting after mutations.
+**Hooks** -- Each returns `{ <named>, loading, isFetching, error, refetch }` and uses cache subscription for automatic refetch after mutations.
 
 | Hook | Returns | Use For |
 |------|---------|---------|
@@ -114,6 +114,8 @@ import { FunctionSpaceProvider } from '@functionspace/react';
 | `useAuth()` | `{ user, isAuthenticated, loading, error, login, signup, logout, refreshUser }` | Authentication state and actions |
 | `useChartZoom(options)` | `{ containerRef, xDomain, yDomain, isZoomed, isPanning, containerProps, reset }` | Zoom and pan interaction for charts |
 | `useCustomShape(market)` | `{ controlValues, pVector, prediction, setControlValue, toggleLock, ... }` | Custom shape editing with draggable control points |
+| `useMarkets(options?)` | `{ markets, loading, error, refetch }` | Market discovery with filtering, sorting, limiting |
+| `useMarketFilters(config?)` | `{ markets, loading, filterBarProps, ... }` | Search, category, sort state on top of useMarkets |
 
 **Theme System** -- Pass a preset string or a custom color scheme. The provider resolves 30 CSS tokens and chart-specific color values, making them available to all widgets automatically. See [Theming](#theming) for full documentation.
 
@@ -146,8 +148,12 @@ Pre-built React components organized by purpose. Each widget is self-contained -
 | Component | Props | Description |
 |-----------|-------|-------------|
 | `MarketStats` | `marketId` | Read-only statistics bar (mean, median, mode, pool, volume) |
-| `PositionTable` | `marketId`, `username`, `pageSize?`, `tabs?`, `onSell?` | Tabbed position/trade table with row selection and sell actions |
+| `PositionTable` | `marketId`, `pageSize?`, `tabs?`, `onSell?` | Tabbed position/trade table with row selection and sell actions |
 | `TimeSales` | `marketId` | Real-time trade log |
+| `MarketCard` | `market`, `onSelect?` | Summary card for a single market (title, consensus mean, volume, liquidity, traders, status) |
+| `MarketCardGrid` | `markets`, `onSelect?`, `loading?` | Responsive grid of MarketCards for market discovery |
+| `MarketFilterBar` | `...filterBarProps` | Search, category chips, sort controls -- driven by `useMarketFilters` |
+| `MarketExplorer` | `views?`, `children?`, `onSelect?`, `state?`, `showFilterBar?`, ... | Multi-view market discovery with tabbed views (cards, pulse, compact, gauge, split, table, heatmap, charts), filter bar, and optional overlay panel |
 
 **Auth** (`auth/`)
 
@@ -160,7 +166,7 @@ Pre-built React components organized by purpose. Each widget is self-contained -
 ```tsx
 <FunctionSpaceProvider config={config} theme="fs-dark">
   <MarketCharts marketId={1} views={['consensus', 'distribution']} />
-  <PositionTable marketId={1} username="alice" />
+  <PositionTable marketId={1} />
   <TradePanel marketId={1} />
 </FunctionSpaceProvider>
 ```
@@ -187,11 +193,27 @@ function App() {
     >
       <ConsensusChart marketId={1} height={400} />
       <TradePanel marketId={1} />
-      <PositionTable marketId={1} username="alice" />
+      <PositionTable marketId={1} />
     </FunctionSpaceProvider>
   );
 }
 ```
+
+### Market Discovery
+
+Browse and select markets, then trade on the selected one:
+
+```tsx
+import { FunctionSpaceProvider, useMarkets } from '@functionspace/react';
+import { MarketCardGrid, MarketCharts, TradePanel } from '@functionspace/ui';
+
+function App() {
+  const [marketId, setMarketId] = useState<number | null>(null);
+  // ... see composition guide for full pattern
+}
+```
+
+Two navigation patterns are available -- state-driven (no router, simpler) and route-driven (React Router, shareable URLs). See the documentation for complete examples and trade-offs.
 
 ## Theming
 
@@ -334,8 +356,10 @@ npx vitest run
 | `tests/themes.test.ts` | Theme presets, resolveTheme, resolveChartColors, chart color derivation |
 | `tests/shapes.test.ts` | Belief shape validation (vector properties, shape characteristics) |
 | `tests/binary.test.ts` | Binary panel-specific tests |
-| `tests/stage1.test.ts` | Core math functions (position generators, density evaluation) |
-| `tests/stage2.test.ts` | API / transaction functions |
+| `tests/client-auth.test.ts` | Client auth, core math functions (position generators, density evaluation) |
+| `tests/api-integration.test.ts` | API / transaction functions |
+| `tests/mappings.test.ts` | Mocked-fetch mapping contract tests (raw API shape to SDK type, POST body assertions) |
+| `tests/validation.test.ts` | Belief vector validation (validateBeliefVector) |
 | `tests/chart-zoom.test.ts` | Chart zoom/pan utilities (domain computation, pixel mapping, data filtering) |
 | `tests/cache.test.ts` | QueryCache class unit tests (deduplication, staleness, revalidation) |
 | `tests/client-signal.test.ts` | FSClient signal forwarding and request cancellation |
@@ -381,6 +405,6 @@ packages/
     ├── styles/base.css        All widget styles (CSS variables only)
     ├── charts/               ConsensusChart, DistributionChart, TimelineChart, MarketCharts
     ├── trading/              TradePanel, ShapeCutter, BinaryPanel, BucketRangeSelector, BucketTradePanel, CustomShapeEditor
-    ├── market/               MarketStats, PositionTable, TimeSales
+    ├── market/               MarketStats, MarketCardGrid, MarketExplorer, MarketFilterBar, PositionTable, TimeSales
     └── auth/                 AuthWidget
 ```

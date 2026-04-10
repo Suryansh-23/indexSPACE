@@ -1,6 +1,7 @@
 ---
 title: "loginUser"
 sidebar_position: 1
+description: "Authenticate a user with username and password, returning a session token and profile."
 ---
 
 # loginUser

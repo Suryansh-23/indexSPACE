@@ -1,6 +1,7 @@
 ---
 title: "ShapeCutter"
 sidebar_position: 3
+description: "ShapeCutter offering 8 named belief shape presets with adaptive parameter sliders and SVG icons."
 ---
 
 import { ShapeCutter } from '@functionspace/ui';
@@ -47,7 +48,7 @@ import { ShapeCutter } from '@functionspace/ui';
 | The Dip    | `generateDip`                                        | Target outcome, confidence                       |
 | Left Skew  | `generateLeftSkew`                                   | Target outcome, confidence, skew intensity       |
 | Right Skew | `generateRightSkew`                                  | Target outcome, confidence, skew intensity       |
-| Uniform    | `generateRange(L, H, ...)` (full range)              | None                                             |
+| Uniform    | `generateRange(lowerBound, upperBound, ...)` (full range) | None                                             |
 
 **Behavior:**
 
@@ -63,7 +64,7 @@ import { ShapeCutter } from '@functionspace/ui';
 * **Writes:** `ctx.setPreviewBelief(belief)` on input change, `ctx.setPreviewPayout(result)` after debounced preview, clears both on unmount
 * **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useMarket`, `generateGaussian`, `generateRange`, `generateBelief`, `generateDip`, `generateLeftSkew`, `generateRightSkew`, `SHAPE_DEFINITIONS`, `previewPayoutCurve`, `buy`
+**Internal calls:** `useMarket`, `useBuy`, `usePreviewPayout`, `generateGaussian`, `generateRange`, `generateBelief`, `generateDip`, `generateLeftSkew`, `generateRightSkew`, `SHAPE_DEFINITIONS`
 
 **Example:**
 

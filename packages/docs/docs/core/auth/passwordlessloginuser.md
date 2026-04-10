@@ -1,6 +1,7 @@
 ---
 title: "passwordlessLoginUser"
 sidebar_position: 5
+description: "Single-call passwordless auth that handles login, auto-signup, or password-required rejection."
 ---
 
 # passwordlessLoginUser

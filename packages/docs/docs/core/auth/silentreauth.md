@@ -1,6 +1,7 @@
 ---
 title: "silentReAuth"
 sidebar_position: 6
+description: "Re-authenticate a returning user from a stored username without prompting for credentials."
 ---
 
 # silentReAuth

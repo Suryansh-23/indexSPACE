@@ -18,10 +18,10 @@ const USERNAME = process.env.FS_TEST_USERNAME || '';
 const PASSWORD = process.env.FS_TEST_PASSWORD || '';
 const MARKET_ID = process.env.FS_TEST_MARKET_ID || '15';
 
-// Use K=60, L and H from actual market — but for pure math tests use representative values
-const K = 60;
-const L = 0;
-const H = 100;
+// Use numBuckets=60, lowerBound and upperBound from actual market  -- but for pure math tests use representative values
+const numBuckets = 60;
+const lowerBound = 0;
+const upperBound = 100;
 
 function makeClient() {
   return new FSClient({ baseUrl: BASE_URL, username: USERNAME, password: PASSWORD });
@@ -30,15 +30,15 @@ function makeClient() {
 // ── Math tests (no backend) ──
 
 describe('Math: generateGaussian', () => {
-  it('produces vector of length K+1 that sums to 1', () => {
-    const v = generateGaussian(60, 9, K, L, H);
-    expect(v.length).toBe(K + 1);
+  it('produces vector of length numBuckets+2 that sums to numBuckets+2', () => {
+    const v = generateGaussian(60, 9, numBuckets, lowerBound, upperBound);
+    expect(v.length).toBe(numBuckets + 2);
     const sum = v.reduce((a, b) => a + b, 0);
-    expect(sum).toBeCloseTo(1.0, 10);
+    expect(sum).toBeCloseTo(numBuckets + 2, 10);
   });
 
   it('all values are non-negative', () => {
-    const v = generateGaussian(60, 9, K, L, H);
+    const v = generateGaussian(60, 9, numBuckets, lowerBound, upperBound);
     for (const val of v) {
       expect(val).toBeGreaterThanOrEqual(0);
     }
@@ -46,11 +46,11 @@ describe('Math: generateGaussian', () => {
 });
 
 describe('Math: generateRange', () => {
-  it('produces vector that sums to 1 with non-negative values', () => {
-    const v = generateRange(50, 70, K, L, H);
-    expect(v.length).toBe(K + 1);
+  it('produces vector that sums to numBuckets+2 with non-negative values', () => {
+    const v = generateRange(50, 70, numBuckets, lowerBound, upperBound);
+    expect(v.length).toBe(numBuckets + 2);
     const sum = v.reduce((a, b) => a + b, 0);
-    expect(sum).toBeCloseTo(1.0, 10);
+    expect(sum).toBeCloseTo(numBuckets + 2, 10);
     for (const val of v) {
       expect(val).toBeGreaterThanOrEqual(0);
     }
@@ -61,9 +61,9 @@ describe('Math: generateBelief', () => {
   it('single PointRegion produces similar output to generateGaussian', () => {
     const fromGenerator = generateBelief(
       [{ type: 'point', center: 60, spread: 9 }],
-      K, L, H,
+      numBuckets, lowerBound, upperBound,
     );
-    const fromGaussian = generateGaussian(60, 9, K, L, H);
+    const fromGaussian = generateGaussian(60, 9, numBuckets, lowerBound, upperBound);
     expect(fromGenerator.length).toBe(fromGaussian.length);
     for (let i = 0; i < fromGenerator.length; i++) {
       expect(fromGenerator[i]).toBeCloseTo(fromGaussian[i], 10);
@@ -73,28 +73,28 @@ describe('Math: generateBelief', () => {
 
 describe('Math: evaluateDensityPiecewise', () => {
   it('density at center of Gaussian is highest', () => {
-    const v = generateGaussian(60, 9, K, L, H);
-    const atCenter = evaluateDensityPiecewise(v, 60, L, H);
-    const atEdge = evaluateDensityPiecewise(v, 20, L, H);
+    const v = generateGaussian(60, 9, numBuckets, lowerBound, upperBound);
+    const atCenter = evaluateDensityPiecewise(v, 60, lowerBound, upperBound);
+    const atEdge = evaluateDensityPiecewise(v, 20, lowerBound, upperBound);
     expect(atCenter).toBeGreaterThan(atEdge);
     expect(atCenter).toBeGreaterThan(0);
   });
 });
 
 describe('Math: evaluateDensityCurve', () => {
-  it('returns correct number of points spanning [L, H]', () => {
-    const v = generateGaussian(60, 9, K, L, H);
-    const curve = evaluateDensityCurve(v, L, H, 100);
+  it('returns correct number of points spanning [lowerBound, upperBound]', () => {
+    const v = generateGaussian(60, 9, numBuckets, lowerBound, upperBound);
+    const curve = evaluateDensityCurve(v, lowerBound, upperBound, 100);
     expect(curve.length).toBe(100);
-    expect(curve[0].x).toBeCloseTo(L);
-    expect(curve[99].x).toBeCloseTo(H);
+    expect(curve[0].x).toBeCloseTo(lowerBound);
+    expect(curve[99].x).toBeCloseTo(upperBound);
   });
 });
 
 describe('Math: computeStatistics', () => {
   it('returns all 5 fields with mean close to center for symmetric Gaussian', () => {
-    const v = generateGaussian(50, 10, K, L, H);
-    const stats = computeStatistics(v, L, H);
+    const v = generateGaussian(50, 10, numBuckets, lowerBound, upperBound);
+    const stats = computeStatistics(v, lowerBound, upperBound);
     expect(stats.mean).toBeCloseTo(50, 0);
     expect(stats.median).toBeDefined();
     expect(stats.mode).toBeDefined();
@@ -186,7 +186,7 @@ describe('API: queryMarketState', () => {
     expect(market.alpha).toBeDefined();
     expect(Array.isArray(market.alpha)).toBe(true);
     expect(market.consensus).toBeDefined();
-    expect(market.config.K).toBe(60);
+    expect(market.config.numBuckets).toBe(80);
     expect(market.title).toBeDefined();
     expect(market.totalMass).toBeGreaterThan(0);
     expect(market.poolBalance).toBeDefined();
@@ -206,7 +206,7 @@ describe('API: getConsensusCurve', () => {
     const client = makeClient();
     const curve = await getConsensusCurve(client, MARKET_ID, 100);
     expect(curve.points.length).toBe(100);
-    expect(curve.config.K).toBe(60);
+    expect(curve.config.numBuckets).toBe(80);
     expect(curve.points[0].y).toBeGreaterThan(0);
   });
 });
@@ -227,7 +227,7 @@ describe('API: queryDensityAt', () => {
   it('returns positive density at midpoint', async () => {
     const client = makeClient();
     const market = await queryMarketState(client, MARKET_ID);
-    const mid = (market.config.L + market.config.H) / 2;
+    const mid = (market.config.lowerBound + market.config.upperBound) / 2;
     const result = await queryDensityAt(client, MARKET_ID, mid);
     expect(result.x).toBe(mid);
     expect(result.density).toBeGreaterThan(0);
@@ -239,13 +239,13 @@ describe('API: previewPayoutCurve', () => {
     const client = makeClient();
     const market = await queryMarketState(client, MARKET_ID);
     const belief = generateGaussian(
-      (market.config.L + market.config.H) / 2,
-      (market.config.H - market.config.L) * 0.1,
-      market.config.K,
-      market.config.L,
-      market.config.H,
+      (market.config.lowerBound + market.config.upperBound) / 2,
+      (market.config.upperBound - market.config.lowerBound) * 0.1,
+      market.config.numBuckets,
+      market.config.lowerBound,
+      market.config.upperBound,
     );
-    const payout = await previewPayoutCurve(client, MARKET_ID, belief, 10, 20);
+    const payout = await previewPayoutCurve(client, MARKET_ID, belief, 10, market.config.numBuckets, 20);
     expect(payout.previews.length).toBe(20);
     expect(payout.maxPayout).toBeGreaterThan(0);
     expect(payout.inputCollateral).toBe(10);
@@ -259,17 +259,17 @@ describe('API: Full trade cycle (Gaussian via generateGaussian)', () => {
   it('generateGaussian → buy → queryPositionState → previewSell → sell', async () => {
     const client = makeClient();
     const market = await queryMarketState(client, MARKET_ID);
-    const center = (market.config.L + market.config.H) / 2;
+    const center = (market.config.lowerBound + market.config.upperBound) / 2;
     const belief = generateGaussian(
       center,
-      (market.config.H - market.config.L) * 0.1,
-      market.config.K,
-      market.config.L,
-      market.config.H,
+      (market.config.upperBound - market.config.lowerBound) * 0.1,
+      market.config.numBuckets,
+      market.config.lowerBound,
+      market.config.upperBound,
     );
 
     // Buy
-    const buyResult = await buy(client, MARKET_ID, belief, 1, { prediction: center });
+    const buyResult = await buy(client, MARKET_ID, belief, 1, market.config.numBuckets, { prediction: center });
     expect(buyResult.positionId).toBeDefined();
     expect(buyResult.claims).toBeGreaterThan(0);
     expect(buyResult.collateral).toBe(1);
@@ -294,12 +294,12 @@ describe('API: Full trade cycle (Range via generateRange)', () => {
   it('generateRange -> buy -> previewSell -> sell', async () => {
     const client = makeClient();
     const market = await queryMarketState(client, MARKET_ID);
-    const { L: mL, H: mH, K: mK } = market.config;
+    const { lowerBound: mL, upperBound: mH, numBuckets: mK } = market.config;
     const low = mL + (mH - mL) * 0.3;
     const high = mL + (mH - mL) * 0.7;
     const belief = generateRange(low, high, mK, mL, mH);
 
-    const buyResult = await buy(client, MARKET_ID, belief, 1, { prediction: (low + high) / 2 });
+    const buyResult = await buy(client, MARKET_ID, belief, 1, mK, { prediction: (low + high) / 2 });
     expect(buyResult.positionId).toBeDefined();
     expect(buyResult.claims).toBeGreaterThan(0);
 
@@ -315,7 +315,7 @@ describe('API: Full trade cycle (generateBelief with mixed regions)', () => {
   it('generateBelief → buy → sell', async () => {
     const client = makeClient();
     const market = await queryMarketState(client, MARKET_ID);
-    const { L: mL, H: mH, K: mK } = market.config;
+    const { lowerBound: mL, upperBound: mH, numBuckets: mK } = market.config;
     const belief = generateBelief(
       [
         { type: 'point', center: mL + (mH - mL) * 0.4, spread: (mH - mL) * 0.08 },
@@ -324,7 +324,7 @@ describe('API: Full trade cycle (generateBelief with mixed regions)', () => {
       mK, mL, mH,
     );
 
-    const buyResult = await buy(client, MARKET_ID, belief, 1);
+    const buyResult = await buy(client, MARKET_ID, belief, 1, mK);
     expect(buyResult.positionId).toBeDefined();
 
     const sellResult = await sell(client, buyResult.positionId, MARKET_ID);
@@ -336,20 +336,20 @@ describe('Cross-validation: local stats vs backend data', () => {
   it('local computeStatistics mean is consistent with backend consensus', async () => {
     const client = makeClient();
     const market = await queryMarketState(client, MARKET_ID);
-    const localStats = computeStatistics(market.consensus, market.config.L, market.config.H);
+    const localStats = computeStatistics(market.consensus, market.config.lowerBound, market.config.upperBound);
 
     // Mean should be within the market range
-    expect(localStats.mean).toBeGreaterThanOrEqual(market.config.L);
-    expect(localStats.mean).toBeLessThanOrEqual(market.config.H);
+    expect(localStats.mean).toBeGreaterThanOrEqual(market.config.lowerBound);
+    expect(localStats.mean).toBeLessThanOrEqual(market.config.upperBound);
     // Median should be within range
-    expect(localStats.median).toBeGreaterThanOrEqual(market.config.L);
-    expect(localStats.median).toBeLessThanOrEqual(market.config.H);
+    expect(localStats.median).toBeGreaterThanOrEqual(market.config.lowerBound);
+    expect(localStats.median).toBeLessThanOrEqual(market.config.upperBound);
     // Mode should be within range
-    expect(localStats.mode).toBeGreaterThanOrEqual(market.config.L);
-    expect(localStats.mode).toBeLessThanOrEqual(market.config.H);
+    expect(localStats.mode).toBeGreaterThanOrEqual(market.config.lowerBound);
+    expect(localStats.mode).toBeLessThanOrEqual(market.config.upperBound);
     // StdDev should be positive and less than the full range
     expect(localStats.stdDev).toBeGreaterThan(0);
-    expect(localStats.stdDev).toBeLessThan(market.config.H - market.config.L);
+    expect(localStats.stdDev).toBeLessThan(market.config.upperBound - market.config.lowerBound);
   });
 
   it('local evaluateDensity on consensus produces values consistent with getConsensusCurve', async () => {
@@ -360,7 +360,7 @@ describe('Cross-validation: local stats vs backend data', () => {
     // Pick a few points from the curve and compare against direct evaluateDensityPiecewise
     for (const point of [curve.points[10], curve.points[25], curve.points[40]]) {
       const directDensity = evaluateDensityPiecewise(
-        market.consensus, point.x, market.config.L, market.config.H,
+        market.consensus, point.x, market.config.lowerBound, market.config.upperBound,
       );
       expect(directDensity).toBeCloseTo(point.y, 5);
     }
@@ -369,17 +369,17 @@ describe('Cross-validation: local stats vs backend data', () => {
   it('previewSell value is consistent with previewPayoutCurve at consensus mean', async () => {
     const client = makeClient();
     const market = await queryMarketState(client, MARKET_ID);
-    const center = (market.config.L + market.config.H) / 2;
-    const belief = generateGaussian(center, (market.config.H - market.config.L) * 0.1, market.config.K, market.config.L, market.config.H);
+    const center = (market.config.lowerBound + market.config.upperBound) / 2;
+    const belief = generateGaussian(center, (market.config.upperBound - market.config.lowerBound) * 0.1, market.config.numBuckets, market.config.lowerBound, market.config.upperBound);
 
     // Buy a position
-    const buyResult = await buy(client, MARKET_ID, belief, 5, { prediction: center });
+    const buyResult = await buy(client, MARKET_ID, belief, 5, market.config.numBuckets, { prediction: center });
 
     // Get previewSell value
     const sellPreview = await previewSell(client, buyResult.positionId, MARKET_ID);
 
     // Get payout curve
-    const payoutCurve = await previewPayoutCurve(client, MARKET_ID, belief, 5, 50);
+    const payoutCurve = await previewPayoutCurve(client, MARKET_ID, belief, 5, market.config.numBuckets, 50);
 
     // previewSell gives the current sell value; payoutCurve gives payout at settlement outcomes
     // They measure different things, but both should be positive for a valid position

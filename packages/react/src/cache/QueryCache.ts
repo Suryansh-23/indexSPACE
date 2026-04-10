@@ -1,4 +1,4 @@
-import type { CacheKey, CacheSnapshot, CacheEntry, QueryFn, CacheConfig } from './types.js';
+import type { CacheKey, CacheSnapshot, CacheEntry, QueryFn, CacheConfig, RetryDelayFn } from './types.js';
 
 const IDLE_SNAPSHOT: CacheSnapshot = Object.freeze({
   data: null,
@@ -10,10 +10,68 @@ function serializeKey(key: CacheKey): string {
   return JSON.stringify(key);
 }
 
+// Default exponential backoff: 1s, 2s, 4s, 8s, ... capped at 30s
+const DEFAULT_RETRY_DELAY: RetryDelayFn = (attempt: number) =>
+  Math.min(1000 * Math.pow(2, attempt), 30_000);
+
+/**
+ * Determine whether an error is transient and should be retried.
+ * - AbortError: never retry (request was intentionally cancelled)
+ * - HTTP 4xx: never retry (client error, not transient)
+ * - HTTP 5xx: retry (server error, likely transient)
+ * - Network errors (TypeError from fetch): retry
+ * - All other errors: retry (assume transient)
+ *
+ * FSClient throws plain Error with message "API error: <status> <text> on <method> <path>".
+ * We parse the status code from the message to classify HTTP errors.
+ */
+function isRetryable(error: unknown): boolean {
+  // AbortError -- never retry
+  if (error instanceof DOMException && error.name === 'AbortError') return false;
+
+  if (error instanceof Error) {
+    // Parse HTTP status from FSClient error message pattern: "API error: <status> "
+    const statusMatch = error.message.match(/^API error: (\d{3}) /);
+    if (statusMatch) {
+      const status = parseInt(statusMatch[1], 10);
+      // 4xx = client error, not retryable
+      if (status >= 400 && status < 500) return false;
+      // 5xx = server error, retryable
+      return true;
+    }
+  }
+
+  // Network errors (TypeError from fetch) and all other errors: retryable
+  return true;
+}
+
+/**
+ * Wait for a given duration, but abort early if the signal fires.
+ * Returns a promise that resolves to true if the delay completed,
+ * or false if it was aborted.
+ */
+function abortableDelay(ms: number, signal: AbortSignal): Promise<boolean> {
+  // Early check: if already aborted, resolve immediately as cancelled
+  if (signal.aborted) return Promise.resolve(false);
+
+  return new Promise<boolean>((resolve) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve(true);
+    }, ms);
+
+    function onAbort() {
+      clearTimeout(timer);
+      resolve(false);
+    }
+
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
 export class QueryCache {
   private entries = new Map<string, CacheEntry>();
   private config: Required<CacheConfig>;
-  private destroyed = false;
   private visible = true;
 
   constructor(config: CacheConfig = {}) {
@@ -23,6 +81,8 @@ export class QueryCache {
       defaultPollInterval: config.defaultPollInterval ?? 0,
       revalidateOnFocus: config.revalidateOnFocus ?? true,
       revalidateOnReconnect: config.revalidateOnReconnect ?? true,
+      defaultRetry: config.defaultRetry ?? 0,
+      defaultRetryDelay: config.defaultRetryDelay ?? DEFAULT_RETRY_DELAY,
     };
 
     if (typeof document !== 'undefined') {
@@ -39,7 +99,6 @@ export class QueryCache {
   // ---------------------------------------------------------------------------
 
   subscribe(key: CacheKey, callback: () => void): () => void {
-    if (this.destroyed) return () => {};
     const serialized = serializeKey(key);
     const entry = this.getOrCreateEntry(serialized);
 
@@ -50,10 +109,12 @@ export class QueryCache {
     }
 
     entry.subscribers.add(callback);
+    entry.subscriberActivity.set(callback, true);
 
     // Return unsubscribe function
     return () => {
       entry.subscribers.delete(callback);
+      entry.subscriberActivity.delete(callback);
 
       if (entry.subscribers.size === 0) {
         // Last subscriber left -- clear poll timer immediately
@@ -69,6 +130,9 @@ export class QueryCache {
         entry.gcTimer = setTimeout(() => {
           this.entries.delete(serialized);
         }, this.config.gcTime);
+      } else {
+        // Check if all remaining subscribers are inactive -- pause poll if so
+        this.reconcilePollTimer(serialized, entry);
       }
     };
   }
@@ -81,14 +145,19 @@ export class QueryCache {
   }
 
   registerQueryFn<T>(key: CacheKey, queryFn: QueryFn<T>): void {
-    if (this.destroyed) return;
     const serialized = serializeKey(key);
     const entry = this.getOrCreateEntry(serialized);
     entry.queryFn = queryFn as QueryFn<unknown>;
   }
 
+  registerRetryConfig(key: CacheKey, retry?: number, retryDelay?: number | RetryDelayFn): void {
+    const serialized = serializeKey(key);
+    const entry = this.getOrCreateEntry(serialized);
+    entry.retryCount = retry ?? this.config.defaultRetry;
+    entry.retryDelay = retryDelay ?? this.config.defaultRetryDelay;
+  }
+
   ensureFetching(key: CacheKey): void {
-    if (this.destroyed) return;
     const serialized = serializeKey(key);
     const entry = this.entries.get(serialized);
     if (!entry) return;
@@ -103,7 +172,6 @@ export class QueryCache {
   }
 
   async refetch(key: CacheKey): Promise<void> {
-    if (this.destroyed) return;
     const serialized = serializeKey(key);
     const entry = this.entries.get(serialized);
     if (!entry || !entry.queryFn) return;
@@ -118,7 +186,6 @@ export class QueryCache {
   }
 
   setPollInterval(key: CacheKey, interval: number): void {
-    if (this.destroyed) return;
     const serialized = serializeKey(key);
     const entry = this.entries.get(serialized);
     if (!entry) return;
@@ -126,13 +193,27 @@ export class QueryCache {
     entry.pollInterval = interval;
     this.clearPollTimer(entry);
 
-    if (interval > 0 && entry.subscribers.size > 0 && this.visible) {
+    if (interval > 0 && entry.subscribers.size > 0 && this.hasActiveSubscriber(entry) && this.visible) {
       this.startPollTimer(serialized, entry);
     }
   }
 
+  /**
+   * Mark a subscriber as active (visible) or inactive (backgrounded/hidden).
+   * When all subscribers for an entry become inactive, the poll timer pauses.
+   * When any subscriber becomes active again, the poll timer resumes.
+   */
+  setSubscriberActive(key: CacheKey, callback: () => void, active: boolean): void {
+    const serialized = serializeKey(key);
+    const entry = this.entries.get(serialized);
+    if (!entry) return;
+    if (!entry.subscriberActivity.has(callback)) return;
+
+    entry.subscriberActivity.set(callback, active);
+    this.reconcilePollTimer(serialized, entry);
+  }
+
   invalidate(marketId: string): void {
-    if (this.destroyed) return;
     for (const [serialized, entry] of this.entries) {
       const key: CacheKey = JSON.parse(serialized);
       if (key.length > 1 && key[1] === marketId) {
@@ -151,7 +232,6 @@ export class QueryCache {
   }
 
   invalidateAll(): void {
-    if (this.destroyed) return;
     for (const [serialized, entry] of this.entries) {
       // Abort in-flight request
       if (entry.abortController !== null) {
@@ -167,7 +247,6 @@ export class QueryCache {
   }
 
   handleFocus(): void {
-    if (this.destroyed) return;
     if (!this.config.revalidateOnFocus) return;
 
     for (const [serialized, entry] of this.entries) {
@@ -178,7 +257,6 @@ export class QueryCache {
   }
 
   handleReconnect(): void {
-    if (this.destroyed) return;
     if (!this.config.revalidateOnReconnect) return;
 
     for (const [serialized, entry] of this.entries) {
@@ -193,13 +271,12 @@ export class QueryCache {
   }
 
   setVisible(visible: boolean): void {
-    if (this.destroyed) return;
     this.visible = visible;
 
     if (visible) {
-      // Resume poll timers for entries with subscribers
+      // Resume poll timers for entries with active subscribers
       for (const [serialized, entry] of this.entries) {
-        if (entry.pollInterval > 0 && entry.subscribers.size > 0 && entry.pollTimer === null) {
+        if (entry.pollInterval > 0 && entry.subscribers.size > 0 && this.hasActiveSubscriber(entry) && entry.pollTimer === null) {
           this.startPollTimer(serialized, entry);
         }
       }
@@ -211,10 +288,29 @@ export class QueryCache {
     }
   }
 
-  destroy(): void {
-    if (this.destroyed) return;
-    this.destroyed = true;
+  /**
+   * Re-register event listeners after destroy(). Handles React StrictMode
+   * which runs effect cleanup (destroy) then re-runs effects (init).
+   * Safe to call multiple times -- addEventListener deduplicates.
+   */
+  init(): void {
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', this.handleReconnectEvent);
+      window.addEventListener('focus', this.handleFocusEvent);
+    }
+  }
 
+  /**
+   * Clean up event listeners, timers, and in-flight requests.
+   * Does NOT prevent future operations -- after destroy(), the cache
+   * still works if re-used (entries, queryFns, subscribers persist).
+   * This is intentional for React StrictMode compatibility where
+   * child effects re-register before the parent calls init().
+   */
+  destroy(): void {
     // Clear all timers and abort all controllers
     for (const [, entry] of this.entries) {
       this.clearPollTimer(entry);
@@ -250,15 +346,42 @@ export class QueryCache {
         dataUpdatedAt: null,
         fetchCount: 0,
         subscribers: new Set(),
+        subscriberActivity: new Map(),
         queryFn: null,
         abortController: null,
         pollInterval: this.config.defaultPollInterval,
         pollTimer: null,
         gcTimer: null,
+        retryCount: this.config.defaultRetry,
+        retryDelay: this.config.defaultRetryDelay,
       };
       this.entries.set(serialized, entry);
     }
     return entry;
+  }
+
+  private hasActiveSubscriber(entry: CacheEntry): boolean {
+    for (const active of entry.subscriberActivity.values()) {
+      if (active) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Start or stop the poll timer based on whether any subscriber is active.
+   * Called when subscriber activity changes or on unsubscribe.
+   */
+  private reconcilePollTimer(serialized: string, entry: CacheEntry): void {
+    const shouldPoll = entry.pollInterval > 0 &&
+      entry.subscribers.size > 0 &&
+      this.hasActiveSubscriber(entry) &&
+      this.visible;
+
+    if (shouldPoll && entry.pollTimer === null) {
+      this.startPollTimer(serialized, entry);
+    } else if (!shouldPoll && entry.pollTimer !== null) {
+      this.clearPollTimer(entry);
+    }
   }
 
   private isStale(entry: CacheEntry): boolean {
@@ -282,6 +405,11 @@ export class QueryCache {
     }
   }
 
+  private resolveDelay(entry: CacheEntry, attempt: number): number {
+    const delay = entry.retryDelay;
+    return typeof delay === 'function' ? delay(attempt) : delay;
+  }
+
   private async executeFetch(serialized: string, entry: CacheEntry): Promise<void> {
     if (!entry.queryFn) return;
 
@@ -296,48 +424,62 @@ export class QueryCache {
       status: 'fetching',
     });
 
-    try {
-      const data = await entry.queryFn(controller.signal);
+    const maxAttempts = entry.retryCount + 1; // retryCount=3 means 1 initial + 3 retries = 4 attempts
 
-      // Guard: if this controller was aborted (replaced or cancelled), ignore result
-      if (controller.signal.aborted) return;
-      // Guard: if destroyed during fetch, ignore result
-      if (this.destroyed) return;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const data = await entry.queryFn(controller.signal);
 
-      entry.abortController = null;
-      entry.dataUpdatedAt = Date.now();
+        // Guard: if this controller was aborted (replaced or cancelled), ignore result
+        if (controller.signal.aborted) return;
 
-      this.updateSnapshot(entry, {
-        data,
-        error: null,
-        status: 'fresh',
-      });
+        entry.abortController = null;
+        entry.dataUpdatedAt = Date.now();
 
-      // Start poll timer if configured and has subscribers
-      if (entry.pollInterval > 0 && entry.subscribers.size > 0 && this.visible && entry.pollTimer === null) {
-        this.startPollTimer(serialized, entry);
-      }
-    } catch (err: unknown) {
-      // Guard: if this controller was aborted, ignore the error
-      if (controller.signal.aborted) return;
-      // Guard: if destroyed during fetch, ignore result
-      if (this.destroyed) return;
+        this.updateSnapshot(entry, {
+          data,
+          error: null,
+          status: 'fresh',
+        });
 
-      // Check if this is an AbortError -- never store as error state
-      if (err instanceof DOMException && err.name === 'AbortError') return;
+        // Start poll timer if configured, has active subscribers, and visible
+        if (entry.pollInterval > 0 && entry.subscribers.size > 0 && this.hasActiveSubscriber(entry) && this.visible && entry.pollTimer === null) {
+          this.startPollTimer(serialized, entry);
+        }
+        return; // Success -- exit retry loop
+      } catch (err: unknown) {
+        // Guard: if this controller was aborted, ignore the error
+        if (controller.signal.aborted) return;
 
-      entry.abortController = null;
+        // Check if this is an AbortError -- never store as error state
+        if (err instanceof DOMException && err.name === 'AbortError') return;
 
-      const error = err instanceof Error ? err : new Error(String(err));
-      this.updateSnapshot(entry, {
-        data: entry.snapshot.data, // preserve previous data
-        error,
-        status: 'error',
-      });
+        const isLastAttempt = attempt >= maxAttempts - 1;
 
-      // Continue poll timer in error state
-      if (entry.pollInterval > 0 && entry.subscribers.size > 0 && this.visible && entry.pollTimer === null) {
-        this.startPollTimer(serialized, entry);
+        // If not retryable or last attempt, transition to error state
+        if (!isRetryable(err) || isLastAttempt) {
+          entry.abortController = null;
+
+          const error = err instanceof Error ? err : new Error(String(err));
+          this.updateSnapshot(entry, {
+            data: entry.snapshot.data, // preserve previous data
+            error,
+            status: 'error',
+          });
+
+          // Continue poll timer in error state
+          if (entry.pollInterval > 0 && entry.subscribers.size > 0 && this.hasActiveSubscriber(entry) && this.visible && entry.pollTimer === null) {
+            this.startPollTimer(serialized, entry);
+          }
+          return;
+        }
+
+        // Retryable error with attempts remaining -- wait with backoff
+        const delayMs = this.resolveDelay(entry, attempt);
+        const completed = await abortableDelay(delayMs, controller.signal);
+
+        // If the delay was aborted, stop retrying
+        if (!completed) return;
       }
     }
   }
@@ -350,10 +492,6 @@ export class QueryCache {
 
   private startPollTimer(serialized: string, entry: CacheEntry): void {
     entry.pollTimer = setInterval(() => {
-      if (this.destroyed) {
-        this.clearPollTimer(entry);
-        return;
-      }
       this.ensureFetchingInternal(serialized, entry);
     }, entry.pollInterval);
   }
@@ -370,7 +508,6 @@ export class QueryCache {
   // ---------------------------------------------------------------------------
 
   private handleVisibilityChange = (): void => {
-    if (this.destroyed) return;
     if (typeof document === 'undefined') return;
 
     if (document.visibilityState === 'hidden') {

@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, useId, useContext, createContext } from 'react';
 import { FSClient, loginUser, signupUser, fetchCurrentUser, passwordlessLoginUser, silentReAuth, PASSWORD_REQUIRED } from '@functionspace/core';
 import type { PayoutCurve, Position, UserProfile, SignupOptions, PasswordlessLoginResult } from '@functionspace/core';
 import { FunctionSpaceContext } from './context.js';
+import { QueryCache } from './cache/index.js';
+import type { CacheConfig } from './cache/index.js';
+import { QueryCacheContext } from './QueryCacheContext.js';
 import {
   FS_DARK, FS_LIGHT, NATIVE_DARK, NATIVE_LIGHT,
   resolveChartColors, getPresetChartColors,
@@ -66,8 +69,27 @@ export function resolveTheme(input?: FSThemeInput): ResolvedFSTheme {
     return applyDefaults({ ...base, ...overrides });
   }
 
-  // No preset — apply defaults to derive optional tokens from core 9
+  // No preset  -- apply defaults to derive optional tokens from core 9
   return applyDefaults(overrides as FSTheme);
+}
+
+// ── Theme Class Context (portal support) ──
+
+const ThemeClassContext = createContext<string | null>(null);
+
+/**
+ * Returns the scoped CSS class name for the current FunctionSpaceProvider's theme.
+ * Only available when the provider has `portalSupport={true}`.
+ * Consumers rendering widgets inside portals (e.g., React portals outside the
+ * provider's DOM subtree) can apply this class to their portal container to
+ * inherit the SDK's CSS variable theming.
+ */
+export function useThemeClass(): string {
+  const ctx = useContext(FunctionSpaceContext);
+  if (!ctx) throw new Error('useThemeClass must be used within FunctionSpaceProvider');
+  const themeClass = useContext(ThemeClassContext);
+  if (!themeClass) throw new Error('useThemeClass requires portalSupport={true} on FunctionSpaceProvider');
+  return themeClass;
 }
 
 // ── Provider Props ──
@@ -80,11 +102,13 @@ export interface FunctionSpaceProviderProps {
     autoAuthenticate?: boolean;
   };
   theme?: FSThemeInput;
+  cache?: CacheConfig;
+  portalSupport?: boolean;
   storedUsername?: string | null;
   children: React.ReactNode;
 }
 
-export function FunctionSpaceProvider({ config, theme, storedUsername, children }: FunctionSpaceProviderProps) {
+export function FunctionSpaceProvider({ config, theme, cache, portalSupport = false, storedUsername, children }: FunctionSpaceProviderProps) {
   const clientRef = useRef<FSClient | null>(null);
   const [providerReady, setProviderReady] = useState(false);
   const [authError, setAuthError] = useState<Error | null>(null);
@@ -92,7 +116,6 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
   const [user, setUser] = useState<UserProfile | null>(null);
   const [previewBelief, setPreviewBelief] = useState<number[] | null>(null);
   const [previewPayout, setPreviewPayout] = useState<PayoutCurve | null>(null);
-  const [invalidationCount, setInvalidationCount] = useState(0);
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [pendingAdminUsername, setPendingAdminUsername] = useState<string | null>(null);
@@ -104,12 +127,25 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
 
   const client = clientRef.current;
 
+  // Create cache once
+  const cacheRef = useRef<QueryCache | null>(null);
+  if (!cacheRef.current) {
+    cacheRef.current = new QueryCache(cache);
+  }
+  const queryCache = cacheRef.current;
+
+  // Cache lifecycle: init on mount (handles StrictMode remount), destroy on unmount
+  useEffect(() => {
+    queryCache.init();
+    return () => { cacheRef.current?.destroy(); };
+  }, [queryCache]);
+
   // Dual-mode auth on mount
   useEffect(() => {
     const shouldAutoAuth = config.autoAuthenticate !== false && !!config.username && !!config.password;
 
     if (shouldAutoAuth) {
-      // Auto-auth via loginUser — single request returns token + user profile
+      // Auto-auth via loginUser  -- single request returns token + user profile
       setAuthLoading(true);
       loginUser(client, config.username!, config.password!)
         .then((result) => {
@@ -148,7 +184,7 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
   // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount-only effect; config/storedUsername are read once
   }, []);
 
-  // Login callback (interactive auth) — returns UserProfile for caller convenience
+  // Login callback (interactive auth)  -- returns UserProfile for caller convenience
   const login = useCallback(async (username: string, password: string) => {
     setAuthLoading(true);
     setAuthError(null);
@@ -159,7 +195,7 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
       setUser(result.user);
       setShowAdminLogin(false);
       setPendingAdminUsername(null);
-      setInvalidationCount((c) => c + 1);
+      queryCache.invalidateAll();
       return result.user;
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -168,19 +204,19 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
     } finally {
       setAuthLoading(false);
     }
-  }, [client]);
+  }, [client, queryCache]);
 
-  // Signup callback (signup → auto-login) — returns UserProfile for caller convenience
+  // Signup callback (signup → auto-login)  -- returns UserProfile for caller convenience
   const signup = useCallback(async (username: string, password: string, options?: SignupOptions) => {
     setAuthLoading(true);
     setAuthError(null);
     try {
       await signupUser(client, username, password, options);
-      // Signup returns no token — login to get session
+      // Signup returns no token  -- login to get session
       const result = await loginUser(client, username, password);
       client.setToken(result.token);
       setUser(result.user);
-      setInvalidationCount((c) => c + 1);
+      queryCache.invalidateAll();
       return result.user;
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -189,7 +225,7 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
     } finally {
       setAuthLoading(false);
     }
-  }, [client]);
+  }, [client, queryCache]);
 
   // Logout callback
   const logout = useCallback(() => {
@@ -202,8 +238,8 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
     setSelectedPosition(null);
     setPreviewBelief(null);
     setPreviewPayout(null);
-    setInvalidationCount((c) => c + 1);
-  }, [client]);
+    queryCache.invalidateAll();
+  }, [client, queryCache]);
 
   // Refresh user profile (wallet balance update after trades)
   const refreshUser = useCallback(async () => {
@@ -212,7 +248,7 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
       const profile = await fetchCurrentUser(client);
       setUser(profile);
     } catch {
-      // silently fail — wallet refresh is best-effort
+      // silently fail  -- wallet refresh is best-effort
     }
   }, [client]);
 
@@ -227,7 +263,7 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
       setUser(result.user);
       setShowAdminLogin(false);
       setPendingAdminUsername(null);
-      setInvalidationCount((c) => c + 1);
+      queryCache.invalidateAll();
       return result;
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -236,7 +272,7 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
     } finally {
       setAuthLoading(false);
     }
-  }, [client]);
+  }, [client, queryCache]);
 
   // Clear admin login state
   const clearAdminLogin = useCallback(() => {
@@ -244,13 +280,18 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
     setPendingAdminUsername(null);
   }, []);
 
-  // Invalidate: increment counter + refresh user wallet when authenticated
-  const invalidate = useCallback((_marketId: string | number) => {
-    setInvalidationCount((c) => c + 1);
+  // Invalidate: bust cache for a specific market + refresh user wallet when authenticated
+  const invalidate = useCallback((marketId: string | number) => {
+    queryCache.invalidate(String(marketId));
     if (client.isAuthenticated) {
       fetchCurrentUser(client).then(setUser).catch(() => {});
     }
-  }, [client]);
+  }, [client, queryCache]);
+
+  // Invalidate all cache entries
+  const invalidateAll = useCallback(() => {
+    queryCache.invalidateAll();
+  }, [queryCache]);
 
   // Resolve theme from preset + overrides
   const resolvedTheme = useMemo(() => resolveTheme(theme), [theme]);
@@ -265,38 +306,64 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
   );
 
   // CSS custom properties (all 30 tokens)
-  const style = useMemo(() => ({
-    '--fs-primary':          resolvedTheme.primary,
-    '--fs-accent':           resolvedTheme.accent,
-    '--fs-positive':         resolvedTheme.positive,
-    '--fs-negative':         resolvedTheme.negative,
-    '--fs-background':       resolvedTheme.background,
-    '--fs-surface':          resolvedTheme.surface,
-    '--fs-text':             resolvedTheme.text,
-    '--fs-text-secondary':   resolvedTheme.textSecondary,
-    '--fs-border':           resolvedTheme.border,
-    '--fs-bg-secondary':     resolvedTheme.bgSecondary,
-    '--fs-surface-hover':    resolvedTheme.surfaceHover,
-    '--fs-border-subtle':    resolvedTheme.borderSubtle,
-    '--fs-text-muted':       resolvedTheme.textMuted,
-    '--fs-nav-from':         resolvedTheme.navFrom,
-    '--fs-nav-to':           resolvedTheme.navTo,
-    '--fs-overlay':          resolvedTheme.overlay,
-    '--fs-input-bg':         resolvedTheme.inputBg,
-    '--fs-code-bg':          resolvedTheme.codeBg,
-    '--fs-chart-bg':         resolvedTheme.chartBg,
-    '--fs-accent-glow':      resolvedTheme.accentGlow,
-    '--fs-badge-bg':         resolvedTheme.badgeBg,
-    '--fs-badge-border':     resolvedTheme.badgeBorder,
-    '--fs-badge-text':       resolvedTheme.badgeText,
-    '--fs-logo-filter':      resolvedTheme.logoFilter,
-    '--fs-font-family':      resolvedTheme.fontFamily,
-    '--fs-radius-sm':        resolvedTheme.radiusSm,
-    '--fs-radius-md':        resolvedTheme.radiusMd,
-    '--fs-radius-lg':        resolvedTheme.radiusLg,
-    '--fs-border-width':     resolvedTheme.borderWidth,
-    '--fs-transition-speed': resolvedTheme.transitionSpeed,
-  } as React.CSSProperties), [resolvedTheme]);
+  const cssVarEntries: [string, string][] = useMemo(() => [
+    ['--fs-primary',          resolvedTheme.primary],
+    ['--fs-accent',           resolvedTheme.accent],
+    ['--fs-positive',         resolvedTheme.positive],
+    ['--fs-negative',         resolvedTheme.negative],
+    ['--fs-background',       resolvedTheme.background],
+    ['--fs-surface',          resolvedTheme.surface],
+    ['--fs-text',             resolvedTheme.text],
+    ['--fs-text-secondary',   resolvedTheme.textSecondary],
+    ['--fs-border',           resolvedTheme.border],
+    ['--fs-bg-secondary',     resolvedTheme.bgSecondary],
+    ['--fs-surface-hover',    resolvedTheme.surfaceHover],
+    ['--fs-border-subtle',    resolvedTheme.borderSubtle],
+    ['--fs-text-muted',       resolvedTheme.textMuted],
+    ['--fs-nav-from',         resolvedTheme.navFrom],
+    ['--fs-nav-to',           resolvedTheme.navTo],
+    ['--fs-overlay',          resolvedTheme.overlay],
+    ['--fs-input-bg',         resolvedTheme.inputBg],
+    ['--fs-code-bg',          resolvedTheme.codeBg],
+    ['--fs-chart-bg',         resolvedTheme.chartBg],
+    ['--fs-accent-glow',      resolvedTheme.accentGlow],
+    ['--fs-badge-bg',         resolvedTheme.badgeBg],
+    ['--fs-badge-border',     resolvedTheme.badgeBorder],
+    ['--fs-badge-text',       resolvedTheme.badgeText],
+    ['--fs-logo-filter',      resolvedTheme.logoFilter],
+    ['--fs-font-family',      resolvedTheme.fontFamily],
+    ['--fs-radius-sm',        resolvedTheme.radiusSm],
+    ['--fs-radius-md',        resolvedTheme.radiusMd],
+    ['--fs-radius-lg',        resolvedTheme.radiusLg],
+    ['--fs-border-width',     resolvedTheme.borderWidth],
+    ['--fs-transition-speed', resolvedTheme.transitionSpeed],
+  ], [resolvedTheme]);
+
+  const style = useMemo(() => {
+    const obj: Record<string, string> = {};
+    for (const [key, value] of cssVarEntries) {
+      obj[key] = value;
+    }
+    return obj as React.CSSProperties;
+  }, [cssVarEntries]);
+
+  // Portal support: scoped class name + injected <style> tag
+  const instanceId = useId();
+  const themeClassName = portalSupport ? `fs-theme-${instanceId.replace(/:/g, '')}` : null;
+
+  useEffect(() => {
+    if (!portalSupport || !themeClassName || typeof document === 'undefined') return;
+
+    const styleEl = document.createElement('style');
+    styleEl.setAttribute('data-fs-theme', themeClassName);
+    const declarations = cssVarEntries.map(([k, v]) => `${k}: ${v};`).join(' ');
+    styleEl.textContent = `.${themeClassName} { ${declarations} }`;
+    document.head.appendChild(styleEl);
+
+    return () => {
+      styleEl.parentNode?.removeChild(styleEl);
+    };
+  }, [portalSupport, themeClassName, cssVarEntries]);
 
   const isAuthenticated = user !== null;
 
@@ -307,7 +374,7 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
     previewPayout,
     setPreviewPayout,
     invalidate,
-    invalidationCount,
+    invalidateAll,
     selectedPosition,
     setSelectedPosition,
     user,
@@ -324,7 +391,7 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
     clearAdminLogin,
     chartColors: resolvedChartColors,
   }), [
-    previewBelief, previewPayout, invalidate, invalidationCount,
+    previewBelief, previewPayout, invalidate, invalidateAll,
     selectedPosition, user, isAuthenticated, authLoading, authError,
     login, signup, logout, refreshUser, passwordlessLogin,
     showAdminLogin, pendingAdminUsername, clearAdminLogin,
@@ -336,10 +403,14 @@ export function FunctionSpaceProvider({ config, theme, storedUsername, children 
   }
 
   return (
-    <FunctionSpaceContext.Provider value={contextValue}>
-      <div style={style}>
-        {children}
-      </div>
-    </FunctionSpaceContext.Provider>
+    <QueryCacheContext.Provider value={queryCache}>
+      <FunctionSpaceContext.Provider value={contextValue}>
+        <ThemeClassContext.Provider value={themeClassName}>
+          <div style={style} className={themeClassName ?? undefined}>
+            {children}
+          </div>
+        </ThemeClassContext.Provider>
+      </FunctionSpaceContext.Provider>
+    </QueryCacheContext.Provider>
   );
 }

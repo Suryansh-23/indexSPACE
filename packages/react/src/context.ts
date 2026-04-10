@@ -9,8 +9,7 @@ export interface FSContext {
   previewPayout: PayoutCurve | null;
   setPreviewPayout: (payout: PayoutCurve | null) => void;
   invalidate: (marketId: string | number) => void;
-  /** Internal: counter that increments on invalidate, hooks watch this */
-  invalidationCount: number;
+  invalidateAll: () => void;
   /** Selected position for component coordination (chart/table sync) */
   selectedPosition: Position | null;
   setSelectedPosition: (pos: Position | null) => void;

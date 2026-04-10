@@ -1,0 +1,73 @@
+---
+title: "MarketCard"
+sidebar_position: 2
+description: "MarketCard widget displaying a single market summary with title, consensus mean, volume, liquidity, traders, status, and resolution date."
+---
+
+# MarketCard
+
+**`MarketCard`**
+
+Presentational card component displaying a single market summary. Receives a `MarketState` object as a prop -- does not fetch data internally.
+
+```tsx
+import { MarketCard } from '@functionspace/ui';
+```
+
+**CSS class:** `fs-market-card`
+
+**Props:**
+
+| Prop       | Type                          | Default  | Description                                      |
+| ---------- | ----------------------------- | -------- | ------------------------------------------------ |
+| `market`   | `MarketState`                 | required | Market state object containing all display fields |
+| `onSelect` | `(marketId: number) => void`  | --       | Called when the card or Trade button is clicked   |
+
+**Displays:**
+
+| Element          | Source                      | Format                                       |
+| ---------------- | --------------------------- | -------------------------------------------- |
+| Title            | `market.title`              | Plain text                                    |
+| Consensus Mean   | `market.consensusMean`      | Fixed 2 decimals + `market.xAxisUnits`       |
+| Range            | `market.config`             | `lowerBound - upperBound`                    |
+| Volume           | `market.totalVolume`        | Compact number (e.g., `50.0K`)                |
+| Liquidity        | `market.poolBalance`        | Compact number                                |
+| Traders          | `market.positionsOpen`      | Integer                                       |
+| Status Badge     | `market.resolutionState`    | `'open'` to "Active", `'resolved'` to "Resolved", else "Voided" |
+| Resolution Date  | `market.expiresAt`          | Formatted date or "Resolves TBD" if null     |
+
+**Behavior:**
+
+* Clicking anywhere on the card calls `onSelect(market.marketId)`.
+* The Trade button also calls `onSelect` but uses `stopPropagation` to prevent double-firing.
+* Requires `FunctionSpaceProvider` ancestor (throws if missing).
+
+**Selection:**
+
+Wire `onSelect` to your navigation -- see [MarketCardGrid](./marketcardgrid) for wiring patterns or [Composition and Usage](../composition-and-usage#market-discovery-patterns) for the full browse-to-trade flow.
+
+**Example:**
+
+```tsx
+import { FunctionSpaceProvider } from '@functionspace/react';
+import { useMarket } from '@functionspace/react';
+import { MarketCard } from '@functionspace/ui';
+
+function MyMarketCard({ marketId }: { marketId: number }) {
+  const { market, loading, error } = useMarket(marketId);
+  if (loading || !market) return <div>Loading...</div>;
+  return <MarketCard market={market} onSelect={(id) => console.log('Selected:', id)} />;
+}
+
+function App() {
+  return (
+    <FunctionSpaceProvider config={{ baseUrl: 'https://api.example.com' }} theme="fs-dark">
+      <MyMarketCard marketId={42} />
+    </FunctionSpaceProvider>
+  );
+}
+```
+
+**Related:** `MarketCardGrid` (renders multiple cards), `MarketExplorer` (multi-view discovery), `useMarket` (data hook), `useMarkets` (lists markets)
+
+---

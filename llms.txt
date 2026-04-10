@@ -11,7 +11,7 @@ These packages are not yet published to npm. Clone the repo and use workspace li
 
 ## Build Custom UI with React Hooks
 
-- [React Package Reference](https://docs.functionspace.dev/react.txt): FunctionSpaceProvider setup, data hooks (useMarket, useConsensus, usePositions, useMarketHistory, useTradeHistory), state hooks (useAuth, useCustomShape, useBucketDistribution, useDistributionState), belief construction, trade execution. Requires @functionspace/core + @functionspace/react. Repo path: `packages/docs/static/react.txt`
+- [React Package Reference](https://docs.functionspace.dev/react.txt): FunctionSpaceProvider setup, data hooks (useMarket, useConsensus, usePositions, useMarketHistory, useTradeHistory), mutation hooks (useBuy, useSell), preview hooks (usePreviewPayout, usePreviewSell), state hooks (useAuth, useCustomShape, useBucketDistribution, useDistributionState), belief construction, trade execution. Requires @functionspace/core + @functionspace/react. Repo path: `packages/docs/static/react.txt`
 
 ## Use Core Only (No React)
 

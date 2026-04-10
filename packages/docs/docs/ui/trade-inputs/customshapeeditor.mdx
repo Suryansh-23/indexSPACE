@@ -1,6 +1,7 @@
 ---
 title: "CustomShapeEditor"
 sidebar_position: 4
+description: "CustomShapeEditor for freeform belief drawing by dragging control points on a density chart."
 ---
 
 import { CustomShapeEditor } from '@functionspace/ui';
@@ -44,7 +45,7 @@ import { CustomShapeEditor } from '@functionspace/ui';
 * **Loading/error states:** Renders "Loading..." or "Error: \{message\}" when market data is unavailable.
 * **Trade form:** Below the sliders, a trade summary section displays the current prediction, peak payout, and max loss (equal to collateral). An amount input (default 100 USDC) and submit button complete the trade execution form -- the same pattern as other trading widgets.
 * **Post-trade reset:** Calls `resetToDefault()`, regenerating a bell shape and clearing locks.
-* **Prediction:** The mode (peak) of the belief distribution is derived from `useCustomShape` (which internally uses `computeStatistics`) and passed to `buy()`.
+* **Prediction:** The mode (peak) of the belief distribution is derived from `useCustomShape` (which internally uses `computeStatistics`) and passed to `useBuy`'s `execute()`.
 
 **Context interactions:**
 
@@ -52,7 +53,7 @@ import { CustomShapeEditor } from '@functionspace/ui';
 * **Writes:** `ctx.setPreviewBelief(belief)` on control value change, `ctx.setPreviewPayout(result)` after debounced preview, clears both on unmount
 * **Triggers:** `ctx.invalidate(marketId)` after successful buy
 
-**Internal calls:** `useMarket`, `useConsensus`, `useCustomShape`, `evaluateDensityCurve`, `useChartZoom`, `rechartsPlotArea`, `previewPayoutCurve`, `buy`
+**Internal calls:** `useMarket`, `useConsensus`, `useCustomShape`, `useBuy`, `usePreviewPayout`, `evaluateDensityCurve`, `useChartZoom`, `rechartsPlotArea`
 
 **Example:**
 

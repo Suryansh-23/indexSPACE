@@ -11,9 +11,9 @@ This playbook documents how to add new widgets and expand the SDK. All widgets m
 ### 1. Create the Component File
 
 Choose the appropriate folder:
-- `charts/` — for visualizations
-- `trading/` — for user input/actions
-- `market/` — for read-only market info
+- `charts/`  -- for visualizations
+- `trading/`  -- for user input/actions
+- `market/`  -- for read-only market info
 
 ```typescript
 // packages/ui/src/{category}/MyWidget.tsx
@@ -177,12 +177,12 @@ Example:
 --fs-header-gradient    /* Header accent gradients */
 ```
 
-**Note:** `--fs-input-bg` is no longer derived via `color-mix()` in CSS — it is now set as an explicit CSS variable via inline styles from the resolved theme (Phase 1A). Each theme preset defines its own `inputBg` token.
+**Note:** `--fs-input-bg` is no longer derived via `color-mix()` in CSS  -- it is now set as an explicit CSS variable via inline styles from the resolved theme (Phase 1A). Each theme preset defines its own `inputBg` token.
 
 **CRITICAL:** These derived variables are computed via a shared CSS selector near the top of `base.css`. When adding a new widget that uses gradient backgrounds or any derived variable, you **MUST** add its root class to this selector:
 
 ```css
-/* base.css — shared derived-variables selector */
+/* base.css  -- shared derived-variables selector */
 .fs-chart-container,
 .fs-trade-panel,
 .fs-shape-cutter,
@@ -194,7 +194,12 @@ Example:
 .fs-bucket-trade-panel,
 .fs-auth-widget,
 .fs-passwordless-auth,
-.fs-custom-shape {          /* ← add new widget roots here */
+.fs-custom-shape,
+.fs-market-card,
+.fs-market-card-grid,
+.fs-market-explorer,
+.fs-overlay-panel,
+.fs-market-filter-bar {       /* ← add new widget roots here */
   --fs-primary-glow: color-mix(in srgb, var(--fs-primary) 20%, transparent);
   --fs-primary-light: color-mix(in srgb, var(--fs-primary) 80%, white);
   --fs-header-gradient: color-mix(in srgb, var(--fs-primary) 15%, transparent);
@@ -221,14 +226,14 @@ The SDK has two parallel color systems because of a Recharts limitation:
 
 | Element Type | Color Source | Why |
 |-------------|-------------|-----|
-| **HTML/CSS elements** (backgrounds, borders, text, inputs) | CSS variables (`var(--fs-primary)`) | Standard CSS cascade — works everywhere |
-| **Recharts SVG elements** (line strokes, area fills, grid, axis ticks, tooltips) | `ctx.chartColors.*` (concrete hex values) | SVG `fill`/`stroke` props ignore CSS `var()` — they need literal color strings |
+| **HTML/CSS elements** (backgrounds, borders, text, inputs) | CSS variables (`var(--fs-primary)`) | Standard CSS cascade  -- works everywhere |
+| **Recharts SVG elements** (line strokes, area fills, grid, axis ticks, tooltips) | `ctx.chartColors.*` (concrete hex values) | SVG `fill`/`stroke` props ignore CSS `var()`  -- they need literal color strings |
 
 **Rule for new widgets:**
 - If the element is styled via CSS (`.fs-my-widget { color: ... }`) → use `var(--fs-*)` variables
 - If the element is a Recharts prop (`stroke={...}`, `fill={...}`, `tick={{ fill: ... }}`) → use `ctx.chartColors.*`
 - If the element is a custom tooltip or legend rendered as HTML inside a chart → use `ctx.chartColors.*` for consistency with the chart it belongs to
-- **Never** import from `packages/ui/src/theme.ts` — those exports are deprecated and hardcoded to FS Dark
+- **Never** import from `packages/ui/src/theme.ts`  -- those exports are deprecated and hardcoded to FS Dark
 
 ### Dynamic Chart Colors (context-based)
 
@@ -263,7 +268,7 @@ ctx.chartColors.fanBands.band95 // Widest CI band (lowest opacity)
 
 The resolution pipeline (in `resolveChartColors()`) works in three layers:
 
-1. **Smart defaults** — derived from the resolved theme's semantic tokens:
+1. **Smart defaults**  -- derived from the resolved theme's semantic tokens:
    - `consensus` ← `theme.primary`
    - `previewLine` ← `theme.accent`
    - `payout` ← `theme.positive`
@@ -272,14 +277,14 @@ The resolution pipeline (in `resolveChartColors()`) works in three layers:
    - `tooltipBg` ← `theme.surface`, `tooltipBorder` ← `theme.border`, `tooltipText` ← `theme.text`
    - `crosshair` ← `theme.textSecondary`
 
-2. **Preset overrides** — each named preset can override any field (defined in `PRESET_CHART_COLORS`):
+2. **Preset overrides**  -- each named preset can override any field (defined in `PRESET_CHART_COLORS`):
    - FS presets override grid/tooltip values but let consensus/preview derive from theme tokens (stays blue/amber)
    - Native presets explicitly set `consensus: '#6B7280'` and `previewLine: '#9CA3AF'` (gray, de-branded)
    - Fan band colors are provided per preset with matching opacity variants
 
-3. **Custom overrides** — consumers can pass additional overrides that take highest precedence
+3. **Custom overrides**  -- consumers can pass additional overrides that take highest precedence
 
-### Adding a New Chart Widget — Color Checklist
+### Adding a New Chart Widget  -- Color Checklist
 
 When building a new Recharts-based widget:
 
@@ -293,8 +298,8 @@ When building a new Recharts-based widget:
 - [ ] Use `ctx.chartColors.payout` for payout-related series
 - [ ] Use `ctx.chartColors.positions[i]` for position overlays (index 0 = positive, 1 = negative, 2+ = accent colors)
 - [ ] For SVG gradient `<defs>`, use `ctx.chartColors.*` for `stopColor` values
-- [ ] **Never** hardcode hex colors in Recharts props — they won't respond to theme changes
-- [ ] **Never** use `var(--fs-*)` in Recharts props — they resolve to empty strings in SVG
+- [ ] **Never** hardcode hex colors in Recharts props  -- they won't respond to theme changes
+- [ ] **Never** use `var(--fs-*)` in Recharts props  -- they resolve to empty strings in SVG
 
 ### Template: Themed Chart Component
 
@@ -344,28 +349,61 @@ export function MyChart({ data }: { data: any[] }) {
 
 | Hook | Returns | Use For |
 |------|---------|---------|
-| `useMarket(marketId)` | `{ market, loading, error, refetch }` | Market metadata, config, state |
-| `useConsensus(marketId, points?)` | `{ consensus, loading, error, refetch }` | Probability density curves |
-| `usePositions(marketId, username?)` | `{ positions, loading, error, refetch }` | Positions — filtered by `username` when provided, all positions when omitted |
-| `useMarketHistory(marketId, options?)` | `{ history, loading, error, refetch }` | Alpha vector snapshots over time (timeline fan chart) |
-| `useTradeHistory(marketId, options?)` | `{ trades, loading, error, refetch }` | Trade history entries — supports `pollInterval` for auto-refresh |
+| `useMarket(marketId, options?)` | `{ market, loading, isFetching, error, refetch }` | Market metadata, config, state. Accepts `QueryOptions` (`pollInterval`, `enabled`). |
+| `useConsensus(marketId, points?, options?)` | `{ consensus, loading, isFetching, error, refetch }` | Probability density curves. Derives from market cache via `select` transform (no separate API call). Accepts `QueryOptions`. |
+| `usePositions(marketId, username?, options?)` | `{ positions, loading, isFetching, error, refetch }` | Positions -- filtered by `username` when provided, all positions when omitted. Client-side filtering after cache. Accepts `QueryOptions`. |
+| `useMarketHistory(marketId, options?)` | `{ history, loading, isFetching, error, refetch }` | Alpha vector snapshots over time (timeline fan chart). Options include `limit`, `pollInterval`, `enabled`. |
+| `useTradeHistory(marketId, options?)` | `{ trades, loading, isFetching, error, refetch }` | Trade history entries. Options include `limit`, `pollInterval`, `enabled`. |
 | `useBucketDistribution(marketId, numBuckets?, numPoints?)` | `{ buckets, loading, error, refetch }` | Probability distribution across equal-width outcome buckets (derived from market + consensus) |
-| `useDistributionState(marketId, config?)` | `{ market, loading, error, refetch, bucketCount, setBucketCount, buckets, percentiles, getBucketsForRange }` | Shared distribution state for bucket-based trading components — state/composition hook |
-| `useAuth()` | `{ user, isAuthenticated, loading, error, login, signup, logout, refreshUser, passwordlessLogin, showAdminLogin, pendingAdminUsername, clearAdminLogin }` | Auth state and actions -- state/action hook (no `invalidationCount`) |
-| `useCustomShape(market)` | `{ controlValues, lockedPoints, numPoints, pVector, prediction, setControlValue, toggleLock, setNumPoints, resetToDefault, startDrag, handleDrag, endDrag, isDragging, draggingIndex }` | Custom shape editing state — state/action hook (no `invalidationCount`). Accepts `market` from `useMarket`. |
-| `useChartZoom(options)` | `{ containerRef, xDomain, yDomain, isZoomed, isPanning, containerProps, reset }` | Chart zoom/pan state — state/action hook (no context dependency, no `invalidationCount`). Use with `rechartsPlotArea()` helper for Recharts integration. |
+| `useDistributionState(marketId, config?)` | `{ market, loading, error, refetch, bucketCount, setBucketCount, buckets, percentiles, getBucketsForRange }` | Shared distribution state for bucket-based trading components -- state/composition hook |
+| `useAuth()` | `{ user, isAuthenticated, loading, error, login, signup, logout, refreshUser, passwordlessLogin, showAdminLogin, pendingAdminUsername, clearAdminLogin }` | Auth state and actions -- state/action hook (no cache subscription) |
+| `useCustomShape(market)` | `{ controlValues, lockedPoints, numPoints, pVector, prediction, setControlValue, toggleLock, setNumPoints, resetToDefault, startDrag, handleDrag, endDrag, isDragging, draggingIndex }` | Custom shape editing state -- state/action hook (no cache subscription). Accepts `market` from `useMarket`. |
+| `useChartZoom(options)` | `{ containerRef, xDomain, yDomain, isZoomed, isPanning, containerProps, reset }` | Chart zoom/pan state -- state/action hook (no context dependency, no cache subscription). Use with `rechartsPlotArea()` helper for Recharts integration. |
+| `useBuy(marketId)` | `{ execute, loading, error, reset }` | Mutation hook -- wraps `buy()` from core. Auto-invalidates market cache and refreshes wallet on success. |
+| `useSell(marketId)` | `{ execute, loading, error, reset }` | Mutation hook -- wraps `sell()` from core. Auto-invalidates market cache and refreshes wallet on success. |
+| `usePreviewPayout(marketId)` | `{ execute, loading, error, reset }` | Preview hook -- wraps `previewPayoutCurve()` from core. Manages own AbortController. No auto-invalidation. |
+| `usePreviewSell(marketId)` | `{ execute, loading, error, reset }` | Preview hook -- wraps `previewSell()` from core. Accepts optional caller-provided `AbortSignal`. No auto-invalidation. |
+| `useMarkets(options?)` | `{ markets, loading, isFetching, error, refetch }` | Market listing with optional filtering/sorting. Options combine `MarketDiscoveryOptions` (state, titleContains, categories, filters, sortBy, sortOrder, limit) and `QueryOptions` (pollInterval, enabled). |
+| `useMarketFilters(config?)` | `{ markets, loading, isFetching, error, refetch, searchText, selectedCategories, activeSortField, sortOrder, resultCount, setSearchText, clearSearch, toggleCategory, setSortField, toggleSortOrder, resetFilters, availableCategories, sortOptions, filterBarProps, discoveryOptions }` | Search, category, and sort state on top of `useMarkets`. Config: `categories?`, `featuredCategories?`, `sortOptions?`, `defaultSortField?`, `defaultSortOrder?`, `pollInterval?`, `enabled?`, `state?`. Returns a memoized `filterBarProps` bundle for `MarketFilterBar`. |
+| `useThemeClass()` | `string` | Returns the scoped CSS class name for portal containers. Requires `portalSupport={true}` on the Provider. Throws if used outside Provider or without portal support enabled. |
 
-**useChartZoom invariants:** The hook cancels any pending `requestAnimationFrame` before applying a reset (via `resetTrigger` change, `fullXDomain` value change, `reset()`, or `onDoubleClick`). This prevents a race where a wheel event fired milliseconds before a reset would re-apply the zoomed domain one frame later. Pass a stable (memoized) `fullXDomain` — the hook resets zoom when its value changes. When the chart container has a second ref (Pattern B, e.g. `CustomShapeEditor`), create a callback ref that assigns to both refs and spread individual handlers from `containerProps` rather than using `{...containerProps}`.
+**useChartZoom invariants:** The hook cancels any pending `requestAnimationFrame` before applying a reset (via `resetTrigger` change, `fullXDomain` value change, `reset()`, or `onDoubleClick`). This prevents a race where a wheel event fired milliseconds before a reset would re-apply the zoomed domain one frame later. Pass a stable (memoized) `fullXDomain`  -- the hook resets zoom when its value changes. When the chart container has a second ref (Pattern B, e.g. `CustomShapeEditor`), create a callback ref that assigns to both refs and spread individual handlers from `containerProps` rather than using `{...containerProps}`.
 
 ### Server State vs Preview State
 
 | Type | Source | Example | Updates |
 |------|--------|---------|---------|
-| **Server State** | Hooks | Market data, positions, consensus | On refetch, after invalidation |
+| **Server State** | Hooks | Market data, positions, consensus | On refetch, after invalidation, on poll interval, on focus/reconnect |
 | **Preview State** | Context | previewBelief, previewPayout | Immediately on user input |
 | **Coordination State** | Context | selectedPosition | On user action |
 
 **Rule:** Data from the API → use hooks. Ephemeral UI state for coordination → use context.
+
+### Mutation Hooks
+
+Mutation hooks differ from data-fetching hooks. They wrap core transaction/preview functions and return:
+
+```
+{ execute: (...args) => Promise<Result>, loading: boolean, error: Error | null, reset: () => void }
+```
+
+**Key differences from data-fetching hooks:**
+- Use local `useState` for `loading` and `error` -- NOT `useCacheSubscription`. Mutations are imperative (fire on user action), not declarative (fire on mount).
+- `execute` is the trigger function. It is wrapped in `useCallback` with the hook's dependencies.
+- `reset()` clears the error state. Useful for dismissing error messages.
+- No `isFetching` or `refetch` -- those are data-fetching concepts.
+
+**Auto-clear error timer:**
+All mutation and preview hooks auto-clear errors after 5 seconds. The timer is cancelled if `execute()` is called again or `reset()` is called manually.
+
+**Auto-invalidation (useBuy, useSell only):**
+On success, `useBuy` and `useSell` call `ctx.invalidate(marketId)` to trigger targeted cache invalidation. This causes all data hooks subscribed to that market to refetch. The wallet balance is refreshed as part of the invalidation cycle. Preview hooks (`usePreviewPayout`, `usePreviewSell`) do not invalidate because they are read-only.
+
+**AbortController (usePreviewPayout only):**
+`usePreviewPayout` manages its own `AbortController` via `useRef`. Each call to `execute` aborts any in-flight request before starting a new one. This prevents stale preview responses from overwriting newer ones. When `execute` catches an `AbortError`, it re-throws without setting the error state. The `finally` block only clears `loading` if the request was not aborted. `usePreviewSell` does NOT manage an internal AbortController -- it accepts an optional `{ signal?: AbortSignal }` from the caller, allowing batch callers (like `PositionTable`) to control cancellation themselves.
+
+**Cache snapshot for numBuckets (useBuy, usePreviewPayout):**
+`useBuy` and `usePreviewPayout` read `numBuckets` from the market cache snapshot via `cache.getSnapshot(['marketState', String(marketId)])`. This avoids requiring the caller to pass `numBuckets` explicitly. If the market data is not loaded, the hook throws `"Market data not loaded. Cannot determine numBuckets for validation."`.
 
 ---
 
@@ -379,7 +417,6 @@ ctx.client              // FSClient instance
 ctx.previewBelief       // Current trade preview (number[] | null)
 ctx.previewPayout       // Current payout preview (PayoutCurve | null)
 ctx.selectedPosition    // Currently selected position (Position | null)
-ctx.invalidationCount   // Cache bust counter
 ctx.user                // Current authenticated user (UserProfile | null)
 ctx.isAuthenticated     // Whether user is logged in
 ctx.authLoading         // Auth operation in progress
@@ -389,12 +426,17 @@ ctx.authError           // Last auth error (Error | null)
 ctx.setPreviewBelief(belief)        // Update preview visualization
 ctx.setPreviewPayout(payout)        // Update payout preview
 ctx.setSelectedPosition(position)   // Select position (chart/table sync)
-ctx.invalidate(marketId)            // Trigger data refetch after mutations
-ctx.login(username, password)       // Interactive login
-ctx.signup(username, password, options?) // Interactive signup (auto-logs-in)
-ctx.logout()                        // Clear auth state
+ctx.invalidate(marketId)            // Targeted cache invalidation for a market
+ctx.invalidateAll()                 // Global cache invalidation (login, logout)
+ctx.login(username, password)       // Interactive login (auto-invalidates all)
+ctx.signup(username, password, options?) // Interactive signup (auto-invalidates all)
+ctx.logout()                        // Clear auth state (auto-invalidates all)
 ctx.refreshUser()                   // Refresh wallet balance
 ctx.chartColors                     // Resolved chart colors (ChartColors) for Recharts
+ctx.passwordlessLogin(username)     // Initiate passwordless login flow -- returns PasswordlessLoginResult
+ctx.showAdminLogin                  // Whether the admin login modal should be shown (PASSWORD_REQUIRED response)
+ctx.pendingAdminUsername             // Username pending admin login completion (string | null)
+ctx.clearAdminLogin()               // Dismiss the admin login state
 ```
 
 ---
@@ -405,11 +447,11 @@ Every market has a `config` object with three core parameters used throughout th
 
 | Parameter | Meaning | Example |
 |-----------|---------|---------|
-| `K` | Polynomial degree — determines belief vector resolution (K+1 elements) | 20 |
-| `L` | Lower bound of the market outcome range | 0 |
-| `H` | Upper bound of the market outcome range | 100 |
+| `numBuckets` | Polynomial degree  -- determines belief vector resolution (numBuckets+2 elements) | 20 |
+| `lowerBound` | Lower bound of the market outcome range | 0 |
+| `upperBound` | Upper bound of the market outcome range | 100 |
 
-These are accessed via `market.config.K`, `market.config.L`, `market.config.H` from the `useMarket` hook.
+These are accessed via `market.config.numBuckets`, `market.config.lowerBound`, `market.config.upperBound` from the `useMarket` hook. Deprecated aliases `K`, `L`, `H` still exist on the config object but should not be used in new code.
 
 ---
 
@@ -417,41 +459,41 @@ These are accessed via `market.config.K`, `market.config.L`, `market.config.H` f
 
 The belief construction system lives in `packages/core/src/math/generators.ts` and uses a strict two-layer architecture. Understanding this is essential before adding new shapes or modifying trade inputs.
 
-### L1 — `generateBelief(regions, K, L, H)` → `BeliefVector`
+### L1  -- `generateBelief(regions, numBuckets, lowerBound, upperBound)` → `BeliefVector`
 
 The **universal constructor**. ALL belief vector creation MUST route through this function. It:
 1. Takes an array of `Region` objects
 2. Generates a raw kernel for each region (`pointKernel` for PointRegion, `rangeKernel` for RangeRegion, `splineKernel` for SplineRegion)
 3. Combines them with weights
-4. Normalizes the result (private `normalize()` function — guarantees output sums to 1)
+4. Normalizes the result (private `normalize()` function  -- guarantees output sums to numBuckets+2)
 
 ```
-generateBelief(regions, K, L, H)
+generateBelief(regions, numBuckets, lowerBound, upperBound)
   for each region:
-    if type === 'point' → pointKernel(region, K, L, H)  → raw K+1 array
-    if type === 'range' → rangeKernel(region, K, L, H)  → raw K+1 array
-    if type === 'spline' → splineKernel(region, K, L, H) → raw K+1 array
+    if type === 'point' → pointKernel(region, numBuckets, lowerBound, upperBound)  → raw numBuckets+2 array
+    if type === 'range' → rangeKernel(region, numBuckets, lowerBound, upperBound)  → raw numBuckets+2 array
+    if type === 'spline' → splineKernel(region, numBuckets, lowerBound, upperBound) → raw numBuckets+2 array
     combined[k] += raw[k] * weight
   return normalize(combined)
 ```
 
 Both kernel functions accept the full `Region` object (not individual scalars), following the same pattern.
 
-**`normalize` is private and stays private.** It is called exclusively by `generateBelief`. Since every shape goes through `generateBelief`, there is exactly one normalization code path — no duplication. Never export it, never duplicate it.
+**`normalize` is private and stays private.** It is called exclusively by `generateBelief`. Since every shape goes through `generateBelief`, there is exactly one normalization code path  -- no duplication. Never export it, never duplicate it.
 
-### L2 — Convenience generators
+### L2  -- Convenience generators
 
-Thin wrappers that construct the correct `Region` array and delegate to `generateBelief`. They contain **zero math** — only shape semantics (what "gaussian" or "dip" means in terms of regions).
+Thin wrappers that construct the correct `Region` array and delegate to `generateBelief`. They contain **zero math**  -- only shape semantics (what "gaussian" or "dip" means in terms of regions).
 
 | L2 Function | What it passes to `generateBelief` |
 |-------------|--------------------------------|
-| `generateGaussian(center, spread, K, L, H)` | `[{ type: 'point', center, spread }]` |
-| `generateRange(low, high, K, L, H, sharpness?)` | `[{ type: 'range', low, high, sharpness: sharpness ?? 0.5 }]` — single range |
-| `generateRange(ranges[], K, L, H)` | Multiple `RangeRegion` entries with per-range sharpness/weight — multi-range composition |
-| `generateDip(center, spread, K, L, H)` | `[{ type: 'point', center, spread: spread*1.5, inverted: true }]` |
-| `generateLeftSkew(center, spread, K, L, H, skewAmount?)` | `[{ type: 'point', center, spread, skew: -skewAmount }]` |
-| `generateRightSkew(center, spread, K, L, H, skewAmount?)` | `[{ type: 'point', center, spread, skew: skewAmount }]` |
-| `generateCustomShape(controlValues, K, L, H)` | `[{ type: 'spline', controlX: evenly-spaced, controlY: controlValues }]` — spline interpolation of user control points |
+| `generateGaussian(center, spread, numBuckets, lowerBound, upperBound)` | `[{ type: 'point', center, spread }]` |
+| `generateRange(low, high, numBuckets, lowerBound, upperBound, sharpness?)` | `[{ type: 'range', low, high, sharpness: sharpness ?? 1 }]`  -- single range |
+| `generateRange(ranges[], numBuckets, lowerBound, upperBound)` | Multiple `RangeRegion` entries with per-range sharpness/weight  -- multi-range composition |
+| `generateDip(center, spread, numBuckets, lowerBound, upperBound)` | `[{ type: 'point', center, spread: spread*1.5, inverted: true }]` |
+| `generateLeftSkew(center, spread, numBuckets, lowerBound, upperBound, skewAmount?)` | `[{ type: 'point', center, spread, skew: -skewAmount }]` |
+| `generateRightSkew(center, spread, numBuckets, lowerBound, upperBound, skewAmount?)` | `[{ type: 'point', center, spread, skew: skewAmount }]` |
+| `generateCustomShape(controlValues, numBuckets, lowerBound, upperBound)` | `[{ type: 'spline', controlX: evenly-spaced, controlY: controlValues }]`  -- quadratic B-spline approximation of user control points |
 
 ### Region Types
 
@@ -477,7 +519,7 @@ interface RangeRegion {
 
 interface SplineRegion {
   type: 'spline';
-  controlX: number[];  // X positions in outcome space [L..H], must be sorted ascending
+  controlX: number[];  // X positions in outcome space [lowerBound..upperBound], must be sorted ascending
   controlY: number[];  // Y values (unnormalized, e.g. [0, 25])
   weight?: number;     // Relative weight (default 1)
 }
@@ -486,23 +528,23 @@ interface SplineRegion {
 **`skew` details:** `|skew|` controls intensity (0 = symmetric, 1 = full asymmetry). Sign controls direction. At the kernel level, two multipliers interpolate based on `|skew|`: the wider side scales `1 + 2.0 * intensity` (up to 3x), the narrower side scales `1 - 0.7 * intensity` (down to 0.3x). Each side of center uses a different effective spread.
 
 **`sharpness` details:** Interpolates two parameters in `rangeKernel`:
-- Taper width: `(2/K) * (1 - sharpness)` — at 0, cosine taper over 2 coefficient bins; at 1, no taper (hard step).
-- EPS (out-of-range floor): `0.001 - sharpness * 0.0009` — at 0, floor is 0.001; at 1, floor is 0.0001.
+- Taper width: `(2/numBuckets) * (1 - sharpness)`  -- at 0, cosine taper over 2 coefficient bins; at 1, no taper (hard step).
+- EPS (out-of-range floor): `0.001 - sharpness * 0.0009`  -- at 0, floor is 0.001; at 1, floor is 0.0001.
 
-When `sharpness = 1`, the coefficient vector has a hard step function at the range boundaries. The actual visual sharpness on the chart depends on the polynomial degree `K` and the density evaluation (piecewise-linear interpolation).
+When `sharpness = 1`, the coefficient vector has a hard step function at the range boundaries. The actual visual sharpness on the chart depends on the polynomial degree `numBuckets` and the density evaluation (quadratic B-spline evaluation).
 
 ### When to Create a New L2 vs Call L1 Directly
 
 | Scenario | What to do | Example |
 |----------|-----------|---------|
 | Simple shape with one region | Create L2 if it will be reused | `generateGaussian`, `generateDip` |
-| Shape that's just existing L2 with different params | Call existing L2 with modified params — **no new function** | Spike = `generateGaussian(center, spread * 0.2, K, L, H)` |
+| Shape that's just existing L2 with different params | Call existing L2 with modified params  -- **no new function** | Spike = `generateGaussian(center, spread * 0.2, numBuckets, lowerBound, upperBound)` |
 | Shape with multiple regions | Call `generateBelief` directly from the widget | Bimodal = two PointRegions with different centers/weights |
-| Shape that is a special case of existing L2 | Call existing L2 with boundary params | Uniform = `generateRange(L, H, K, L, H)` |
+| Shape that is a special case of existing L2 | Call existing L2 with boundary params | Uniform = `generateRange(lowerBound, upperBound, numBuckets, lowerBound, upperBound)` |
 
 **Rule of thumb:** Create a new L2 only when the shape has unique Region parameters that encode a distinct shape concept (like inversion or skew). If it's just "same generator, different numbers," let the widget pass different numbers.
 
-**Multi-range composition:** For non-contiguous range selections (e.g., `BucketRangeSelector`), use `generateRange(ranges[], K, L, H)` which accepts an array of `RangeInput` objects, each with its own `low`, `high`, `weight`, and `sharpness`. This composes multiple range regions into a single belief vector via `generateBelief`.
+**Multi-range composition:** For non-contiguous range selections (e.g., `BucketRangeSelector`), use `generateRange(ranges[], numBuckets, lowerBound, upperBound)` which accepts an array of `RangeInput` objects, each with its own `low`, `high`, `weight`, and `sharpness`. This composes multiple range regions into a single belief vector via `generateBelief`.
 
 ### End-to-End Belief Flow
 
@@ -511,42 +553,46 @@ Widget (e.g. TradePanel, ShapeCutter)
   → L2 generator or generateBelief directly
     → pointKernel / rangeKernel / splineKernel (private, internal)
       → normalize (private, internal)
-        → BeliefVector (number[], K+1 elements, sums to 1)
+        → BeliefVector (number[], numBuckets+2 elements, sums to numBuckets+2)
 
 BeliefVector → ctx.setPreviewBelief(belief)     [instant, on every input change]
             → ConsensusChart / MarketCharts reads ctx.previewBelief
-              → evaluateDensityCurve(belief, L, H, numPoints)  [piecewise-linear interpolation]
+              → evaluateDensityCurve(belief, lowerBound, upperBound, numPoints)  [quadratic B-spline evaluation]
                 → rendered as dashed yellow area on chart (type="linear")
 
-BeliefVector + collateral → previewPayoutCurve(client, marketId, belief, collateral)  [debounced 500ms]
+BeliefVector + collateral → previewPayoutCurve(client, marketId, belief, collateral, numBuckets)  [debounced 500ms]
+                          → validateBeliefVector(belief, numBuckets) runs first [throws on invalid]
                           → ctx.setPreviewPayout(payoutCurve)
                             → ConsensusChart shows payout in tooltip
 
-BeliefVector + collateral + prediction → buy(client, marketId, belief, collateral, { prediction })
-                                       → ctx.invalidate(marketId)  [refreshes all hooks]
+BeliefVector + collateral → buy(client, marketId, belief, collateral, numBuckets)
+                          → validateBeliefVector(belief, numBuckets) runs first [throws on invalid]
+                          → ctx.invalidate(marketId)  [refreshes all hooks]
+                          Note: core buy() accepts optional { prediction } but useBuy does not forward it.
 ```
 
 ### Density Evaluation
 
-All density rendering uses piecewise-linear interpolation via a single function:
+All density rendering uses quadratic B-spline evaluation via a single function:
 
-**`evaluateDensityCurve(coefficients, L, H, numPoints)` — Multi-point curve for charting**
+**`evaluateDensityCurve(coefficients, lowerBound, upperBound, numPoints)`  -- Multi-point curve for charting**
 
-- Maps each output point to a position in the coefficient array (`u * K`)
-- Linearly interpolates between the two nearest coefficients
-- Applies density scaling `(K+1)/(H-L)` for correct PDF normalization
-- Preserves sharp transitions faithfully (ranges have cliff edges, spikes have narrow peaks)
+- Maps each output point to a position in the coefficient array
+- Evaluates a quadratic B-spline basis over neighboring coefficients (smooth, C1-continuous curve)
+- Applies normalization-agnostic density scaling `n/(coeffSum*range)` where n = coefficients.length for correct PDF normalization
+- Boundary values are 0.5x interior values because the B-spline basis function support extends outside [0,1]
 - Used by `ConsensusChart` for previews, consensus, and selected position curves
 
-**`evaluateDensityPiecewise(coefficients, x, L, H)` — Single-point evaluation**
+**`evaluateDensityPiecewise(coefficients, x, lowerBound, upperBound)`  -- Single-point evaluation**
 
 Same math as `evaluateDensityCurve` but for one x value. Used internally by `computeStatistics` and `queryDensityAt`.
 
 **Invariants:**
 - Coefficients are non-negative (guaranteed by kernel functions)
-- Coefficients sum to 1 (guaranteed by `normalize` in `generateBelief`)
-- Density scaling is `(K+1)/(H-L)`
-- Preview and consensus use the same evaluation — what the user sees before submitting matches what they see after
+- Coefficients sum to numBuckets+2 (guaranteed by `normalize` in `generateBelief`)
+- Density scaling is normalization-agnostic: `n/(coeffSum*range)` where n = coefficients.length
+- Boundary values are 0.5x due to B-spline basis function support extending outside [0,1]
+- Preview and consensus use the same evaluation  -- what the user sees before submitting matches what they see after
 
 ---
 
@@ -566,45 +612,50 @@ Peaks beyond 4x are clipped visually but remain in the tooltip data. This ensure
 ## Core Functions (from @functionspace/core)
 
 ### Math/Position Generation (Positions category)
-- `generateBelief(regions, K, L, H)` → belief vector (L1 — universal constructor, see above)
-- `generateGaussian(center, spread, K, L, H)` → belief vector (L2)
-- `generateRange(low, high, K, L, H, sharpness?)` → belief vector (L2, single range)
-- `generateRange(ranges[], K, L, H)` → belief vector (L2, multi-range composition)
-- `generateDip(center, spread, K, L, H)` → belief vector (L2)
-- `generateLeftSkew(center, spread, K, L, H, skewAmount?)` → belief vector (L2)
-- `generateRightSkew(center, spread, K, L, H, skewAmount?)` → belief vector (L2)
-- `generateCustomShape(controlValues, K, L, H)` → belief vector (L2 — spline interpolation of user control points)
-- `generateBellShape(numPoints, peakPosition?, spread?, zeroTailPercent?)` → `number[]` (utility — default bell-shaped control values for custom shape editor)
+- `generateBelief(regions, numBuckets, lowerBound, upperBound)` → belief vector (L1  -- universal constructor, see above)
+- `generateGaussian(center, spread, numBuckets, lowerBound, upperBound)` → belief vector (L2)
+- `generateRange(low, high, numBuckets, lowerBound, upperBound, sharpness?)` → belief vector (L2, single range)
+- `generateRange(ranges[], numBuckets, lowerBound, upperBound)` → belief vector (L2, multi-range composition)
+- `generateDip(center, spread, numBuckets, lowerBound, upperBound)` → belief vector (L2)
+- `generateLeftSkew(center, spread, numBuckets, lowerBound, upperBound, skewAmount?)` → belief vector (L2)
+- `generateRightSkew(center, spread, numBuckets, lowerBound, upperBound, skewAmount?)` → belief vector (L2)
+- `generateCustomShape(controlValues, numBuckets, lowerBound, upperBound)` → belief vector (L2  -- quadratic B-spline approximation of user control points)
+- `generateBellShape(numPoints, peakPosition?, spread?, zeroTailPercent?)` → `number[]` (utility  -- default bell-shaped control values for custom shape editor)
 
 ### Math/Density & Statistics (L0 pure math)
-- `evaluateDensityCurve(belief, L, H, numPoints)` → chart points (piecewise-linear interpolation)
-- `evaluateDensityPiecewise(coefficients, x, L, H)` → density at single point
-- `computeStatistics(coefficients, L, H)` → `{ mean, median, mode, variance, stdDev }`
-- `computePercentiles(coefficients, L, H)` → `PercentileSet` (9 percentiles via CDF integration)
-- `calculateBucketDistribution(points, L, H, numBuckets?, decimals?)` → `BucketData[]`
+- `evaluateDensityCurve(belief, lowerBound, upperBound, numPoints)` → chart points (quadratic B-spline evaluation)
+- `evaluateDensityPiecewise(coefficients, x, lowerBound, upperBound)` → density at single point
+- `computeStatistics(coefficients, lowerBound, upperBound)` → `{ mean, median, mode, variance, stdDev }`
+- `computePercentiles(coefficients, lowerBound, upperBound)` → `PercentileSet` (9 percentiles via CDF integration)
+- `calculateBucketDistribution(points, lowerBound, upperBound, numBuckets?, decimals?)` → `BucketData[]`
 
 ### Math/Fan Chart
-- `transformHistoryToFanChart(snapshots, L, H, maxPoints?)` → `FanChartPoint[]` (downsample + percentile extraction)
+- `transformHistoryToFanChart(snapshots, lowerBound, upperBound, maxPoints?)` → `FanChartPoint[]` (downsample + percentile extraction)
 
 ### Queries
 All query functions accept an optional trailing `options?: { signal?: AbortSignal }` parameter (backward-compatible). Signal is forwarded through composed call chains.
-- `queryMarketState(client, marketId, options?)` → `MarketState` (wraps `GET /api/market/state`)
+- `queryMarketState(client, marketId, options?)` → `MarketState` (wraps `GET /api/views/markets/{market_id}`)
 - `getConsensusCurve(client, marketId, numPoints?, options?)` → `ConsensusCurve` (market state + client-side density eval)
 - `queryConsensusSummary(client, marketId, options?)` → `ConsensusSummary` (client-side stats from consensus coefficients)
 - `queryDensityAt(client, marketId, x, options?)` → density value at a single outcome point
-- `queryMarketHistory(client, marketId, limit?, offset?, options?)` → `MarketHistory` (wraps `GET /api/market/history`)
-- `queryMarketPositions(client, marketId, options?)` → `Position[]` (wraps `GET /api/market/positions`)
+- `queryMarketHistory(client, marketId, limit?, offset?, options?)` → `MarketHistory` (wraps `GET /api/views/history/{market_id}`)
+- `queryMarketPositions(client, marketId, options?)` → `Position[]` (wraps `GET /api/views/positions/{market_id}`)
 - `queryPositionState(client, positionId, marketId, options?)` → `Position` (single position by ID)
 - `mapPosition(raw)` → `Position` (raw API response → typed Position)
 - `positionsToTradeEntries(positions, options?)` → `TradeEntry[]` (pure transform, sorted by timestamp desc)
 - `queryTradeHistory(client, marketId, options?)` → `TradeEntry[]` (composed: queryMarketPositions → positionsToTradeEntries; options accepts limit and signal)
 
 ### Discovery
-- `discoverMarkets(client, options?)` → `MarketState[]`
+- `discoverMarkets(client, options?)` -> `MarketState[]` (L1 -- wraps `GET /api/views/markets/list`; accepts `MarketDiscoveryOptions` for client-side filtering/sorting)
+- `filterMarkets(markets, options)` -> `MarketState[]` (L1 Discovery -- pure client-side filtering/sorting of `MarketState` arrays; field resolution checks top-level then metadata)
+- `discoverPopularMarkets(client, options?)` -> `MarketState[]` (L2 -- preset: sortBy totalVolume desc, limit 10; merges caller options)
+- `discoverActiveMarkets(client, options?)` -> `MarketState[]` (L2 -- preset: state 'open'; merges caller options)
+- `discoverMarketsByCategory(client, categories, options?)` -> `MarketState[]` (L2 -- preset: categories filter; merges caller options)
+- `treemapLayout<T extends TreemapItem>(items, x0?, y0?, w0?, h0?)` -> `TreemapRect<T>[]` (L0 Pure Math -- recursive binary-split squarified treemap; used by HeatmapView in MarketExplorer)
 
 ### Auth
 - `loginUser(client, username, password)` → `{ user: UserProfile, token: string }` (raw fetch, bypasses ensureAuth)
-- `signupUser(client, username, password, options?)` → `{ user: UserProfile }` (no token — caller must login after)
+- `signupUser(client, username, password, options?)` → `{ user: UserProfile }` (no token  -- caller must login after)
 - `fetchCurrentUser(client)` → `UserProfile` (uses client.get, requires token)
 - `validateUsername(name)` → `{ valid: boolean, error?: string }` (3-32 chars, alphanumeric + dots/dashes/underscores)
 - `passwordlessLoginUser(client, username)` → `PasswordlessLoginResult` (L1 Transaction -- try login, auto-signup on "Invalid username", throw PASSWORD_REQUIRED for password-protected accounts)
@@ -618,14 +669,28 @@ All query functions accept an optional trailing `options?: { signal?: AbortSigna
 - `generateEvenTicks(domain, count)` → `number[]` (evenly spaced tick values)
 
 ### Transactions
-- `buy(client, marketId, belief, collateral)` → BuyResult
-- `sell(client, positionId, marketId)` → SellResult
+- `buy(client, marketId, belief, collateral, numBuckets, options?)` -- wraps `POST /api/market/trading/buy/{marketId}` → BuyResult
+- `sell(client, positionId, marketId)` -- wraps `POST /api/market/trading/sell/{marketId}/{positionId}` → SellResult
 
 ### Previews
-- `previewPayoutCurve(client, marketId, belief, collateral, numOutcomes?, options?)` → PayoutCurve
-- `previewSell(client, positionId, marketId, options?)` → PreviewSellResult
+- `previewPayoutCurve(client, marketId, belief, collateral, numBuckets, numOutcomes?, options?)` -- wraps `POST /api/views/preview/payout/{marketId}` → PayoutCurve
+- `previewSell(client, positionId, marketId, options?)` -- wraps `GET /api/views/preview/sell/{marketId}/{positionId}` → PreviewSellResult
+
+### Validation (L0)
+- `validateBeliefVector(vector, numBuckets)` -- throws descriptive error if belief vector is invalid (length, finite, non-negative, sum-to-1)
 
 ---
+
+**Metadata policy:** Mapping functions read fields from their primary source in the API response. lowerBound/upperBound/title come from root level. xAxisUnits/decimals come from the metadata dict (their only source). Do not add metadata fallback chains (e.g., `data.metadata?.X ?? data.X`).
+
+**API field name discrepancy:** The list endpoint (`GET /api/views/markets/list`) and single endpoint (`GET /api/views/markets/{id}`) use different field names for the same data. Both mapping functions (`discoverMarkets` and `queryMarketState`) handle their respective names and produce identical `MarketState` objects:
+
+| SDK field | List endpoint field | Single endpoint field |
+|---|---|---|
+| `participantCount` | `total_positions` | `num_positions` |
+| `positionsOpen` | `open_positions` | `positions_currently_open` |
+| `totalVolume` | Not returned (defaults to 0) | `total_volume` |
+| `createdAt` | `created_at` | Not returned (defaults to null) |
 
 ## CSS Class Naming Convention
 
@@ -673,7 +738,8 @@ setState(result);
 
 ### After Mutations
 ```typescript
-await buy(ctx.client, marketId, belief, collateral);
+const { numBuckets } = market.config;
+const result = await buy(ctx.client, marketId, belief, collateral, numBuckets);
 ctx.invalidate(marketId);  // Triggers useMarket/usePositions refetch
 onSuccess?.(result);       // Notify parent
 ```
@@ -687,6 +753,10 @@ onSuccess?.(result);       // Notify parent
 | `AuthWidget` | Login/signup/user bar | Uses `useAuth` hook, form state, `validateUsername` from core |
 | `PasswordlessAuthWidget` | Passwordless login/signup with modal | Uses `useAuth` hook, modal overlay, auto-signup, PASSWORD_REQUIRED sentinel, silent re-auth via `storedUsername` prop |
 | `MarketStats` | Stats display | Minimal, read-only |
+| `MarketCard` | Single market summary card | Presentational -- receives `MarketState` as prop, no internal data fetching. Displays title, consensusMean, volume, pool, positions, status badge, resolution date. `onSelect` callback. |
+| `MarketCardGrid` | Responsive grid of MarketCards | Presentational -- receives `MarketState[]` as prop. Loading (skeleton cards), error, empty, and data states. Passes `onSelect` through to cards. Replaces `MarketList`. |
+| `MarketFilterBar` | Search, category chips, sort controls | Presentational filter bar driven by `useMarketFilters`. Spread `filterBarProps` from the hook. Props: `searchText`, `onSearchChange`, `onSearchClear`, `searchPlaceholder?`, `availableCategories`, `selectedCategories`, `onToggleCategory`, `featuredCategories?`, `sortOptions`, `activeSortField`, `sortOrder`, `onSortFieldChange`, `onSortOrderToggle`, `resultCount`, `loading?`, `onReset`, `maxWidth?`. |
+| `MarketExplorer` | Multi-view market discovery | Compound widget with tabbed views (cards, pulse, compact, gauge, split, table, heatmap, charts), `MarketFilterBar`, and optional `Overlay`. Uses `useMarketFilters` internally. Props: `views?`, `children?`, `onSelect?`, `state?`, `categories?`, `pollInterval?`, `emptyMessage?`, `showFilterBar?`, `featuredCategories?`, `sortOptions?`, `searchPlaceholder?`, `filterBarMaxWidth?`. Replaces `MarketOverlay`. |
 | `ConsensusChart` | Consensus PDF visualization | Standalone chart, reads context for overlays |
 | `DistributionChart` | Distribution bar chart | Standalone chart with bucket slider |
 | `TimelineChart` | Fan chart (percentile bands over time) | Standalone chart, fetches own history data (see note below) |
@@ -698,23 +768,24 @@ onSuccess?.(result);       // Notify parent
 | `BucketTradePanel` | Composed chart + range selector | Composes `DistributionChart` + `BucketRangeSelector` with shared `useDistributionState` (see shared state composition below) |
 | `PositionTable` | Data table | Tabbed views (Open Orders / Trade History / Market Positions), per-tab columns, pagination, row selection → chart overlay, sell actions |
 | `TimeSales` | Time & sales ticker | Uses `useTradeHistory` with `pollInterval` (default 5s), read-only market activity feed |
-| `CustomShapeEditor` | Custom shape trade input | Uses `useCustomShape` for control point state, draggable scatter dots + vertical sliders, spline interpolation via `generateCustomShape`, three-phase trade pattern |
+| `CustomShapeEditor` | Custom shape trade input | Uses `useCustomShape` for control point state, draggable scatter dots + vertical sliders, quadratic B-spline approximation via `generateCustomShape`, three-phase trade pattern |
 
 **TimelineChart data-fetching pattern:** Unlike Consensus/Distribution (which receive shared `market` + `consensus` data as props from `MarketCharts`), `TimelineChartContent` calls `useMarketHistory` internally. This avoids fetching history data when the timeline tab isn't active. The `timeFilter` state is lifted to `MarketCharts` so it persists across tab switches.
 
-**Developer-configurable tabs pattern:** Both `MarketCharts` and `PositionTable` use the same tab pattern — an optional array prop controls which tabs appear, the first entry is initially active, and a single tab hides the tab bar:
+**Developer-configurable tabs pattern:** `MarketCharts`, `PositionTable`, and `MarketExplorer` use the same tab pattern  -- an optional array prop controls which tabs appear, the first entry is initially active, and a single tab hides the tab bar:
 ```typescript
 // MarketCharts: views?: ChartView[]    (default: ['consensus'])
 // PositionTable: tabs?: PositionTabId[] (default: ['open-orders', 'trade-history'])
+// MarketExplorer: views?: MarketExplorerView[] (default: ['cards'])
 const effectiveTabs = tabs && tabs.length > 0 ? tabs : DEFAULT_TABS;
 const showTabs = effectiveTabs.length > 1;
 const [activeTab, setActiveTab] = useState(effectiveTabs[0]);
 ```
-When adding a new tabbed widget, follow this exact pattern — do not invent a different approach.
+When adding a new tabbed widget, follow this exact pattern  -- do not invent a different approach.
 
-**PositionTable tab-aware data fetching:** The table uses a single `usePositions` call. When the `market-positions` tab is enabled, `username` is omitted to fetch all positions; client-side filtering derives per-tab data. Market value fetching (`previewSell`) only runs for open positions on the active tab — never for Trade History.
+**PositionTable tab-aware data fetching:** The table uses a single `usePositions` call. When the `market-positions` tab is enabled, username is omitted from the query to fetch all positions; client-side filtering by `ctx.user?.username` derives per-tab data. The authenticated user is read from context automatically -- no `username` prop is needed. Market value fetching (`previewSell`) only runs for open positions on the active tab -- never for Trade History.
 
-**Shared state composition pattern:** `BucketTradePanel` is a "composed widget" — it renders `DistributionChart` + `BucketRangeSelector` and coordinates them via a shared `useDistributionState` instance passed as a prop. This differs from context-based coordination (used by charts + trade panels). Use this pattern when two public widgets need to share derived state that isn't relevant to the broader SDK context.
+**Shared state composition pattern:** `BucketTradePanel` is a "composed widget"  -- it renders `DistributionChart` + `BucketRangeSelector` and coordinates them via a shared `useDistributionState` instance passed as a prop. This differs from context-based coordination (used by charts + trade panels). Use this pattern when two public widgets need to share derived state that isn't relevant to the broader SDK context.
 
 ---
 
@@ -729,62 +800,79 @@ When adding a new tabbed widget, follow this exact pattern — do not invent a d
 - [ ] Styles added to `base.css`
 - [ ] Exported from category and root `index.ts`
 - [ ] Error and loading states handled
-- [ ] **Add widget smoke tests** (see [Widget Component Testing Guide](../Docs/widget-component-testing-guide.md)) — at minimum: provider guard, loading state, error state, primary action, unmount cleanup
-- [ ] **Run `npx vitest run` — all tests pass**
+- [ ] **Add widget smoke tests** (see [Widget Component Testing Guide](../Docs/widget-component-testing-guide.md))  -- at minimum: provider guard, loading state, error state, primary action, unmount cleanup
+- [ ] **Run `npx vitest run`  -- all tests pass**
 - [ ] **Update `architecture.test.ts` if new exports or prop patterns**
 - [ ] **Update PLAYBOOK.md** -- Widget Reference table, File Locations tree, derived-variables selector if new root class
 - [ ] **Update docs site** -- Add MDX page at `packages/docs/docs/ui/{category}/{widgetname}.mdx` with live widget embed (see "Adding Widget Documentation" below)
 
-### Adding a New Hook
+### Adding a New Hook (Data-Fetching)
 - [ ] Hook file in `packages/react/src/`
 - [ ] Uses `FunctionSpaceContext` for client access
-- [ ] Returns `{ <named>, loading, error, refetch }` pattern (named property matches hook purpose)
-- [ ] Reacts to `ctx.invalidationCount` for cache busting
+- [ ] Uses `useCacheSubscription` for data fetching (subscribes to cache via `useSyncExternalStore`)
+- [ ] Returns `{ <named>, loading, isFetching, error, refetch }` pattern (named property matches hook purpose)
+- [ ] Accepts optional `QueryOptions` (`pollInterval`, `enabled`, `retry`, `retryDelay`) for cache-based polling, conditional fetching, and configurable retry with exponential backoff.
+- [ ] `loading` is true only on first fetch (no cached data); `isFetching` is true whenever a request is in flight
 - [ ] Exported from `packages/react/src/index.ts`
 - [ ] **Add tests to `hooks.test.tsx` (context check, loading, success, error)**
-- [ ] **Run `npx vitest run` — all tests pass**
-- [ ] **Update PLAYBOOK.md** — Available Hooks table; **update CLAUDE.md** — test table if new test file
+- [ ] **Run `npx vitest run` -- all tests pass**
+- [ ] **Update PLAYBOOK.md** -- Available Hooks table; **update CLAUDE.md** -- test table if new test file
+
+### Adding a New Hook (Mutation)
+- [ ] Hook file in `packages/react/src/`
+- [ ] Uses `FunctionSpaceContext` for client access
+- [ ] Uses local `useState` for `loading` and `error` -- NOT `useCacheSubscription`
+- [ ] Returns `{ execute, loading, error, reset }` pattern
+- [ ] `execute` is wrapped in `useCallback`
+- [ ] On success: calls `ctx.invalidate(marketId)` if the mutation modifies state (buy/sell)
+- [ ] On error: sets error state and re-throws
+- [ ] `reset()` clears the error state
+- [ ] For preview hooks: manages own `AbortController` via `useRef`, aborts previous request on new call
+- [ ] Exported from `packages/react/src/index.ts`
+- [ ] **Add tests to `hooks.test.tsx`**
+- [ ] **Run `npx vitest run` -- all tests pass**
+- [ ] **Update PLAYBOOK.md** -- Available Hooks table
 
 ### Adding a New Belief Shape
 
 Before creating anything, decide the correct approach (see "When to Create a New L2" in the Position Generator Architecture section):
 
 **If the shape needs new Region parameters (e.g., a new kernel behavior):**
-- [ ] Extend `PointRegion` or `RangeRegion` with optional fields — do NOT create new region types
+- [ ] Extend `PointRegion` or `RangeRegion` with optional fields  -- do NOT create new region types
 - [ ] Update the corresponding kernel function (`pointKernel` or `rangeKernel`) in `generators.ts` to handle new fields
 - [ ] Ensure existing callers without the new fields produce identical output (backward compatible)
 
 **If the shape needs a new L2 generator:**
-- [ ] Add L2 function to `generators.ts` — one line of logic constructing a Region array and passing to `generateBelief`
+- [ ] Add L2 function to `generators.ts`  -- one line of logic constructing a Region array and passing to `generateBelief`
 - [ ] Export from `packages/core/src/index.ts`
-- [ ] Add tests to `tests/shapes.test.ts` — valid vector (K+1 elements, all >= 0, sums to ~1) + shape-specific assertions
+- [ ] Add tests to `tests/shapes.test.ts`  -- valid vector (numBuckets+2 elements, all >= 0, sums to ~numBuckets+2) + shape-specific assertions
 
 **If the shape is just existing generator with different params:**
-- [ ] No new function needed — widget passes different params to existing L2 or calls `generateBelief` directly
+- [ ] No new function needed  -- widget passes different params to existing L2 or calls `generateBelief` directly
 - [ ] Document the parameter mapping in the widget code (e.g., `spike = generateGaussian with spread * 0.2`)
 
 **For any new shape:**
 - [ ] Add shape metadata to `SHAPE_DEFINITIONS` in `packages/core/src/shapes/definitions.ts` (id, name, description, parameters, svgPath)
 - [ ] Add routing case in the trade input widget's `generateCurrentBelief` switch
 - [ ] Add prediction calculation in the widget's `getPrediction` function
-- [ ] **Run `npx vitest run` — all tests pass, no regressions on existing shapes**
-- [ ] **Update PLAYBOOK.md** — L2 generators table if new generator, Region Types if new fields, Core Functions list
+- [ ] **Run `npx vitest run`  -- all tests pass, no regressions on existing shapes**
+- [ ] **Update PLAYBOOK.md**  -- L2 generators table if new generator, Region Types if new fields, Core Functions list
 
 ### Adding a New Core Function
 - [ ] Function in appropriate `packages/core/src/` module
 - [ ] TypeScript types defined in `types.ts`
 - [ ] Exported from `packages/core/src/index.ts`
-- [ ] **Add tests to `stage1.test.ts` (math) or `stage2.test.ts` (API)**
+- [ ] **Add tests to `client-auth.test.ts` (math) or `api-integration.test.ts` (API)**
 - [ ] **If the function maps an API endpoint:** Add mocked-fetch contract test to `tests/mappings.test.ts` (raw fixture, field mapping assertion, URL assertion, POST body assertion for writes)
-- [ ] **Run `npx vitest run` — all tests pass**
-- [ ] **Update PLAYBOOK.md** — Core Functions list (correct category + layer)
+- [ ] **Run `npx vitest run`  -- all tests pass**
+- [ ] **Update PLAYBOOK.md**  -- Core Functions list (correct category + layer)
 
 ### Modifying Existing Components
 - [ ] **Run `npx vitest run` before making changes**
 - [ ] Make changes following existing patterns
 - [ ] Update tests if prop interfaces or behavior changed
-- [ ] **Run `npx vitest run` after changes — all tests pass**
-- [ ] **Run `cd demo-app && npx vite build` — build succeeds**
+- [ ] **Run `npx vitest run` after changes  -- all tests pass**
+- [ ] **Run `cd demo-app && npx vite build`  -- build succeeds**
 - [ ] **Update CLAUDE.md and PLAYBOOK.md** if the change introduced new patterns, conventions, or reference data
 
 ### Adding Widget Documentation
@@ -828,13 +916,13 @@ Key rules:
 
 ### Simple by Default, Flexible When Needed
 
-UI components work together automatically via shared context. Consumers just place components — no wiring required.
+UI components work together automatically via shared context. Consumers just place components  -- no wiring required.
 
 **Simple consumer (90% of use cases):**
 ```tsx
 <FunctionSpaceProvider config={config}>
   <ConsensusChart marketId={ID} />
-  <PositionTable marketId={ID} username={user} />
+  <PositionTable marketId={ID} />
 </FunctionSpaceProvider>
 // Click row → curve appears on chart. No code needed.
 ```
@@ -855,7 +943,7 @@ UI components work together automatically via shared context. Consumers just pla
 Components are interchangeable because they share a context contract:
 - Any chart that reads `ctx.selectedPosition` works
 - Any table that writes `ctx.setSelectedPosition` works
-- Swap imports freely — behavior stays consistent
+- Swap imports freely  -- behavior stays consistent
 
 ### Trade Input Variants
 
@@ -904,14 +992,14 @@ useEffect(() => {
 
 Every trade input widget follows this exact pattern (see `TradePanel.tsx` as reference):
 
-**Phase 1 — Instant preview (no debounce):**
+**Phase 1  -- Instant preview (no debounce):**
 Generate the belief vector on every parameter change and write it to context immediately. The chart updates in real-time.
 ```typescript
 const generateCurrentBelief = useCallback(() => {
   if (!market) return null;
-  const { K, L, H } = market.config;
+  const { numBuckets, lowerBound, upperBound } = market.config;
   // Call appropriate generator based on current inputs
-  return generateGaussian(prediction, stdDev, K, L, H);
+  return generateGaussian(prediction, stdDev, numBuckets, lowerBound, upperBound);
 }, [market, prediction, stdDev, /* other deps */]);
 
 useEffect(() => {
@@ -921,50 +1009,59 @@ useEffect(() => {
 }, [generateCurrentBelief]);
 ```
 
-**Phase 2 — Debounced payout preview (500ms):**
-Preview the payout curve via API. Debounced because this hits the server.
+**Phase 2  -- Debounced payout preview (500ms):**
+Preview the payout curve via API. Debounced because this hits the server. Uses `usePreviewPayout` which manages its own AbortController internally.
 ```typescript
+const { execute: preview } = usePreviewPayout(marketId);
+
 useEffect(() => {
   if (debounceRef.current) clearTimeout(debounceRef.current);
   const belief = generateCurrentBelief();
   const collateral = parseFloat(amount);
   if (!belief || isNaN(collateral) || collateral <= 0) { setPotentialPayout(null); return; }
   debounceRef.current = setTimeout(async () => {
-    const result = await previewPayoutCurve(ctx.client, marketId, belief, collateral);
-    if (!mountedRef.current) return;
-    setPotentialPayout(result.maxPayout);
-    ctx.setPreviewPayout(result);
+    try {
+      const result = await preview(belief, collateral);
+      setPotentialPayout(result.maxPayout);
+      ctx.setPreviewPayout(result);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      setPotentialPayout(null);
+      ctx.setPreviewPayout(null);
+    }
   }, 500);
   return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
 }, [generateCurrentBelief, amount, market, marketId]);
 ```
 
-**Phase 3 — Trade submission:**
+**Phase 3  -- Trade submission:**
+Uses `useBuy` which handles invalidation and wallet refresh automatically on success.
 ```typescript
-const result = await buy(ctx.client, marketId, belief, collateral, { prediction });
+const { execute: executeBuy } = useBuy(marketId);
+
+const result = await executeBuy(belief, collateral);
 resetToDefaults();
 ctx.setPreviewBelief(null);
 ctx.setPreviewPayout(null);
 onBuy?.(result);
-ctx.invalidate(marketId);
 ```
 
 ### Confidence → Spread Conversion
 
-Trade input widgets that offer a "confidence" slider (0-100%) convert it to a `spread` value for the generators. This is a UI concern, not a core math concern — each trade input widget owns its own conversion formula:
+Trade input widgets that offer a "confidence" slider (0-100%) convert it to a `spread` value for the generators. This is a UI concern, not a core math concern  -- each trade input widget owns its own conversion formula:
 
 ```typescript
 const getSpreadFromConfidence = useCallback((conf: number): number => {
   if (!market) return 4.0;
-  const { L, H } = market.config;
-  const range = H - L;
+  const { lowerBound, upperBound } = market.config;
+  const range = upperBound - lowerBound;
   const minSigma = range * 0.01;   // 1% of range (high confidence = narrow)
   const maxSigma = range * 0.20;   // 20% of range (low confidence = wide)
   return maxSigma - ((conf / 100) * (maxSigma - minSigma));
 }, [market]);
 ```
 
-This formula is intentionally owned by each widget — different trade inputs may wish to tune the mapping differently. It is NOT in core because it maps a slider value (UI) to a math parameter.
+This formula is intentionally owned by each widget  -- different trade inputs may wish to tune the mapping differently. It is NOT in core because it maps a slider value (UI) to a math parameter.
 
 ### What Goes in Context vs Consumer App
 
@@ -972,7 +1069,7 @@ This formula is intentionally owned by each widget — different trade inputs ma
 |----------------|-----------------|
 | `selectedPosition` (enables chart/table sync) | Custom multi-select logic |
 | `previewBelief` (enables trade preview) | Filters, sorts, search |
-| `invalidationCount` (cache busting) | UI preferences |
+| `invalidate`/`invalidateAll` (targeted/global cache invalidation) | UI preferences |
 
 **Rule:** If multiple SDK components need to coordinate, it goes in context.
 
@@ -982,9 +1079,9 @@ This formula is intentionally owned by each widget — different trade inputs ma
 |-------|--------|-----------|
 | `core` | Pure functions, API client, types | Import React |
 | `react` | Hooks, context, state coordination | Import from ui |
-| `ui` | Read/write context, call pure core functions, render | Make API calls directly |
+| `ui` | Read/write context, call pure core functions, use mutation hooks, render | Make API calls directly, import buy/sell/previewPayoutCurve/previewSell from core |
 
-**UI components CAN call pure core functions** like `evaluateDensityCurve` and `evaluateDensityPiecewise`. They CANNOT make API calls — use hooks for that.
+**UI components CAN call pure core functions** like `evaluateDensityCurve` and `evaluateDensityPiecewise`. They CANNOT make API calls -- use hooks for that. **UI components MUST use mutation hooks** (`useBuy`, `useSell`, `usePreviewPayout`, `usePreviewSell`) for trade operations -- they MUST NOT import `buy`, `sell`, `previewPayoutCurve`, or `previewSell` from core directly.
 
 ---
 
@@ -1002,12 +1099,15 @@ packages/
 │   ├── math/fanChart.ts      # History → FanChartPoint[] transform
 │   ├── shapes/definitions.ts # SHAPE_DEFINITIONS (id, name, svgPath, parameters)
 │   ├── queries/market.ts     # Market state queries (queryMarketState, getConsensusCurve, etc.)
-│   ├── queries/history.ts    # Market history queries (GET /api/market/history)
+│   ├── queries/history.ts    # Market history queries (GET /api/views/history/{market_id})
 │   ├── queries/positions.ts  # Position queries (queryMarketPositions, queryPositionState)
 │   ├── queries/trades.ts     # Trade history (positionsToTradeEntries, queryTradeHistory)
 │   ├── previews/             # previewPayoutCurve, previewSell
 │   ├── transactions/         # buy, sell
-│   ├── discovery/markets.ts  # discoverMarkets
+│   ├── discovery/markets.ts      # discoverMarkets (with MarketDiscoveryOptions)
+│   ├── discovery/filters.ts      # filterMarkets (pure client-side filtering)
+│   ├── discovery/convenience.ts  # discoverPopularMarkets, discoverActiveMarkets, discoverMarketsByCategory
+│   ├── discovery/treemap.ts      # treemapLayout (L0 Pure Math -- squarified treemap)
 │   └── auth/auth.ts          # loginUser, signupUser, fetchCurrentUser, validateUsername
 ├── react/src/
 │   ├── index.ts              # All exports
@@ -1047,11 +1147,27 @@ packages/
     │   └── PasswordlessAuthWidget.tsx
     ├── market/               # Read-only market info
     │   ├── index.ts
+    │   ├── MarketCard.tsx
+    │   ├── MarketCardGrid.tsx
+    │   ├── MarketExplorer.tsx
+    │   ├── MarketFilterBar.tsx
+    │   ├── MarketList.tsx        # Deprecated -- use MarketCardGrid
     │   ├── MarketStats.tsx
     │   ├── PositionTable.tsx
-    │   └── TimeSales.tsx
+    │   ├── TimeSales.tsx
+    │   └── views/                # MarketExplorer view components
+    │       ├── index.ts
+    │       ├── viewUtils.ts
+    │       ├── PulseCard.tsx
+    │       ├── CompactCard.tsx
+    │       ├── GaugeCard.tsx
+    │       ├── SplitCard.tsx
+    │       ├── TableView.tsx
+    │       ├── HeatmapView.tsx
+    │       └── ChartsView.tsx
     └── components/           # Internal UI primitives (NOT exported from package root)
         ├── index.ts
+        ├── Overlay.tsx
         ├── Slider.tsx
         └── RangeSlider.tsx
 
@@ -1061,8 +1177,8 @@ tests/
 ├── themes.test.ts        # Theme preset validation, resolveTheme behavior
 ├── shapes.test.ts        # Belief shape validation (vector properties, shape characteristics)
 ├── binary.test.ts        # Binary panel-specific tests
-├── stage1.test.ts        # Core math functions
-├── stage2.test.ts        # API/transaction functions
+├── client-auth.test.ts   # Client auth, core math functions
+├── api-integration.test.ts # API/transaction functions (live backend)
 └── components.test.tsx   # Widget smoke tests (jsdom)
 
 packages/docs/            # Docusaurus documentation site
@@ -1101,6 +1217,6 @@ packages/docs/            # Docusaurus documentation site
 |--------|---------|----------|
 | `charts/` | Data visualizations | ConsensusChart, DistributionChart, TimelineChart, MarketCharts |
 | `trading/` | User input/actions | TradePanel, ShapeCutter, BinaryPanel, BucketRangeSelector, BucketTradePanel |
-| `market/` | Read-only market info | MarketStats, PositionTable, TimeSales |
+| `market/` | Read-only market info | MarketCard, MarketCardGrid, MarketExplorer, MarketFilterBar, MarketStats, PositionTable, TimeSales |
 | `auth/` | Authentication | AuthWidget (login/signup forms), PasswordlessAuthWidget (username-only login with modal, auto-signup, silent re-auth) |
-| `components/` | Internal UI primitives (not exported from package root) | Slider, RangeSlider (rc-slider wrappers with consistent styling) |
+| `components/` | Internal UI primitives (not exported from package root) | Slider, RangeSlider (rc-slider wrappers with consistent styling), Overlay (reusable modal shell) |

@@ -2,6 +2,7 @@
 title: "Introduction"
 sidebar_position: 1
 slug: /
+description: "Overview of the FunctionSpace SDK, its package structure, and core concepts for probability trading."
 ---
 
 # Introduction
@@ -21,10 +22,10 @@ This documentation covers:
 
 functionSPACE is a decentralized probability protocol that transforms how we express and trade beliefs about future outcomes. Unlike traditional prediction markets that offer discrete Yes/No choices, functionSPACE enables:
 
-* **Continuous probability markets** — Express nuanced beliefs as full probability distributions
-* **Bernstein polynomial encoding** — Beliefs are mathematically represented as coefficient vectors
-* **Participant-funded liquidity** — No external market makers; all liquidity comes from traders
-* **Claim-based payouts** — Rewards based on both contribution timing and final accuracy
+* **Continuous probability markets**  -- Express nuanced beliefs as full probability distributions
+* **Bernstein polynomial encoding**  -- Beliefs are mathematically represented as coefficient vectors
+* **Participant-funded liquidity**  -- No external market makers; all liquidity comes from traders
+* **Claim-based payouts**  -- Rewards based on both contribution timing and final accuracy
 
 ### Package Structure
 

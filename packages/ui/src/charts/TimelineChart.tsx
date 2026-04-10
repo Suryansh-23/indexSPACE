@@ -75,7 +75,7 @@ export function TimelineChartContent({
   const [hiddenBands, setHiddenBands] = useState<Set<string>>(new Set());
   const fanBandColors = ctx.chartColors.fanBands;
 
-  const { L, H } = market.config;
+  const { lowerBound, upperBound } = market.config;
   const decimals = market.decimals ?? 0;
 
   // Transform and filter data
@@ -91,7 +91,7 @@ export function TimelineChartContent({
     if (filtered.length === 0) return [];
 
     // Transform to fan chart points
-    const fanPoints = transformHistoryToFanChart(filtered, L, H);
+    const fanPoints = transformHistoryToFanChart(filtered, lowerBound, upperBound);
 
     if (fanPoints.length < 2) {
       // Synthetic flat-line for <2 points
@@ -126,11 +126,11 @@ export function TimelineChartContent({
     }
 
     return data;
-  }, [history, timeFilter, L, H]);
+  }, [history, timeFilter, lowerBound, upperBound]);
 
   // Compute Y domain
   const yDomain = useMemo<[number, number]>(() => {
-    if (!chartData.length) return [L, H];
+    if (!chartData.length) return [lowerBound, upperBound];
     let min = Infinity;
     let max = -Infinity;
     for (const d of chartData) {
@@ -139,10 +139,10 @@ export function TimelineChartContent({
     }
     const padding = (max - min) * 0.05;
     return [
-      Math.max(L, min - padding),
-      Math.min(H, max + padding),
+      Math.max(lowerBound, min - padding),
+      Math.min(upperBound, max + padding),
     ];
-  }, [chartData, L, H]);
+  }, [chartData, lowerBound, upperBound]);
 
   // Zoom support
   const fullXDomain = useMemo<[number, number]>(() => {
@@ -153,15 +153,15 @@ export function TimelineChartContent({
   const getPlotArea = useMemo(() => rechartsPlotArea({ left: 10, right: 15 }, 60), []);
 
   const zoomComputeYDomain = useCallback((visible: any[], _full: any[]) => {
-    if (!visible.length) return [L, H] as [number, number];
+    if (!visible.length) return [lowerBound, upperBound] as [number, number];
     let min = Infinity, max = -Infinity;
     for (const d of visible) {
       if (d.band95[0] < min) min = d.band95[0];
       if (d.band95[1] > max) max = d.band95[1];
     }
     const padding = (max - min) * 0.05;
-    return [Math.max(L, min - padding), Math.min(H, max + padding)] as [number, number];
-  }, [L, H]);
+    return [Math.max(lowerBound, min - padding), Math.min(upperBound, max + padding)] as [number, number];
+  }, [lowerBound, upperBound]);
 
   const zoom = useChartZoom({
     data: chartData,
@@ -301,7 +301,7 @@ export function TimelineChartContent({
                 !hiddenBands.has(band.key) && (
                   <Area
                     key={band.key}
-                    type="monotone"
+                    type="linear"
                     dataKey={band.dataKey}
                     stroke="none"
                     fill={fanBandColors[band.colorKey]}
@@ -314,7 +314,7 @@ export function TimelineChartContent({
 
               {/* Mean line */}
               <Line
-                type="monotone"
+                type="linear"
                 dataKey="mean"
                 stroke={fanBandColors.mean}
                 strokeWidth={2}

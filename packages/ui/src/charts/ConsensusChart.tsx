@@ -1,4 +1,4 @@
-import React, { useContext, useMemo } from 'react';
+import React, { useContext, useMemo, useId } from 'react';
 import {
   ComposedChart,
   Area,
@@ -43,6 +43,11 @@ export function ConsensusChartContent({
   const ctx = useContext(FunctionSpaceContext);
   if (!ctx) throw new Error('ConsensusChartContent must be used within FunctionSpaceProvider');
 
+  const uniqueId = useId();
+  const consensusGradId = `${uniqueId}-consensus-grad`;
+  const previewGradId = `${uniqueId}-preview-grad`;
+  const selectedGradId = `${uniqueId}-selected-grad`;
+
   // Build chart data merging consensus, preview belief, payout, and overlays
   const chartData = useMemo<ChartPoint[]>(() => {
     const points: ChartPoint[] = consensus.points.map((p) => ({
@@ -53,8 +58,8 @@ export function ConsensusChartContent({
     // Add preview belief overlay (from trade panel)
     // Uses coefficient-direct interpolation for sharp edges (not Bernstein polynomial which smooths)
     if (ctx.previewBelief && market) {
-      const { L, H } = market.config;
-      const previewCurve = evaluateDensityCurve(ctx.previewBelief, L, H, points.length);
+      const { lowerBound, upperBound } = market.config;
+      const previewCurve = evaluateDensityCurve(ctx.previewBelief, lowerBound, upperBound, points.length);
       for (let i = 0; i < points.length && i < previewCurve.length; i++) {
         points[i].preview = previewCurve[i].y;
       }
@@ -62,8 +67,8 @@ export function ConsensusChartContent({
 
     // Add selected position curve from context (automatic component coordination)
     if (ctx.selectedPosition?.belief && market) {
-      const { L, H } = market.config;
-      const selectedCurve = evaluateDensityCurve(ctx.selectedPosition.belief, L, H, points.length);
+      const { lowerBound, upperBound } = market.config;
+      const selectedCurve = evaluateDensityCurve(ctx.selectedPosition.belief, lowerBound, upperBound, points.length);
       for (let i = 0; i < points.length && i < selectedCurve.length; i++) {
         points[i].selected = selectedCurve[i].y;
       }
@@ -91,7 +96,7 @@ export function ConsensusChartContent({
             bestDist = dist;
           }
         }
-        const step = (market.config.H - market.config.L) / (market.config.K || 50);
+        const step = (market.config.upperBound - market.config.lowerBound) / (market.config.numBuckets || 50);
         if (bestDist < step * 2) {
           point.payout = best.payout;
         }
@@ -119,7 +124,7 @@ export function ConsensusChartContent({
       }
     }
     // Preview/overlays can stretch the axis up to 4x consensus height
-    // Beyond that, peaks get clipped — keeps consensus visible
+    // Beyond that, peaks get clipped  -- keeps consensus visible
     const cappedOverlay = Math.min(overlayMax, consensusMax * 4);
     const max = Math.max(consensusMax, cappedOverlay);
     return [0, max * 1.15];
@@ -209,21 +214,21 @@ export function ConsensusChartContent({
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={chartData} margin={{ top: 25, right: 15, left: 10, bottom: 30 }}>
           <defs>
-            <linearGradient id="fsConsensusGrad" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={consensusGradId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={ctx.chartColors.consensus} stopOpacity={0.4} />
               <stop offset="95%" stopColor={ctx.chartColors.consensus} stopOpacity={0.05} />
             </linearGradient>
-            <linearGradient id="fsPreviewGrad" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={previewGradId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={ctx.chartColors.previewLine} stopOpacity={0.3} />
               <stop offset="95%" stopColor={ctx.chartColors.previewLine} stopOpacity={0.0} />
             </linearGradient>
-            <linearGradient id="fsSelectedGrad" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={selectedGradId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={ctx.chartColors.positions[0]} stopOpacity={0.3} />
               <stop offset="95%" stopColor={ctx.chartColors.positions[0]} stopOpacity={0.0} />
             </linearGradient>
             {/* Dynamic gradients for overlay curves */}
             {overlayCurves?.map((overlay) => (
-              <linearGradient key={`grad-${overlay.id}`} id={`fsOverlayGrad-${overlay.id}`} x1="0" y1="0" x2="0" y2="1">
+              <linearGradient key={`grad-${overlay.id}`} id={`${uniqueId}-overlay-grad-${overlay.id}`} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor={overlay.color || ctx.chartColors.payout} stopOpacity={0.3} />
                 <stop offset="95%" stopColor={overlay.color || ctx.chartColors.payout} stopOpacity={0.0} />
               </linearGradient>
@@ -289,20 +294,20 @@ export function ConsensusChartContent({
             }}
           />
 
-          {/* Consensus area — blue */}
+          {/* Consensus area  -- blue */}
           <Area
             yAxisId="left"
-            type="monotone"
+            type="linear"
             dataKey="consensus"
             stroke={ctx.chartColors.consensus}
             strokeWidth={2}
             fillOpacity={1}
-            fill="url(#fsConsensusGrad)"
+            fill={`url(#${consensusGradId})`}
             name="consensus"
             isAnimationActive={false}
           />
 
-          {/* Preview area — yellow dashed, linear interpolation for sharp edges */}
+          {/* Preview area  -- yellow dashed, linear interpolation for sharp edges */}
           {hasPreview && (
             <Area
               yAxisId="left"
@@ -312,32 +317,32 @@ export function ConsensusChartContent({
               strokeWidth={2}
               strokeDasharray="5 5"
               fillOpacity={1}
-              fill="url(#fsPreviewGrad)"
+              fill={`url(#${previewGradId})`}
               name="preview"
               animationDuration={300}
             />
           )}
 
-          {/* Selected position — green (from context, automatic coordination) */}
+          {/* Selected position  -- green (from context, automatic coordination) */}
           {hasSelected && (
             <Area
               yAxisId="left"
-              type="monotone"
+              type="linear"
               dataKey="selected"
               stroke={ctx.chartColors.positions[0]}
               strokeWidth={2}
               fillOpacity={1}
-              fill="url(#fsSelectedGrad)"
+              fill={`url(#${selectedGradId})`}
               name="selected"
               animationDuration={300}
             />
           )}
 
-          {/* Payout — tooltip-only, invisible line for data access */}
+          {/* Payout  -- tooltip-only, invisible line for data access */}
           {hasPayout && (
             <Area
               yAxisId="right"
-              type="monotone"
+              type="linear"
               dataKey="payout"
               stroke="transparent"
               strokeWidth={0}
@@ -348,17 +353,17 @@ export function ConsensusChartContent({
             />
           )}
 
-          {/* Overlay curves — from props */}
+          {/* Overlay curves  -- from props */}
           {overlayCurves?.map((overlay) => (
             <Area
               key={overlay.id}
               yAxisId="left"
-              type="monotone"
+              type="linear"
               dataKey={overlay.id}
               stroke={overlay.color || ctx.chartColors.payout}
               strokeWidth={2}
               fillOpacity={1}
-              fill={`url(#fsOverlayGrad-${overlay.id})`}
+              fill={`url(#${uniqueId}-overlay-grad-${overlay.id})`}
               name={overlay.id}
               animationDuration={300}
             />

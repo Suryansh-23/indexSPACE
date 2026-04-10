@@ -1,6 +1,7 @@
 ---
 title: "Developer Monetization"
 sidebar_position: 1
+description: "SDK-level fee wrapping that lets developers earn revenue from trades in their apps."
 ---
 
 # Developer Monetization
