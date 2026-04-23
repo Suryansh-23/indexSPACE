@@ -8,7 +8,7 @@ services:
       - key: NODE_VERSION
         value: "20"
       - key: FS_BASE_URL
-        value: "https://fs-core-api.onrender.com"
+        value: "https://fs-engine-api-dev.onrender.com"
     headers:
       - path: /llms.txt
         name: Content-Type
