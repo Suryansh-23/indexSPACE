@@ -1,9 +1,0 @@
-/* Demo app page background -- not part of the SDK theme system */
-/* Switch to match your active theme preset in App.tsx */
-body {
-  /* background: #0a0a0f; fs-dark / fs-midnight */
-  /* background: #f8fafc; */ /* fs-light */
-  /* background: #ffffff; native-light */
-  background: #111111; /* native-dark */
-  margin: 0;
-}
