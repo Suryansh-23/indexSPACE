@@ -75,7 +75,7 @@ Implementation lives under the SDK fork, but in a new product workspace:
 ```text
 fs_trading_sdk/
   indexspace/
-    ui/          # Vite + React app
+    ui/          # Next.js + React app, adopted from index-space-ui-v0
     backend/     # Bun + Hono + SQLite API, curator, simulator
     contracts/   # Foundry project
     shared/      # shared index config and types
@@ -90,7 +90,8 @@ orchestration becomes painful.
 
 ### Stack
 
-- Frontend: Vite + React.
+- Frontend: Next.js App Router + React, adopted from the generated
+  `index-space-ui-v0` app.
 - Wallet stack: `wagmi` + `viem` + RainbowKit.
 - Backend: Bun + Hono + SQLite.
 - Contracts: Foundry + Solidity, custom minimal ERC-7540-style vaults built
@@ -600,7 +601,7 @@ Add a global portfolio drawer or page showing:
 - claimed/completed history;
 - links to Base Sepolia transactions and FunctionSpace position IDs.
 
-Use a Uniswap-like drawer pattern:
+Use a compact right-side account-console drawer pattern:
 
 - wallet/portfolio button in the top-right;
 - drawer slides from the right;

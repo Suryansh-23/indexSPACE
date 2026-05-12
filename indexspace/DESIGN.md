@@ -99,11 +99,11 @@ should sound like an instrument readout.
   unavailable: gray fill, muted label, no decorative opacity tricks. Icon
   buttons should use simple familiar symbols, not text in rounded pills.
 
-* **Trade Drawer:** A right-side drawer inspired by app.uniswap.org for flow,
-  but visually closer to a hardware control panel. It should contain action
-  mode, amount input, quote/NAV preview, request state, allowance state, and one
-  final action. The drawer uses Instrument Ink (#0F0E12), sharp edges, thin
-  separators, tabular numbers, and status lights.
+* **Trade Drawer:** A right-side drawer that behaves like a compact hardware
+  control panel. It should contain action mode, amount input, quote/NAV preview,
+  request state, allowance state, and one final action. The drawer uses
+  Instrument Ink (#0F0E12), sharp edges, thin separators, tabular numbers, and
+  status lights.
 
 * **Vault Cards:** Do not use soft cards. Use product tiles: sharp rectangular
   modules with a numbered identity, one large number, two to four compact
