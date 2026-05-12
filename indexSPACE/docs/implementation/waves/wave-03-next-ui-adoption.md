@@ -11,7 +11,7 @@ except through stable mock adapters shaped like Wave 02 APIs.
 
 ## Status
 
-Planned. Starts after Wave 02 API contracts are stable.
+Complete.
 
 ## Prerequisites
 

@@ -1,0 +1,79 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --ix-shell:          #050505;
+  --ix-shell-mid:      #080808;
+  --ix-panel:          #11100E;
+  --ix-panel-warm:     #12110F;
+  --ix-surface:        #16150F;
+  --ix-text:           #F4F1E8;
+  --ix-text-dim:       #C8C4B8;
+  --ix-text-muted:     #8E8A80;
+  --ix-text-faint:     #4E4A42;
+  --ix-border:         #2A2823;
+  --ix-border-dim:     #1E1D1A;
+  --ix-border-bright:  #3A3830;
+  --ix-blue:           #0071BB;
+  --ix-blue-dim:       #00508A;
+  --ix-orange:         #F05A24;
+  --ix-yellow:         #FFC700;
+  --ix-green:          #1E9E5A;
+  --ix-green-dim:      #157040;
+  --ix-red:            #D62D20;
+  --ix-chart-grid:     #1E1D1A;
+  --ix-chart-axis:     #3A3830;
+
+  --background:           var(--ix-shell);
+  --foreground:           var(--ix-text);
+  --card:                 var(--ix-panel);
+  --card-foreground:      var(--ix-text);
+  --popover:              var(--ix-panel);
+  --popover-foreground:   var(--ix-text);
+  --primary:              var(--ix-blue);
+  --primary-foreground:   var(--ix-text);
+  --secondary:            var(--ix-surface);
+  --secondary-foreground: var(--ix-text);
+  --muted:                var(--ix-panel-warm);
+  --muted-foreground:     var(--ix-text-muted);
+  --accent:               var(--ix-blue);
+  --accent-foreground:    var(--ix-text);
+  --destructive:          var(--ix-red);
+  --destructive-foreground: var(--ix-text);
+  --border:               var(--ix-border);
+  --input:                var(--ix-border);
+  --ring:                 var(--ix-blue);
+  --radius:               0;
+}
+
+* {
+  border-color: var(--ix-border);
+}
+
+body {
+  background-color: var(--ix-shell);
+  color: var(--ix-text);
+  font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@keyframes led-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.led-pulse {
+  animation: led-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes tape-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.tape-scroll {
+  animation: tape-scroll 30s linear infinite;
+}
