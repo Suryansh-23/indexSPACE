@@ -23,7 +23,7 @@ connect wallet
 
 ## Status
 
-Planned. Starts after Waves 01-03 are merged.
+Complete.
 
 ## Prerequisites
 
@@ -230,11 +230,34 @@ Regression evidence:
 
 ## Handoff Notes
 
-Wave 05 needs:
+### Implementation Notes
 
-- exact demo runbook;
-- deployed addresses;
-- backend env file shape;
-- simulator-safe accounts;
-- known latency and failure behavior;
-- screenshots/video-worthy flow notes.
+- Deployment: IndexVault contracts deployed to local Anvil via `forge script`
+- Anvil addresses stored in `@indexspace/shared` (ANVIL_AI_VAULT, ANVIL_CRYPTO_VAULT, etc.)
+- Backend has hybrid mode: `MOCK_VAULT=true` (default) uses mock vault; `MOCK_VAULT=false` + `RPC_URL` + `CURATOR_PRIVATE_KEY` uses real Anvil chain
+- RealIndexer polls `DepositRequest` / `RedeemRequest` events via viem, deduped by tx_hash+log_index
+- Curator calls `fulfillDeposit` / `fulfillRedeem` onchain when `CURATOR_PRIVATE_KEY` is set
+- FSClient buy/sell calls wrapped in try/catch; falls back to mock position IDs when FS not configured
+- UI adapter (`lib/indexspace-api.ts`) tries backend API first, falls back to deterministic mock data on 3s timeout
+- Contract client (`lib/contracts.ts`) provides `approveVault`, `requestDeposit`, `requestRedeem`, `claimDeposit`, `claimRedeem`, `readUserRequest`, `readBalances`
+- Wagmi config (`lib/wagmi.ts`) configured with Anvil (31337) + Base Sepolia (84532)
+- Internal page fetches live backend status; shows degraded state when backend unreachable
+- No browser available for wallet/UI smoke testing; all contract client code is wired but unverified via UI
+
+### Blocker: no browser verification
+Wallet connection, approve/deposit/redeem/claim contract flows cannot be tested without browser. Code is ready for Wave 05 browser session.
+
+### Wave 05 Handoff
+
+- Demo runbook: start anvil -> deploy contracts -> start backend (mock=false) -> start UI -> open browser
+- Deployed addresses: see `@indexspace/shared` `ANVIL_*` exports
+- Backend env file shape:
+  ```
+  MOCK_VAULT=false
+  RPC_URL=http://localhost:8545
+  CURATOR_PRIVATE_KEY=0xac09...ff80 (anvil account #0)
+  FS_USERNAME=<functionspace username>
+  FS_PASSWORD=<functionspace password>
+  ```
+- Simulator-safe accounts: anvil account #0 (deployer), #1 (curator)
+- Known gaps: wallet UI flow, onchain fulfill confirmation, browser screenshots
