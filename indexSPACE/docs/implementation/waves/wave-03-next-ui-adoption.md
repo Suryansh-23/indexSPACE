@@ -15,15 +15,8 @@ Complete.
 
 ## Prerequisites
 
-- Read `indexspace/DESIGN.md` fully.
-- Read UI feedback from the latest screenshot review if present in chat/docs.
+- Read `indexSPACE/DESIGN.md` fully.
 - Read Wave 02 handoff for API shapes.
-- Inspect generated UI:
-  - `../index-space-ui-v0/package.json`;
-  - `../index-space-ui-v0/app/**`;
-  - `../index-space-ui-v0/components/indexspace/**`;
-  - `../index-space-ui-v0/app/globals.css`;
-  - `../index-space-ui-v0/components/indexspace/mock-data.ts`.
 - Run the generated UI build/dev command before moving if practical, to capture
   baseline issues.
 
@@ -31,7 +24,7 @@ Complete.
 
 ### UI Package Decision
 
-`indexspace/ui` becomes a Next.js App Router app.
+`indexSPACE/ui` becomes a Next.js App Router app.
 
 Update `indexspace/ui/package.json` to use Next.js and React 19 if adopting v0
 unchanged. If downgrading to React 18 is required for SDK compatibility, record
@@ -67,9 +60,9 @@ Create a local data adapter boundary so Wave 04 can replace mocks without
 rewriting components:
 
 ```text
-indexspace/ui/lib/indexspace-api.ts
-indexspace/ui/lib/mock-data.ts
-indexspace/ui/lib/types.ts
+indexSPACE/ui/lib/indexspace-api.ts
+indexSPACE/ui/lib/mock-data.ts
+indexSPACE/ui/lib/types.ts
 ```
 
 Required adapter functions:
@@ -116,20 +109,20 @@ unless those names are mapped to real configured markets.
 
 ## Owned Areas
 
-- `indexspace/ui/**`
-- `indexspace/DESIGN.md` for durable design clarifications
+- `indexSPACE/ui/**`
+- `indexSPACE/DESIGN.md` for durable design clarifications
 - root/package manifests and `bun.lock` for UI dependency/workspace changes
 
 ## Shared-Risk Areas
 
-- `indexspace/shared/**` only for UI-facing type gaps
+- `indexSPACE/shared/**` only for UI-facing type gaps
 - backend API contracts from Wave 02
 - SDK packages if React version compatibility becomes an issue
 
 ## Forbidden Write Areas
 
-- `indexspace/contracts/**`
-- `indexspace/backend/**` except documenting API mismatch in handoff
+- `indexSPACE/contracts/**`
+- `indexSPACE/backend/**` except documenting API mismatch in handoff
 - `packages/**` SDK internals
 - `../index-space-ui-v0/**` after adoption begins
 
@@ -182,7 +175,7 @@ unless those names are mapped to real configured markets.
 Expected:
 
 ```bash
-cd indexspace/ui
+cd indexSPACE/ui
 bun install
 bun run typecheck
 bun run build
@@ -214,10 +207,30 @@ Regression evidence:
 
 ## Handoff Notes
 
-Wave 04 needs:
+### Implementation Notes
 
-- adapter function names and expected payloads;
-- wallet state locations;
-- trade drawer state model;
-- any React version compatibility risks;
-- screenshots of final Wave 03 UI.
+- Adopted Next.js 16.2.6 with React 19 (`@functionspace/react` supports `^18 || ^19`)
+- Kept wallet dependencies (`wagmi`, `viem`, `rainbowkit`) for Wave 04, no wallet/contract wiring yet
+- Used `max-md:hidden` for desktop-only elements (vault rail, trade drawer)
+- Mobile: vault selector strip + floating TRADE button opens full-screen trade drawer
+- SSR-safe clock via `useClock` hook (suppresses hydration mismatch)
+- Mock data is fully deterministic: `hashId` function replaces `Math.random` for navChange/shares
+- NAV history uses `Math.sin`/`Math.cos` drift (stable across renders)
+- Constituent names from `@indexspace/shared` (no fake market names)
+- Palette from `DESIGN.md` with warm neutrals, amber undertones (Machine Black, Instrument Ink)
+- Routes: `/` (terminal), `/vault/[id]` (detail), `/internal` (status), `/not-found` (controlled 404)
+- No shadcn UI components copied (indexspace components use custom CSS with `cn` utility)
+- `use-toast.ts` and `use-mobile.ts` hooks available for future use
+
+### Wave 04 Handoff
+
+Adapter functions (in `lib/indexspace-api.ts`):
+- `getIndices()`, `getVault(vaultId)`, `getVaultCandles(vaultId)`
+- `getVaultRequests(vaultId, controller?)`, `getVaultPositions(vaultId)`
+- `quoteSubscribe(vaultId, assets)`, `quoteRedeem(vaultId, shares)`
+- `getInternalStatus()`
+
+Wallet state locations: wagmi provider setup needed in `app/layout.tsx`
+Trade drawer state model: `useState` in `Terminal` component (`walletConnected`, `step`, `mode`)
+React version: React 19, SDK compatible
+No browser screenshots available (no Chrome in dev environment)

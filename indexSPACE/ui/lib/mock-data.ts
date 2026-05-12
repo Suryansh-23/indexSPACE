@@ -28,14 +28,21 @@ const ROLE_GLYPH: Record<string, string> = {
   adoption: '■',
 }
 
-let vaultCounter = 0
+function hashId(id: string): number {
+  let h = 0
+  for (let i = 0; i < id.length; i++) {
+    h = ((h << 5) - h) + id.charCodeAt(i)
+    h |= 0
+  }
+  return Math.abs(h)
+}
 
-function buildVault(idx: typeof FORECAST_INDICES[number]): Vault {
-  vaultCounter++
+function buildVault(idx: typeof FORECAST_INDICES[number], index: number): Vault {
   const isLive = LIVE_VAULT_IDS.includes(idx.id as typeof LIVE_VAULT_IDS[number])
-  const num = vaultCounter
+  const num = index + 1
   const label = isLive ? `VAULT ${String(num).padStart(2, '0')}` : `PREVIEW ${String(num).padStart(2, '0')}`
   const baseNav = 1.0 + (isLive ? (idx.id === 'ai-acceleration' ? 0.0847 : -0.0688) : 0)
+  const h = hashId(idx.id)
 
   const constituents: Constituent[] = idx.constituents.map((c) => ({
     market: c.label,
@@ -57,8 +64,8 @@ function buildVault(idx: typeof FORECAST_INDICES[number]): Vault {
     mode: idx.mode,
     status: isLive ? 'live' : 'preview',
     nav: parseFloat(baseNav.toFixed(4)),
-    navChange: parseFloat((isLive ? (Math.random() - 0.48) * 5 : 0).toFixed(2)),
-    shares: isLive ? Math.floor(Math.random() * 40000 + 10000) : 0,
+    navChange: parseFloat((isLive ? ((h % 101) - 48) * 0.05 : 0).toFixed(2)),
+    shares: isLive ? 10000 + (h % 40000) : 0,
     totalSupply: 100000,
     curatorState: isLive ? ('armed' as const) : ('idle' as const),
     simulatorState: isLive ? ('off' as const) : ('on' as const),
@@ -68,7 +75,7 @@ function buildVault(idx: typeof FORECAST_INDICES[number]): Vault {
   }
 }
 
-const _vaults = FORECAST_INDICES.map(buildVault)
+const _vaults = FORECAST_INDICES.map((idx, i) => buildVault(idx, i))
 
 export const VAULTS: Vault[] = _vaults
 

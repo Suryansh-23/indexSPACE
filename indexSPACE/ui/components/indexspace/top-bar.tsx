@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 
 interface TopBarProps {
@@ -9,10 +10,24 @@ interface TopBarProps {
   onOpenPortfolio: () => void
 }
 
+function useClock() {
+  const [time, setTime] = useState('')
+  const [date, setDate] = useState('')
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date()
+      setTime(now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+      setDate(now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase())
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [])
+  return { time, date }
+}
+
 export function TopBar({ networkOk, walletConnected, onConnectWallet, onOpenPortfolio }: TopBarProps) {
-  const now = new Date()
-  const timeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
-  const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()
+  const { time, date } = useClock()
 
   return (
     <header className="h-11 bg-ix-shell border-b border-ix-border flex items-stretch shrink-0">
@@ -43,8 +58,8 @@ export function TopBar({ networkOk, walletConnected, onConnectWallet, onOpenPort
 
       <div className="flex items-stretch">
         <div className="flex flex-col justify-center items-end px-4 border-l border-ix-border">
-          <span className="text-[12px] font-mono tabular text-ix-text leading-none">{timeStr}</span>
-          <span className="text-[8px] font-mono text-ix-text-muted leading-none mt-[3px] tracking-wider">{dateStr}</span>
+          <span className="text-[12px] font-mono tabular text-ix-text leading-none">{time}</span>
+          <span className="text-[8px] font-mono text-ix-text-muted leading-none mt-[3px] tracking-wider">{date}</span>
         </div>
 
         <button
