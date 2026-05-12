@@ -24,10 +24,14 @@ export const viewport: Viewport = {
   themeColor: '#000000',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
   return (
-    <html lang="en" className={`${ibmPlexSans.variable} ${ibmPlexMono.variable}`}>
-      <body className="font-sans antialiased">
+    <html lang="en" className={`${ibmPlexSans.variable} ${ibmPlexMono.variable} bg-ix-shell`}>
+      <body className="font-sans antialiased bg-ix-shell text-ix-text">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           {children}
         </ThemeProvider>

@@ -4,18 +4,26 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  /* ── IndexSpace Instrument Palette ──────────────────────────────────────── */
+  /* Shell / structure */
   --ix-shell:          #050505;
   --ix-shell-mid:      #080808;
   --ix-panel:          #11100E;
   --ix-panel-warm:     #12110F;
   --ix-surface:        #16150F;
+
+  /* Text */
   --ix-text:           #F4F1E8;
   --ix-text-dim:       #C8C4B8;
   --ix-text-muted:     #8E8A80;
   --ix-text-faint:     #4E4A42;
+
+  /* Borders */
   --ix-border:         #2A2823;
   --ix-border-dim:     #1E1D1A;
   --ix-border-bright:  #3A3830;
+
+  /* Signal colors */
   --ix-blue:           #0071BB;
   --ix-blue-dim:       #00508A;
   --ix-orange:         #F05A24;
@@ -23,9 +31,12 @@
   --ix-green:          #1E9E5A;
   --ix-green-dim:      #157040;
   --ix-red:            #D62D20;
+
+  /* Chart */
   --ix-chart-grid:     #1E1D1A;
   --ix-chart-axis:     #3A3830;
 
+  /* Map to shadcn tokens */
   --background:           var(--ix-shell);
   --foreground:           var(--ix-text);
   --card:                 var(--ix-panel);
@@ -38,42 +49,103 @@
   --secondary-foreground: var(--ix-text);
   --muted:                var(--ix-panel-warm);
   --muted-foreground:     var(--ix-text-muted);
-  --accent:               var(--ix-blue);
+  --accent:               var(--ix-orange);
   --accent-foreground:    var(--ix-text);
   --destructive:          var(--ix-red);
   --destructive-foreground: var(--ix-text);
   --border:               var(--ix-border);
-  --input:                var(--ix-border);
+  --input:                var(--ix-panel);
   --ring:                 var(--ix-blue);
-  --radius:               0;
+  --radius:               0rem;
+
+  /* Chart tokens */
+  --chart-1: var(--ix-blue);
+  --chart-2: var(--ix-orange);
+  --chart-3: var(--ix-green);
+  --chart-4: var(--ix-yellow);
+  --chart-5: var(--ix-text-muted);
 }
 
-* {
-  border-color: var(--ix-border);
+@theme inline {
+  --font-sans: 'IBM Plex Sans', 'Inter', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'JetBrains Mono', monospace;
+
+  /* Expose all ix tokens to tailwind */
+  --color-ix-shell:         var(--ix-shell);
+  --color-ix-shell-mid:     var(--ix-shell-mid);
+  --color-ix-panel:         var(--ix-panel);
+  --color-ix-panel-warm:    var(--ix-panel-warm);
+  --color-ix-surface:       var(--ix-surface);
+  --color-ix-text:          var(--ix-text);
+  --color-ix-text-dim:      var(--ix-text-dim);
+  --color-ix-text-muted:    var(--ix-text-muted);
+  --color-ix-text-faint:    var(--ix-text-faint);
+  --color-ix-border:        var(--ix-border);
+  --color-ix-border-dim:    var(--ix-border-dim);
+  --color-ix-border-bright: var(--ix-border-bright);
+  --color-ix-blue:          var(--ix-blue);
+  --color-ix-blue-dim:      var(--ix-blue-dim);
+  --color-ix-orange:        var(--ix-orange);
+  --color-ix-yellow:        var(--ix-yellow);
+  --color-ix-green:         var(--ix-green);
+  --color-ix-green-dim:     var(--ix-green-dim);
+  --color-ix-red:           var(--ix-red);
+  --color-ix-chart-grid:    var(--ix-chart-grid);
+  --color-ix-chart-axis:    var(--ix-chart-axis);
+
+  --color-background:       var(--background);
+  --color-foreground:       var(--foreground);
+  --color-card:             var(--card);
+  --color-card-foreground:  var(--card-foreground);
+  --color-popover:          var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary:          var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary:        var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted:            var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent:           var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive:      var(--destructive);
+  --color-border:           var(--border);
+  --color-input:            var(--input);
+  --color-ring:             var(--ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --radius-sm: 0rem;
+  --radius-md: 0rem;
+  --radius-lg: 0rem;
+  --radius-xl: 0rem;
 }
 
-body {
-  background-color: var(--ix-shell);
-  color: var(--ix-text);
-  font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    box-sizing: border-box;
+  }
+  body {
+    @apply bg-ix-shell text-ix-text font-sans;
+  }
 }
 
+/* Tabular numerals everywhere numeric */
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: var(--ix-panel); }
+::-webkit-scrollbar-thumb { background: var(--ix-border); }
+::-webkit-scrollbar-thumb:hover { background: var(--ix-border-bright); }
+
+/* Pulse LED animation */
 @keyframes led-pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  50%       { opacity: 0.35; }
 }
-
-.led-pulse {
-  animation: led-pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes tape-scroll {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
-.tape-scroll {
-  animation: tape-scroll 30s linear infinite;
-}
+.led-pulse { animation: led-pulse 1.6s ease-in-out infinite; }
