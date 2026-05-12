@@ -180,6 +180,20 @@ app.post("/internal/indexer/tick", (c) => {
       );
     }
   }
+
+  if (events.length > 0) {
+    const existing = db.query(
+      "SELECT last_indexed_block FROM indexer_checkpoints WHERE chain_id = ? AND contract_address = 'mock-vault'",
+    ).get(config.chainId) as { last_indexed_block: number } | null;
+
+    const nextBlock = (existing?.last_indexed_block ?? 0) + 1;
+
+    db.run(
+      "INSERT OR REPLACE INTO indexer_checkpoints (chain_id, contract_address, last_indexed_block, updated_at) VALUES (?, 'mock-vault', ?, datetime('now'))",
+      [config.chainId, nextBlock],
+    );
+  }
+
   return c.json({ indexed: events.length });
 });
 
