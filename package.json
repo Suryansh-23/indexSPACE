@@ -8,11 +8,20 @@
     "indexSPACE/backend",
     "indexSPACE/ui"
   ],
+  "scripts": {
+    "dev": "concurrently --names backend,ui --prefix-colors cyan,blue 'cd indexSPACE/backend && bun run dev' 'cd indexSPACE/ui && bun run dev'",
+    "backend": "cd indexSPACE/backend && bun run dev",
+    "ui": "cd indexSPACE/ui && bun run dev",
+    "build": "cd indexSPACE/ui && bun run build",
+    "typecheck": "cd indexSPACE/ui && npx tsc --noEmit",
+    "screenshots": "cd indexSPACE/ui && bun run dev & sleep 4 && node indexSPACE/scripts/screenshots-desktop.mjs; kill %1 2>/dev/null"
+  },
   "devDependencies": {
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.2.13",
     "@types/react-dom": "^19.2.3",
+    "concurrently": "^9.1.2",
     "jsdom": "^25.0.1",
     "tsx": "^4.0.0",
     "typescript": "^5.3.0",

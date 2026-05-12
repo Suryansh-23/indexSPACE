@@ -21,5 +21,8 @@ packages/docs/build/
 packages/docs/.docusaurus/
 
 # Next.js
-indexSPACE/ui/.next/indexSPACE/contracts/broadcast/
+indexSPACE/ui/.next/
+
+# Foundry broadcast
+indexSPACE/contracts/broadcast/
 indexSPACE/contracts/cache/
