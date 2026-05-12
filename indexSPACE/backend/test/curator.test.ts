@@ -40,10 +40,10 @@ describe("Curator", () => {
   }
 
   describe("subscribe lifecycle", () => {
-    it("transitions pending -> executing -> claimable for subscribe", () => {
+    it("transitions pending -> executing -> claimable for subscribe", async () => {
       insertRequest({ kind: "subscribe", asset_amount: "500" });
 
-      const results = curator.tick();
+      const results = await curator.tick();
       expect(results).toHaveLength(1);
       expect(results[0]).toContain("subscribe");
 
@@ -53,28 +53,28 @@ describe("Curator", () => {
       expect(row.execution_id).toMatch(/^exec-/);
     });
 
-    it("mints shares = assets when navPerShare = 1 (first deposit)", () => {
+    it("mints shares = assets when navPerShare = 1 (first deposit)", async () => {
       insertRequest({ kind: "subscribe", asset_amount: "500" });
 
-      curator.tick();
+      await curator.tick();
 
       const row = db.query("SELECT share_amount FROM requests WHERE id = 1").get() as any;
       expect(parseFloat(row.share_amount)).toBe(500);
     });
 
-    it("creates fs_positions for each constituent", () => {
+    it("creates fs_positions for each constituent", async () => {
       insertRequest({ kind: "subscribe", asset_amount: "500" });
 
-      curator.tick();
+      await curator.tick();
 
       const positions = db.query("SELECT * FROM fs_positions WHERE vault_id = 'ai-acceleration'").all();
       expect(positions).toHaveLength(9);
     });
 
-    it("rejects unknown vault", () => {
+    it("rejects unknown vault", async () => {
       insertRequest({ kind: "subscribe", vault_id: "nonexistent", asset_amount: "500" });
 
-      const results = curator.tick();
+      const results = await curator.tick();
       expect(results[0]).toContain("failed");
       expect(results[0]).toContain("unknown vault");
 
@@ -84,7 +84,7 @@ describe("Curator", () => {
   });
 
   describe("redeem lifecycle", () => {
-    it("transitions pending -> executing -> claimable for redeem", () => {
+    it("transitions pending -> executing -> claimable for redeem", async () => {
       insertRequest({ kind: "subscribe", asset_amount: "1000", share_amount: "0", status: "claimable" });
       db.run(
         `INSERT INTO fs_positions (vault_id, market_id, position_id, status, collateral, request_id, created_at)
@@ -92,7 +92,7 @@ describe("Curator", () => {
       );
       insertRequest({ kind: "redeem", share_amount: "100" });
 
-      const results = curator.tick();
+      const results = await curator.tick();
       expect(results).toHaveLength(1);
       expect(results[0]).toContain("redeem");
 
@@ -100,7 +100,7 @@ describe("Curator", () => {
       expect(row.status).toBe("claimable");
     });
 
-    it("sells open lots FIFO proportional to redeem fraction", () => {
+    it("sells open lots FIFO proportional to redeem fraction", async () => {
       insertRequest({ kind: "subscribe", asset_amount: "1000", share_amount: "500", status: "claimable" });
       db.run(
         `INSERT INTO fs_positions (vault_id, market_id, position_id, status, collateral, request_id, created_at)
@@ -112,7 +112,7 @@ describe("Curator", () => {
       );
       insertRequest({ kind: "redeem", share_amount: "250" });
 
-      curator.tick();
+      await curator.tick();
 
       const closedLots = db.query(
         "SELECT position_id, status, returned_collateral FROM fs_positions WHERE status = 'closed'",
@@ -122,10 +122,10 @@ describe("Curator", () => {
       expect(parseFloat(first.returned_collateral)).toBeGreaterThan(0);
     });
 
-    it("rejects unknown vault for redeem", () => {
+    it("rejects unknown vault for redeem", async () => {
       insertRequest({ kind: "redeem", vault_id: "nonexistent", share_amount: "100" });
 
-      const results = curator.tick();
+      const results = await curator.tick();
       expect(results[0]).toContain("failed");
 
       const row = db.query("SELECT status FROM requests WHERE id = 1").get() as any;
@@ -134,10 +134,10 @@ describe("Curator", () => {
   });
 
   describe("failure paths", () => {
-    it("stores error message when request fails", () => {
+    it("stores error message when request fails", async () => {
       insertRequest({ kind: "subscribe", vault_id: "nonexistent", asset_amount: "500" });
 
-      const results = curator.tick();
+      const results = await curator.tick();
 
       expect(results[0]).toContain("failed");
       const row = db.query("SELECT status, error FROM requests WHERE id = 1").get() as any;

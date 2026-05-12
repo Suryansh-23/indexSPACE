@@ -1,13 +1,15 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serve } from "bun";
-import { loadConfig, INDICES, LIVE_VAULTS, PREVIEW_INDICES } from "./config.ts";
+import { loadConfig, INDICES, LIVE_VAULTS, PREVIEW_INDICES, ANVIL_AI_VAULT, ANVIL_CRYPTO_VAULT } from "./config.ts";
 import { createDb } from "./db.ts";
 import { getFsClient } from "./sdk.ts";
 import { MockVault } from "./mock-vault.ts";
+import { RealIndexer } from "./indexer.ts";
 import { computeSubscribeQuote, computeRedeemQuote } from "./quotes.ts";
 import { Curator } from "./curator.ts";
 import { Simulator } from "./simulator.ts";
+import type { Address } from "viem";
 
 const config = loadConfig();
 const db = createDb();
@@ -15,6 +17,15 @@ const mockVault = new MockVault(db, INDICES);
 const curator = new Curator(db);
 const simulator = new Simulator(mockVault);
 const fsClient = getFsClient(config.fsApiUrl, config.fsUsername, config.fsPassword);
+
+if (!config.mockVault) {
+  curator.configureRpc(config.rpcUrl, config.curatorPrivateKey);
+}
+
+const realIndexer = config.mockVault ? null : new RealIndexer(db, config, {
+  "ai-acceleration": ANVIL_AI_VAULT as Address,
+  "crypto-reflexivity": ANVIL_CRYPTO_VAULT as Address,
+});
 
 const app = new Hono();
 app.use("*", cors());
@@ -160,12 +171,18 @@ app.get("/internal/status", (c) => {
   });
 });
 
-app.post("/internal/curator/tick", (c) => {
-  const results = curator.tick();
+app.post("/internal/curator/tick", async (c) => {
+  const results = await curator.tick();
   return c.json({ processed: results.length, results });
 });
 
-app.post("/internal/indexer/tick", (c) => {
+app.post("/internal/indexer/tick", async (c) => {
+  if (realIndexer) {
+    const events = await realIndexer.tick();
+    const count = realIndexer.persistEvents(events);
+    return c.json({ indexed: count });
+  }
+
   const events = mockVault.pollEvents();
   for (const ev of events) {
     const exists = db.query(
@@ -185,9 +202,7 @@ app.post("/internal/indexer/tick", (c) => {
     const existing = db.query(
       "SELECT last_indexed_block FROM indexer_checkpoints WHERE chain_id = ? AND contract_address = 'mock-vault'",
     ).get(config.chainId) as { last_indexed_block: number } | null;
-
     const nextBlock = (existing?.last_indexed_block ?? 0) + 1;
-
     db.run(
       "INSERT OR REPLACE INTO indexer_checkpoints (chain_id, contract_address, last_indexed_block, updated_at) VALUES (?, 'mock-vault', ?, datetime('now'))",
       [config.chainId, nextBlock],
@@ -233,11 +248,20 @@ if (config.mockVault) {
     }
   }, config.pollIntervalMs);
 
-  setInterval(() => {
-    curator.tick();
+  setInterval(async () => {
+    await curator.tick();
   }, Math.max(config.pollIntervalMs, 15000));
 
   simulator.start();
+} else {
+  setInterval(async () => {
+    const events = await realIndexer!.tick();
+    realIndexer!.persistEvents(events);
+  }, config.pollIntervalMs);
+
+  setInterval(async () => {
+    await curator.tick();
+  }, Math.max(config.pollIntervalMs, 15000));
 }
 
 console.log(`IndexSpace backend starting on http://${config.host}:${config.port}`);

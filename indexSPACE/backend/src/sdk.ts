@@ -1,4 +1,5 @@
 import { FSClient } from "@functionspace/core";
+import { buy as fsBuy, sell as fsSell } from "@functionspace/core";
 import type { ConstituentStrategy, Orientation } from "@indexspace/shared";
 
 export interface VaultClient {
@@ -87,4 +88,40 @@ export function buildBeliefVector(
   }
 
   return vec;
+}
+
+export interface FsBuyResult {
+  positionId: string | number;
+  marketId: number;
+}
+
+export async function tryFsBuy(
+  marketId: number,
+  collateral: number,
+  strategy: ConstituentStrategy,
+): Promise<FsBuyResult | null> {
+  try {
+    if (!_fsClient) return null;
+    const numBuckets = 10;
+    const belief = buildBeliefVector(numBuckets, strategy);
+    const result = await fsBuy(_fsClient, marketId, belief, Math.floor(collateral * 1e6), numBuckets);
+    return { positionId: result.positionId, marketId };
+  } catch (err) {
+    console.error(`FS buy failed for market ${marketId}:`, err);
+    return null;
+  }
+}
+
+export async function tryFsSell(
+  positionId: string | number,
+  marketId: number,
+): Promise<boolean> {
+  try {
+    if (!_fsClient) return false;
+    await fsSell(_fsClient, positionId, marketId);
+    return true;
+  } catch (err) {
+    console.error(`FS sell failed for position ${positionId}:`, err);
+    return false;
+  }
 }

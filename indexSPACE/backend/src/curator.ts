@@ -1,16 +1,42 @@
 import type { Database } from "bun:sqlite";
-import { FORECAST_INDICES } from "@indexspace/shared";
+import { FORECAST_INDICES, ANVIL_AI_VAULT, ANVIL_CRYPTO_VAULT } from "@indexspace/shared";
 import type { IndexConstituent, Orientation } from "@indexspace/shared";
-import { getDefaultStrategy } from "./sdk.ts";
+import { getDefaultStrategy, tryFsBuy, tryFsSell } from "./sdk.ts";
+import type { Address } from "viem";
+import { createWalletClient, http, parseAbi } from "viem";
+import { anvil } from "viem/chains";
+
+const FULFILL_ABI = parseAbi([
+  "function fulfillDeposit(address controller, uint256 shares) external",
+  "function fulfillRedeem(address controller, uint256 assets) external",
+  "function pendingDepositRequest(uint256 requestId, address controller) view returns (uint256, uint256)",
+  "function pendingRedeemRequest(uint256 requestId, address controller) view returns (uint256, uint256)",
+]);
+
+const VAULT_ADDRESSES: Record<string, Address> = {
+  "ai-acceleration": ANVIL_AI_VAULT as Address,
+  "crypto-reflexivity": ANVIL_CRYPTO_VAULT as Address,
+};
 
 export class Curator {
   private db: Database;
+  private walletClient: ReturnType<typeof createWalletClient> | null = null;
+  private curatorAccount: Address | null = null;
 
   constructor(db: Database) {
     this.db = db;
   }
 
-  processPendingRequests(): string[] {
+  configureRpc(rpcUrl: string, curatorPrivateKey?: string) {
+    if (!curatorPrivateKey) return;
+
+    this.walletClient = createWalletClient({ chain: anvil, transport: http(rpcUrl) });
+    this.curatorAccount = (curatorPrivateKey.startsWith("0x")
+      ? curatorPrivateKey
+      : `0x${curatorPrivateKey}`) as Address;
+  }
+
+  async processPendingRequests(): Promise<string[]> {
     const pending = this.db.query(
       "SELECT * FROM requests WHERE status = 'pending' ORDER BY created_at ASC LIMIT 5",
     ).all() as Array<{
@@ -29,9 +55,9 @@ export class Curator {
     for (const req of pending) {
       try {
         if (req.kind === "subscribe") {
-          results.push(this.processSubscribe(req));
+          results.push(await this.processSubscribe(req));
         } else if (req.kind === "redeem") {
-          results.push(this.processRedeem(req));
+          results.push(await this.processRedeem(req));
         }
       } catch (err) {
         this.db.run(
@@ -45,12 +71,13 @@ export class Curator {
     return results;
   }
 
-  private processSubscribe(req: {
+  private async processSubscribe(req: {
     id: number;
     vault_id: string;
+    controller: string;
     asset_amount: string;
     internal_request_id: number;
-  }): string {
+  }): Promise<string> {
     const index = FORECAST_INDICES.find((i) => i.id === req.vault_id);
     if (!index) throw new Error(`unknown vault: ${req.vault_id}`);
 
@@ -68,9 +95,11 @@ export class Curator {
       const strategy = getDefaultStrategy(constituent.weight, constituent.orientation as Orientation);
       const collateral = (assets * constituent.weight) / 100;
 
-      const posId = this.simulateFsBuy(index.id, constituent, strategy, collateral);
+      const posId = await this.execFsBuy(req.vault_id, constituent, strategy, collateral);
       if (posId) positionIds.push(posId);
     }
+
+    await this.tryFulfillDeposit(req.vault_id, req.controller as Address, sharesToMint);
 
     const executionId = `exec-${req.id}-${Date.now()}`;
     this.db.run(
@@ -81,12 +110,13 @@ export class Curator {
     return `subscribe ${req.id}: minted ${sharesToMint.toFixed(6)} shares (${positionIds.length} positions)`;
   }
 
-  private processRedeem(req: {
+  private async processRedeem(req: {
     id: number;
     vault_id: string;
+    controller: string;
     share_amount: string;
     internal_request_id: number;
-  }): string {
+  }): Promise<string> {
     const index = FORECAST_INDICES.find((i) => i.id === req.vault_id);
     if (!index) throw new Error(`unknown vault: ${req.vault_id}`);
 
@@ -118,6 +148,8 @@ export class Curator {
       const lotCollateral = parseFloat(lot.collateral);
       const soldAmount = Math.min(lotCollateral, remaining);
 
+      await this.execFsSell(req.vault_id, lot.position_id, lot.market_id, soldAmount);
+
       this.db.run(
         "UPDATE fs_positions SET status = 'closed', returned_collateral = ?, closed_at = datetime('now') WHERE id = ?",
         [soldAmount.toFixed(6), lot.id],
@@ -126,6 +158,8 @@ export class Curator {
       totalReturned += soldAmount;
     }
 
+    await this.tryFulfillRedeem(req.vault_id, req.controller as Address, totalReturned);
+
     const executionId = `exec-${req.id}-${Date.now()}`;
     this.db.run(
       "UPDATE requests SET status = 'claimable', asset_amount = ?, execution_id = ?, updated_at = datetime('now') WHERE id = ?",
@@ -133,6 +167,66 @@ export class Curator {
     );
 
     return `redeem ${req.id}: returned ${totalReturned.toFixed(6)} USDC (${openLots.length} lots sold)`;
+  }
+
+  private async execFsBuy(
+    vaultId: string,
+    constituent: IndexConstituent,
+    strategy: ReturnType<typeof getDefaultStrategy>,
+    collateral: number,
+  ): Promise<string | null> {
+    const result = await tryFsBuy(constituent.marketId, collateral, strategy);
+    if (result) {
+      this.db.run(
+        `INSERT INTO fs_positions (vault_id, market_id, position_id, status, collateral, belief_json, request_id, created_at)
+         VALUES (?, ?, ?, 'open', ?, ?, ?, datetime('now'))`,
+        [vaultId, constituent.marketId, result.positionId, collateral.toFixed(6), JSON.stringify(strategy), null],
+      );
+      return String(result.positionId);
+    }
+    return this.simulateFsBuy(vaultId, constituent, strategy, collateral);
+  }
+
+  private async execFsSell(_vaultId: string, positionId: string | number, marketId: number, _amount: number): Promise<void> {
+    await tryFsSell(positionId, marketId);
+  }
+
+  private async tryFulfillDeposit(vaultId: string, controller: Address, shares: number) {
+    if (!this.walletClient || !this.curatorAccount) return;
+
+    const vaultAddress = VAULT_ADDRESSES[vaultId];
+    if (!vaultAddress) return;
+
+    try {
+      await this.walletClient.writeContract({
+        address: vaultAddress,
+        abi: FULFILL_ABI,
+        functionName: "fulfillDeposit",
+        args: [controller, BigInt(Math.floor(shares * 1e18))],
+        account: this.curatorAccount,
+      } as any);
+    } catch (err) {
+      console.error(`Fulfill deposit failed for ${vaultId}/${controller}:`, err);
+    }
+  }
+
+  private async tryFulfillRedeem(vaultId: string, controller: Address, assets: number) {
+    if (!this.walletClient || !this.curatorAccount) return;
+
+    const vaultAddress = VAULT_ADDRESSES[vaultId];
+    if (!vaultAddress) return;
+
+    try {
+      await this.walletClient.writeContract({
+        address: vaultAddress,
+        abi: FULFILL_ABI,
+        functionName: "fulfillRedeem",
+        args: [controller, BigInt(Math.floor(assets * 1e6))],
+        account: this.curatorAccount,
+      } as any);
+    } catch (err) {
+      console.error(`Fulfill redeem failed for ${vaultId}/${controller}:`, err);
+    }
   }
 
   private simulateFsBuy(
@@ -172,7 +266,7 @@ export class Curator {
     return row?.total ?? 0;
   }
 
-  tick(): string[] {
+  async tick(): Promise<string[]> {
     return this.processPendingRequests();
   }
 }

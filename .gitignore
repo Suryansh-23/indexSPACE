@@ -20,4 +20,5 @@ packages/docs/build/
 packages/docs/.docusaurus/
 
 # Next.js
-indexSPACE/ui/.next/
+indexSPACE/ui/.next/indexSPACE/contracts/broadcast/
+indexSPACE/contracts/cache/
