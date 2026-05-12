@@ -4,10 +4,9 @@
   "packageManager": "bun@1.3.1",
   "workspaces": [
     "packages/*",
-    "demo-app",
-    "indexspace/shared",
-    "indexspace/backend",
-    "indexspace/ui"
+    "indexSPACE/shared",
+    "indexSPACE/backend",
+    "indexSPACE/ui"
   ],
   "devDependencies": {
     "@testing-library/react": "^16.3.2",
