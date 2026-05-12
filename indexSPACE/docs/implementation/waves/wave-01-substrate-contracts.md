@@ -14,17 +14,17 @@ This wave must not build backend curator logic or UI integration.
 
 ## Status
 
-Planned.
+Complete.
 
 ## Prerequisites
 
-- Read `indexspace/SPEC.md` fully.
-- Read `indexspace/DESIGN.md` only for naming/product language that appears in
+- Read `indexSPACE/SPEC.md` fully.
+- Read `indexSPACE/DESIGN.md` only for naming/product language that appears in
   shared config.
 - Inspect current package manifests:
   - root `package.json`;
-  - `indexspace/shared/package.json`;
-  - `indexspace/contracts/foundry.toml`;
+  - `indexSPACE/shared/package.json`;
+  - `indexSPACE/contracts/foundry.toml`;
   - SDK package exports if shared config imports SDK types.
 - Verify Foundry is available with `forge --version`.
 - Verify Bun workspace resolution with `bun install` if dependencies change.
@@ -33,15 +33,15 @@ Planned.
 
 ### Shared Config Contract
 
-Add shared config under `indexspace/shared/src/`.
+Add shared config under `indexSPACE/shared/src/`.
 
 Minimum files:
 
 ```text
-indexspace/shared/src/index.ts
-indexspace/shared/src/chains.ts
-indexspace/shared/src/indices.ts
-indexspace/shared/src/types.ts
+indexSPACE/shared/src/index.ts
+indexSPACE/shared/src/chains.ts
+indexSPACE/shared/src/indices.ts
+indexSPACE/shared/src/types.ts
 ```
 
 Required exported constants:
@@ -73,7 +73,9 @@ if unsupported orientation/role strings are used.
 
 ### Contract Scope
 
-Implement a minimal async vault contract in `indexspace/contracts/src/`.
+Implement a minimal async vault contract in `indexSPACE/contracts/src/`.
+
+The contract is named `IndexVault` (file: `IndexVault.sol`).
 
 Required properties:
 
@@ -185,15 +187,15 @@ Rules:
 
 ### Mock Asset
 
-For local tests, add a minimal mock ERC-20 with 6 decimals. Do not use it in
-production config.
+For local tests, add a minimal mock ERC-20 with 6 decimals (`MockUSDC.sol`).
+Do not use it in production config.
 
 ## Owned Areas
 
-- `indexspace/shared/**`
-- `indexspace/contracts/**`
+- `indexSPACE/shared/**`
+- `indexSPACE/contracts/**`
 - root or workspace package manifests only if dependencies/scripts are required
-- `indexspace/SPEC.md` only for correcting contract/API names discovered during
+- `indexSPACE/SPEC.md` only for correcting contract/API names discovered during
   implementation
 
 ## Shared-Risk Areas
@@ -204,9 +206,9 @@ production config.
 
 ## Forbidden Write Areas
 
-- `indexspace/backend/**` except package dependency adjustments if absolutely
+- `indexSPACE/backend/**` except package dependency adjustments if absolutely
   required
-- `indexspace/ui/**`
+- `indexSPACE/ui/**`
 - `packages/**` SDK internals
 - `../index-space-ui-v0/**`
 
@@ -254,19 +256,21 @@ production config.
 Run, at minimum:
 
 ```bash
-cd indexspace/contracts
+cd indexSPACE/contracts
 forge test -vvv
 ```
 
 If shared TypeScript changed:
 
 ```bash
-bun install
-bunx tsc -p tsconfig.base.json --noEmit
+cd indexSPACE/shared
+bunx tsc --noEmit
 ```
 
 If repo-level TypeScript config cannot check `shared`, document the limitation
-and add a smaller package-level check.
+and add a smaller package-level check. (This was the case: root workspace paths
+in `package.json` use `indexspace/` lowercase but directories are `indexSPACE/`
+mixed case, so a package-level `tsconfig.json` was added to shared.)
 
 Failure evidence:
 
@@ -290,8 +294,27 @@ Regression evidence:
 
 Wave 02 needs:
 
-- contract ABI paths;
-- deployed or locally deployable constructor args;
-- exact event names/signatures;
-- curator/admin address requirements;
-- shared index config exports.
+- contract ABI paths: `indexSPACE/contracts/out/IndexVault.sol/IndexVault.json`
+- constructor args: `(address asset_, address curator_, string memory name_, string memory symbol_)`
+  - asset: `0x036CbD53842c5426634e7929541eC2318f3dCF7e` (Base Sepolia USDC)
+  - curator: address of the backend curator account
+- event names/signatures (all include `indexed internalRequestId`):
+  - `DepositRequest(uint256,address,address,uint256)`
+  - `RedeemRequest(uint256,address,address,uint256)`
+  - `DepositFulfilled(uint256,address,uint256,uint256)`
+  - `RedeemFulfilled(uint256,address,uint256,uint256)`
+  - `DepositClaimed(uint256,address,address,uint256)`
+  - `RedeemClaimed(uint256,address,address,uint256)`
+- curator/admin address: set as immutable constructor arg, not changeable post-deploy
+- shared index config exports available from `@indexspace/shared`
+
+## Implementation Notes
+
+- Contract name: `IndexVault` (not `ForecastVault` as originally implied by spec language)
+- Request struct includes `requestId` field to ensure fulfill/claim events reference the correct request ID
+- `requestDeposit`/`requestRedeem` require `msg.sender == owner` (authorization guard)
+- `address(0)` rejected in both request functions
+- OpenZeppelin v5.6.1 installed via `forge install`
+- Foundry v1.7.1 installed at setup (was not previously available)
+- 9 Foundry tests covering all acceptance criteria
+- Bug discovered via code review: stale `_nextRequestId` in fulfill/claim events (fixed)
