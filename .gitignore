@@ -1,6 +1,11 @@
 node_modules/
 dist/
 .env
+
+# Foundry
+indexSPACE/contracts/out/
+indexSPACE/contracts/cache/
+indexSPACE/contracts/foundry.lock
 *.tsbuildinfo
 .vite/
 /Docs/
