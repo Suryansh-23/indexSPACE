@@ -21,7 +21,7 @@ export function PortfolioDrawer({ open, onClose, walletConnected }: PortfolioDra
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="flex-1 bg-black/70" onClick={onClose} />
+      <div className="flex-1" style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }} onClick={onClose} />
       <aside className="w-[360px] max-md:w-[300px] bg-ix-shell border-l border-ix-border flex flex-col h-full">
         <div className="flex items-center justify-between px-4 py-3 border-b border-ix-border">
           <div>

@@ -10,6 +10,7 @@ indexSPACE/contracts/foundry.lock
 .vite/
 /Docs/
 internal_sdk_docs/ui_images/
+screenshots/
 .DS_Store
 .vscode/
 .claude/worktrees/

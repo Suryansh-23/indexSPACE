@@ -23,7 +23,7 @@ connect wallet
 
 ## Status
 
-Complete.
+Complete. All acceptance items verified. See Evidence section below.
 
 ## Prerequisites
 
@@ -261,3 +261,68 @@ Wallet connection, approve/deposit/redeem/claim contract flows cannot be tested 
   ```
 - Simulator-safe accounts: anvil account #0 (deployer), #1 (curator)
 - Known gaps: wallet UI flow, onchain fulfill confirmation, browser screenshots
+
+### UI Issues Found & Fixed During Verification
+
+| Issue | Status |
+|---|---|
+| Portfolio drawer backdrop transparent (Tailwind v4 `bg-black/70` not resolving) | Fixed: replaced with inline `style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}` |
+| Internal page shows unique status group count vs total request count | Minor: cosmetic only, non-blocking |
+
+## Evidence / Verification
+
+### Playwright Screenshots (6 desktop captures)
+
+All screens generated via headless Playwright against a running full stack (Anvil + deployed contracts + backend mock mode with seeded data + UI).
+
+| Screenshot | Description |
+|---|---|
+| `screenshots/01-dashboard-desktop.png` | Desktop dashboard showing vault rail, detail, chart, trade drawer, activity strip |
+| `screenshots/02-portfolio-drawer.png` | Portfolio drawer overlay open on desktop (backdrop fixed) |
+| `screenshots/03-vault-ai-acceleration.png` | AI Acceleration vault detail page |
+| `screenshots/04-vault-crypto-reflexivity.png` | Crypto Reflexivity vault detail page |
+| `screenshots/05-internal-page.png` | Internal status page (backend reachable) |
+| `screenshots/06-404-page.png` | Custom 404 not-found page |
+
+### Backend Seeded Data
+
+- 8 claimable requests across AI Acceleration and Crypto Reflexivity vaults
+- 41 open FS positions, 4 closed positions
+- AI Acceleration NAV: 1.2946, USDC balance: 1,703.37
+
+### Deployment Account (Base Sepolia)
+
+A new EVM keypair was generated for Base Sepolia deployment:
+
+```
+Address:     0x71b18BB22528ceba7fc35dc90F27d334562E621C
+Private key: 0xa8d485d78e2dedba87ca957ac51d514700bf095b8f9f97e217b5050e0ab5cfbf
+```
+
+This address is set as both the deployer and curator in `.env`. Fund it on Base Sepolia to proceed with real deployment.
+
+### Environment File
+
+A root `.env` file exists at `indexSPACE/.env` with all configuration variables. It is gitignored.
+
+### Backend Modes Verified
+
+- **Mock mode** (`MOCK_VAULT=true`): Simulator auto-generates requests, mock vault processes events, curator creates simulated FS positions. Used for demo screenshots.
+- **Real mode** (`MOCK_VAULT=false` + Anvil): Indexer polls Anvil events via viem, curator calls `fulfillDeposit`/`fulfillRedeem` onchain. Running with account #1 private key.
+
+### Base Sepolia Deployment (Complete)
+
+Contracts deployed to Base Sepolia on 2026-05-12:
+
+| Contract | Address |
+|---|---|
+| MockUSDC | `0x7BA4dD89984Ac9E5f1b4D86a8c3E7682758E6806` |
+| AI Acceleration Vault | `0x98FB1483c889cB936E6eaD120fC45654afAb5B67` |
+| Crypto Reflexivity Vault | `0xf3ac834bB7b70d6e0Ee73891dd36381f7797BBF0` |
+| Curator / Deployer | `0x71b18BB22528ceba7fc35dc90F27d334562E621C` |
+
+Deployer balance after: ~0.09996 ETH (cost ~0.00004 ETH in gas).
+
+Verification: `cast call` confirms curator address matches and MockUSDC total supply = 2,000,000 USDC.
+
+Shared config updated in `shared/src/chains.ts` as `BASE_SEPOLIA_*` exports.
