@@ -20,19 +20,17 @@ available. Any mock must be clearly isolated and replaceable in Wave 04.
 
 ## Status
 
-Planned. Starts after Wave 01 is merged.
+Complete.
 
 ## Prerequisites
 
-- Read `indexspace/SPEC.md` sections 4, 7, 10, 11, 12, 13, 14.
+- Read `indexSPACE/SPEC.md` sections 4, 7, 10, 11, 12, 13, 14.
 - Read Wave 01 handoff for ABI/event names.
 - Inspect `llms.txt` for SDK consumer guidance.
 - Inspect relevant `@functionspace/core` exports before writing SDK calls.
-- Inspect existing smoke-test notes or create a small throwaway SDK dry run if
-  credentials/endpoints are configured.
 - Confirm backend dependencies:
   - `hono`;
-  - `better-sqlite3` or Bun SQLite;
+  - Bun SQLite (`bun:sqlite`);
   - `viem`;
   - `@functionspace/core`;
   - `@indexspace/shared`.
@@ -44,7 +42,7 @@ Planned. Starts after Wave 01 is merged.
 Keep backend intentionally small:
 
 ```text
-indexspace/backend/src/
+indexSPACE/backend/src/
   index.ts
   config.ts
   db.ts
@@ -239,10 +237,10 @@ Use HTTP polling and event filters:
 
 ## Owned Areas
 
-- `indexspace/backend/**`
-- `indexspace/shared/**` only for missing backend-facing types
+- `indexSPACE/backend/**`
+- `indexSPACE/shared/**` only for missing backend-facing types
 - root/package manifests and `bun.lock` only for backend dependencies
-- `indexspace/SPEC.md` only if backend API contract changes architecture
+- `indexSPACE/SPEC.md` only if backend API contract changes architecture
 
 ## Shared-Risk Areas
 
@@ -252,8 +250,8 @@ Use HTTP polling and event filters:
 
 ## Forbidden Write Areas
 
-- `indexspace/contracts/**` except ABI copy/reference updates
-- `indexspace/ui/**`
+- `indexSPACE/contracts/**` except ABI copy/reference updates
+- `indexSPACE/ui/**`
 - `packages/**` SDK internals
 - `../index-space-ui-v0/**`
 
@@ -316,25 +314,18 @@ Use HTTP polling and event filters:
 Expected commands:
 
 ```bash
-cd indexspace/backend
+cd indexSPACE/backend
 bun install
 bun run src/index.ts
 ```
 
-Add package scripts during implementation, then run the final scripts instead:
+Package scripts added during implementation:
 
 ```bash
-bun run typecheck
-bun run test
-bun run dev
-```
-
-API smoke examples:
-
-```bash
-curl http://localhost:8787/health
-curl http://localhost:8787/api/vaults
-curl -X POST http://localhost:8787/api/vaults/ai-acceleration/quote-subscribe
+bun run typecheck   # tsc --noEmit
+bun run test        # bun test (20 tests)
+bun run dev         # bun run --watch src/index.ts
+bun start           # bun run src/index.ts
 ```
 
 Failure evidence:
@@ -355,17 +346,71 @@ Regression evidence:
 
 ## Handoff Notes
 
-Wave 03 needs:
+### Implementation Divergences
 
-- API route list;
-- response examples;
-- backend base URL default;
-- env variable list;
-- any known UI-blocking gaps.
+- SQLite driver: `bun:sqlite` (not `better-sqlite3`)
+- Indexer uses in-process `MockVault` instead of RPC polling (real RPC deferred to Wave 04)
+- `simulator_state` table schema exists but Simulator class does not persist to it (state is in-memory)
+- No SDK preview calls before curator execution (deferred until FS credentials available)
+- Contract name `IndexVault` (not `ForecastVault`)
+- Root workspace paths updated from `indexspace/` to `indexSPACE/`
 
-Wave 04 needs:
+### Wave 03 Handoff
 
-- deployed vault addresses or local deployment instructions;
-- curator operator address;
-- request lifecycle states;
-- claimable state polling guidance.
+API routes (all prefix with `http://localhost:8787`):
+
+| Route | Method | Description |
+| --- | --- | --- |
+| `/health` | GET | Server health, FS client status, mock mode, simulator state |
+| `/api/indices` | GET | All four index definitions with constituents |
+| `/api/vaults` | GET | Vault summary list (id, name, mode, live/preview status) |
+| `/api/vaults/:vaultId` | GET | Vault detail with NAV/share, total shares, USDC balance |
+| `/api/vaults/:vaultId/requests?controller=0x...` | GET | Request history filtered by vault and optional controller |
+| `/api/vaults/:vaultId/positions` | GET | Open/closed FunctionSpace positions |
+| `/api/vaults/:vaultId/candles` | GET | NAV candle history |
+| `/api/vaults/:vaultId/quote-subscribe` | POST | Subscribe quote (body: `{ assets: string }`) |
+| `/api/vaults/:vaultId/quote-redeem` | POST | Redeem quote (body: `{ shares: string }`) |
+| `/internal/status` | GET | Full internal status (config, DB counts, simulator) |
+| `/internal/curator/tick` | POST | Trigger curator to process one batch of pending requests |
+| `/internal/indexer/tick` | POST | Trigger indexer to poll mock vault events |
+| `/internal/simulator` | POST | Enable/disable simulator (body: `{ enabled: boolean }`) |
+| `/internal/simulator/generate` | POST | One-shot simulator activity generation |
+
+Response examples:
+
+```
+GET /health -> {"status":"ok","fsClientConfigured":false,"mockVault":true,"simulatorEnabled":true}
+GET /api/vaults -> [{"id":"ai-acceleration","name":"AI Acceleration","mode":"live-vault","isLive":true}]
+POST /api/vaults/ai-acceleration/quote-subscribe -> {"vaultId":"ai-acceleration","side":"subscribe","inputAssets":"500.000000","navPerShare":"1.0000...","allocations":[...]}
+```
+
+Default base URL: `http://localhost:8787`
+
+Environment variables:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PORT` | `8787` | HTTP server port |
+| `HOST` | `0.0.0.0` | HTTP server host |
+| `FS_USERNAME` | - | FunctionSpace API username |
+| `FS_PASSWORD` | - | FunctionSpace API password |
+| `FS_API_URL` | `https://fs-engine-api-dev.onrender.com` | FunctionSpace API base URL |
+| `RPC_URL` | `http://localhost:8545` | Base Sepolia RPC (for Wave 04) |
+| `MOCK_VAULT` | `true` | Use mock vault instead of real onchain |
+| `POLL_INTERVAL_MS` | `10000` | Indexer poll interval |
+| `CONFIRMATIONS` | `3` | Block confirmations |
+| `REORG_BUFFER` | `20` | Reorg safety buffer |
+
+Known UI-blocking gaps:
+- No deployed contract addresses (vaults use mock state)
+- No real onchain events (requests created via simulator or internal API)
+- Vault detail returns empty `vaultAddress` and `shareAddress`
+
+### Wave 04 Handoff
+
+- Vault addresses: set in `indexSPACE/shared/src/indices.ts` when deployed
+- Curator operator address: the `curator` constructor arg on `IndexVault`
+- Request lifecycle states: pending -> executing -> claimable (via curator) -> claimed (via user or claim simulation)
+- Claimable state polling: `GET /api/vaults/:vaultId/requests?controller=0x...` returns `status: "claimable"` rows
+- Indexer checkpoints persisted in `indexer_checkpoints` table
+- ABI path: `indexSPACE/contracts/out/IndexVault.sol/IndexVault.json`
