@@ -24,6 +24,7 @@ packages/docs/.docusaurus/
 
 # Next.js
 indexSPACE/ui/.next/
+indexspace/backend/run.log
 
 # Foundry broadcast
 indexSPACE/contracts/broadcast/

@@ -9,6 +9,7 @@
     "indexSPACE/ui"
   ],
   "scripts": {
+    "sync-env": "node scripts/sync-env.mjs",
     "dev": "node scripts/sync-env.mjs && concurrently --names backend,ui --prefix-colors cyan,blue 'cd indexSPACE/backend && MOCK_VAULT=true bun run dev' 'cd indexSPACE/ui && bun run dev'",
     "dev:real": "node scripts/sync-env.mjs && concurrently --names backend,ui --prefix-colors cyan,blue 'cd indexSPACE/backend && bun run dev' 'cd indexSPACE/ui && bun run dev'",
     "backend": "cd indexSPACE/backend && MOCK_VAULT=true bun run dev",
