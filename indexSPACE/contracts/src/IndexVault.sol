@@ -254,9 +254,11 @@ contract IndexVault is ERC20 {
 
         uint256 id = req.requestId;
         uint256 assets_ = req.assets;
+        uint256 shares_ = req.shares;
 
         delete requests[controller];
 
+        _burn(address(this), shares_);
         IERC20(asset).safeTransfer(receiver, assets_);
 
         emit RedeemClaimed(id, controller, receiver, assets_);
