@@ -112,7 +112,7 @@ app.get("/api/vaults/:vaultId/candles", (c) => {
   const vaultId = c.req.param("vaultId");
   type CandleRow = { bucket_ts: string; close: string; share_supply: string };
   const rows = db.query(
-    "SELECT bucket_ts, close, share_supply FROM index_candles WHERE vault_id = ? ORDER BY bucket_ts ASC LIMIT 2200",
+    "SELECT bucket_ts, close, share_supply FROM index_candles WHERE vault_id = ? ORDER BY bucket_ts ASC LIMIT 4000",
   ).all(vaultId) as CandleRow[];
   const navPoints = rows.map((r) => ({
     ts: r.bucket_ts,

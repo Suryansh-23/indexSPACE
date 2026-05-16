@@ -61,7 +61,7 @@ export class MockVault {
     if (!index) return 0;
 
     const deposits = this.db.query(
-      "SELECT COALESCE(SUM(CAST(asset_amount AS REAL)), 0) AS total FROM requests WHERE vault_id = ? AND kind = 'subscribe'",
+      "SELECT COALESCE(SUM(CAST(asset_amount AS REAL)), 0) AS total FROM requests WHERE vault_id = ? AND kind = 'subscribe' AND status IN ('claimable', 'claimed')",
     ).get(vaultId) as { total: number } | undefined;
 
     const redemptions = this.db.query(
