@@ -3,6 +3,7 @@
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
 import { injected } from 'wagmi/connectors'
 import { cn } from '@/lib/utils'
+import { useState } from 'react'
 
 interface TopBarProps {
   networkOk: boolean
@@ -11,8 +12,9 @@ interface TopBarProps {
 
 export function TopBar({ networkOk, onOpenPortfolio }: TopBarProps) {
   const { address, isConnected } = useAccount()
-  const { connect } = useConnect()
+  const { connect, isPending } = useConnect()
   const { disconnect } = useDisconnect()
+  const [noWallet, setNoWallet] = useState(false)
 
   const now = new Date()
   const timeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -23,9 +25,15 @@ export function TopBar({ networkOk, onOpenPortfolio }: TopBarProps) {
   function handleWalletClick() {
     if (isConnected) {
       disconnect()
-    } else {
-      connect({ connector: injected() })
+      return
     }
+    if (typeof window === 'undefined' || !window.ethereum) {
+      setNoWallet(true)
+      setTimeout(() => setNoWallet(false), 3000)
+      return
+    }
+    setNoWallet(false)
+    connect({ connector: injected() })
   }
 
   return (
@@ -99,17 +107,28 @@ export function TopBar({ networkOk, onOpenPortfolio }: TopBarProps) {
         {/* Wallet */}
         <button
           onClick={handleWalletClick}
+          disabled={isPending}
           className={cn(
-            'flex items-center gap-2.5 px-5 border-l border-ix-border text-[10px] font-mono uppercase tracking-widest transition-colors',
-            isConnected
-              ? 'text-ix-green hover:bg-ix-panel'
-              : 'text-ix-shell bg-ix-blue hover:bg-ix-blue-dim'
+            'flex items-center gap-2.5 px-5 border-l border-ix-border text-[10px] font-mono uppercase tracking-widest transition-colors disabled:opacity-60',
+            noWallet
+              ? 'text-ix-red bg-ix-shell'
+              : isConnected
+                ? 'text-ix-green hover:bg-ix-panel'
+                : 'text-ix-shell bg-ix-blue hover:bg-ix-blue-dim'
           )}
         >
-          <span className={cn('w-1.5 h-1.5 shrink-0', isConnected ? 'bg-ix-green' : 'bg-[#005fa3]',
+          <span className={cn(
+            'w-1.5 h-1.5 shrink-0',
+            noWallet ? 'bg-ix-red' : isConnected ? 'bg-ix-green' : 'bg-[#005fa3]',
             isConnected && 'led-pulse'
           )} />
-          {isConnected && shortAddress ? shortAddress : 'CONNECT WALLET'}
+          {noWallet
+            ? 'NO WALLET'
+            : isPending
+              ? 'CONNECTING...'
+              : isConnected && shortAddress
+                ? shortAddress
+                : 'CONNECT WALLET'}
         </button>
       </div>
     </header>

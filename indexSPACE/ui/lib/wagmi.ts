@@ -17,6 +17,7 @@ export const config = createConfig({
     [anvil.id]: http('http://localhost:8545'),
     [baseSepolia.id]: http(),
   },
+  ssr: true,
 })
 
 export const ANVIL_CHAIN_ID = 31337
