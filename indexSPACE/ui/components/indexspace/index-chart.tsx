@@ -12,16 +12,25 @@ import {
 } from 'recharts'
 import type { NavPoint, Vault } from '@/lib/types'
 import { cn } from '@/lib/utils'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { getVaultCandles } from '@/lib/indexspace-api'
 
-type Range = '1H' | '6H' | '1D' | '1W' | 'ALL'
+type Range = '1H' | '6H' | '1D' | 'ALL'
 type ChartMode = 'NAV' | 'INDEX'
 
-const RANGES: Range[] = ['1H', '6H', '1D', '1W', 'ALL']
+const RANGES: Range[] = ['1H', '6H', '1D', 'ALL']
+
+const RANGE_MS: Record<Range, number> = {
+  '1H': 60 * 60 * 1000,
+  '6H': 6 * 60 * 60 * 1000,
+  '1D': 24 * 60 * 60 * 1000,
+  'ALL': Infinity,
+}
 
 function sliceHistory(data: NavPoint[], range: Range): NavPoint[] {
-  const pts: Record<Range, number> = { '1H': 5, '6H': 30, '1D': 60, '1W': 90, 'ALL': data.length }
-  return data.slice(-pts[range])
+  if (range === 'ALL') return data
+  const cutoff = Date.now() - RANGE_MS[range]
+  return data.filter((d) => new Date(d.ts).getTime() >= cutoff)
 }
 
 interface IndexChartProps {
@@ -50,7 +59,18 @@ function CustomTooltip({ active, payload }: any) {
 export function IndexChart({ vault }: IndexChartProps) {
   const [range, setRange] = useState<Range>('1D')
   const [mode, setMode] = useState<ChartMode>('NAV')
-  const data = sliceHistory(vault.navHistory, range)
+  const [liveHistory, setLiveHistory] = useState<NavPoint[] | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getVaultCandles(vault.id).then((candles) => {
+      if (!cancelled && candles.length > 0) setLiveHistory(candles as NavPoint[])
+    })
+    return () => { cancelled = true }
+  }, [vault.id])
+
+  const history = liveHistory ?? vault.navHistory
+  const data = sliceHistory(history, range)
   const isUp = vault.navChange >= 0
   const isPreview = vault.status === 'preview'
   const lineColor = isPreview ? '#F05A24' : isUp ? '#1E9E5A' : '#D62D20'
