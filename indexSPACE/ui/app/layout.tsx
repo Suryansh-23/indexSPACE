@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google'
+import '@rainbow-me/rainbowkit/styles.css'
 import '@/styles/globals.css'
 import { Providers } from '@/components/providers'
 

@@ -1,7 +1,7 @@
 'use client'
 
-import { useAccount, useConnect, useDisconnect } from 'wagmi'
-import { injected } from 'wagmi/connectors'
+import { useAccount, useDisconnect } from 'wagmi'
+import { useConnectModal } from '@rainbow-me/rainbowkit'
 import { cn } from '@/lib/utils'
 import { useState, useEffect } from 'react'
 
@@ -11,38 +11,38 @@ interface TopBarProps {
 }
 
 export function TopBar({ networkOk, onOpenPortfolio }: TopBarProps) {
-  const { address, isConnected } = useAccount()
-  const { connect, isPending } = useConnect()
+  const { address, isConnected, status } = useAccount()
+  const { openConnectModal } = useConnectModal()
   const { disconnect } = useDisconnect()
+  const [mounted, setMounted] = useState(false)
+  const [connectRequested, setConnectRequested] = useState(false)
   const [noWallet, setNoWallet] = useState(false)
-  const [timeStr, setTimeStr] = useState('')
-  const [dateStr, setDateStr] = useState('')
+  const isPending = mounted && connectRequested && status === 'connecting'
 
   useEffect(() => {
-    function tick() {
-      const now = new Date()
-      setTimeStr(now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }))
-      setDateStr(now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase())
-    }
-    tick()
-    const id = setInterval(tick, 1000)
-    return () => clearInterval(id)
+    setMounted(true)
   }, [])
+
+  useEffect(() => {
+    if (status !== 'connecting') {
+      setConnectRequested(false)
+    }
+  }, [status])
 
   const shortAddress = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : null
 
   function handleWalletClick() {
+    console.log('[wallet] click — isConnected:', isConnected, 'isPending:', isPending, 'address:', address)
     if (isConnected) {
+      console.log('[wallet] disconnecting')
+      setConnectRequested(false)
       disconnect()
       return
     }
-    if (typeof window === 'undefined' || !window.ethereum) {
-      setNoWallet(true)
-      setTimeout(() => setNoWallet(false), 3000)
-      return
-    }
+    console.log('[wallet] opening RainbowKit modal — openConnectModal available:', !!openConnectModal)
+    setConnectRequested(true)
     setNoWallet(false)
-    connect({ connector: injected() })
+    openConnectModal?.()
   }
 
   return (
@@ -98,11 +98,16 @@ export function TopBar({ networkOk, onOpenPortfolio }: TopBarProps) {
 
       {/* ── Right controls ─────────────────────────────────────────────────── */}
       <div className="flex items-stretch">
-        {/* Clock */}
-        <div className="flex flex-col justify-center items-end px-4 border-l border-ix-border">
-          <span className="text-[12px] font-mono tabular text-ix-text leading-none">{timeStr}</span>
-          <span className="text-[8px] font-mono text-ix-text-muted leading-none mt-[3px] tracking-wider">{dateStr}</span>
-        </div>
+        {/* Faucet link */}
+        <a
+          href="https://faucet.circle.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex flex-col justify-center items-end px-4 border-l border-ix-border hover:bg-ix-panel transition-colors group"
+        >
+          <span className="text-[8px] font-mono tracking-[0.2em] text-ix-text-faint uppercase leading-none group-hover:text-ix-text-muted transition-colors">USDC FAUCET</span>
+          <span className="text-[9px] font-mono text-ix-blue leading-none mt-[3px] tracking-wider group-hover:text-[#3a9fe0] transition-colors">BASE SEPOLIA ↗</span>
+        </a>
 
         {/* Portfolio / account console */}
         <button

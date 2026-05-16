@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAccount } from 'wagmi'
 import { TopBar } from './top-bar'
 import { VaultRail } from './vault-rail'
@@ -10,17 +10,52 @@ import { TradeDrawer } from './trade-drawer'
 import { ActivityStrip } from './activity-strip'
 import { PortfolioDrawer } from './portfolio-drawer'
 import { VAULTS, ACTIVITY } from '@/lib/mock-data'
+import { getVault } from '@/lib/indexspace-api'
+import type { Vault } from '@/lib/types'
 
 interface TerminalProps {
   initialVaultId?: string
 }
 
+type LiveMetrics = Pick<Vault, 'nav' | 'navChange' | 'shares' | 'totalSupply' | 'curatorState' | 'usdc' | 'idleUsdc' | 'fsExposure' | 'claimableCount'>
+
 export function Terminal({ initialVaultId }: TerminalProps) {
   const [selectedId, setSelectedId] = useState(initialVaultId ?? VAULTS[0]!.id)
   const [portfolioOpen, setPortfolio] = useState(false)
+  const [liveMetrics, setLiveMetrics] = useState<Record<string, LiveMetrics>>({})
 
   const { isConnected } = useAccount()
-  const vault = VAULTS.find((v) => v.id === selectedId) ?? VAULTS[0]!
+
+  useEffect(() => {
+    async function fetchAll() {
+      const updates: Record<string, LiveMetrics> = {}
+      for (const v of VAULTS) {
+        const data = await getVault(v.id)
+        if (!data) continue
+        updates[v.id] = {
+          nav: data.nav,
+          navChange: data.navChange,
+          shares: data.shares,
+          totalSupply: data.totalSupply,
+          curatorState: data.curatorState,
+          usdc: data.usdc,
+          idleUsdc: data.idleUsdc,
+          fsExposure: data.fsExposure,
+          claimableCount: data.claimableCount,
+        }
+      }
+      setLiveMetrics(updates)
+    }
+    fetchAll()
+    const id = setInterval(fetchAll, 15_000)
+    return () => clearInterval(id)
+  }, [])
+
+  const liveVaults = VAULTS.map((v) => {
+    const m = liveMetrics[v.id]
+    return m ? { ...v, ...m } : v
+  })
+  const vault = liveVaults.find((v) => v.id === selectedId) ?? liveVaults[0]!
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-ix-shell">
@@ -36,7 +71,7 @@ export function Terminal({ initialVaultId }: TerminalProps) {
 
         {/* Left vault rail */}
         <VaultRail
-          vaults={VAULTS}
+          vaults={liveVaults}
           selectedId={selectedId}
           onSelect={setSelectedId}
         />

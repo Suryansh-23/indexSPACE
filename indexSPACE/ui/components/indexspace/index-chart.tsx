@@ -7,7 +7,6 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  ReferenceLine,
   CartesianGrid,
 } from 'recharts'
 import type { NavPoint, Vault } from '@/lib/types'
@@ -64,7 +63,8 @@ export function IndexChart({ vault }: IndexChartProps) {
   useEffect(() => {
     let cancelled = false
     getVaultCandles(vault.id).then((candles) => {
-      if (!cancelled && candles.length > 0) setLiveHistory(candles as NavPoint[])
+      if (cancelled || !candles.length) return
+      setLiveHistory(candles as NavPoint[])
     })
     return () => { cancelled = true }
   }, [vault.id])
@@ -123,9 +123,13 @@ export function IndexChart({ vault }: IndexChartProps) {
           {/* Right: stat cells */}
           <div className="flex items-start gap-px">
             <ChartStatCell label="GROSS NAV" value={vault.nav.toFixed(4)} />
-            <ChartStatCell label="IDLE USDC" value={`$${(vault.usdc * 0.08).toFixed(0)}`} />
-            <ChartStatCell label="FS EXPOSURE" value={`$${(vault.usdc * 0.92).toFixed(0)}`} />
-            <ChartStatCell label="CLAIMABLE" value="1" accent="text-ix-orange" />
+            <ChartStatCell label="IDLE USDC" value={`$${vault.idleUsdc.toFixed(0)}`} />
+            <ChartStatCell label="FS EXPOSURE" value={`$${vault.fsExposure.toFixed(0)}`} />
+            <ChartStatCell
+              label="CLAIMABLE"
+              value={String(vault.claimableCount)}
+              accent={vault.claimableCount > 0 ? 'text-ix-orange' : undefined}
+            />
           </div>
         </div>
       </div>
@@ -202,18 +206,6 @@ export function IndexChart({ vault }: IndexChartProps) {
               tickLine={false}
               tickFormatter={(v: number) => v.toFixed(4)}
               width={54}
-            />
-            <ReferenceLine
-              y={1.0}
-              stroke="#3A3830"
-              strokeDasharray="4 4"
-              label={{
-                value: 'PAR 1.0000',
-                position: 'insideTopRight',
-                fill: '#4E4A42',
-                fontSize: 8,
-                fontFamily: 'IBM Plex Mono, monospace',
-              }}
             />
             <Tooltip content={<CustomTooltip />} />
             <Area

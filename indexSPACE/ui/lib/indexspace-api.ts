@@ -28,12 +28,19 @@ export async function getIndices(): Promise<Array<{ id: string; name: string; mo
 export async function getVault(vaultId: string) {
   const { ok, data } = await backendFetch<Record<string, unknown>>(`/api/vaults/${vaultId}`)
   if (ok && data) {
+    const metrics = (data.metrics as Record<string, unknown> | undefined) ?? {}
     return {
       ...data,
       status: data.mode === 'live-vault' ? ('live' as const) : ('preview' as const),
-      nav: parseFloat((data.metrics as any)?.navPerShare ?? '1'),
-      shares: parseFloat((data.metrics as any)?.totalShares ?? '0'),
-      usdc: parseFloat((data.metrics as any)?.usdcBalance ?? '0'),
+      nav: parseFloat(String(metrics.navPerShare ?? '1')),
+      navChange: parseFloat(String(metrics.navChange24h ?? '0')),
+      shares: parseFloat(String(metrics.displayShares ?? '0')),
+      totalSupply: parseFloat(String(metrics.shareCapacity ?? '1')),
+      usdc: parseFloat(String(metrics.usdcBalance ?? '0')),
+      idleUsdc: parseFloat(String(metrics.idleUsdc ?? '0')),
+      fsExposure: parseFloat(String(metrics.openExposure ?? '0')),
+      claimableCount: parseInt(String(metrics.claimableRequests ?? '0'), 10),
+      curatorState: (metrics.curatorState as 'armed' | 'executing' | 'idle' | undefined) ?? 'idle',
     }
   }
   return VAULTS.find((v) => v.id === vaultId) ?? null

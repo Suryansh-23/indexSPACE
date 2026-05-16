@@ -1,6 +1,6 @@
-import { http, createConfig } from 'wagmi'
+import { getDefaultConfig } from '@rainbow-me/rainbowkit'
+import { http } from 'wagmi'
 import { baseSepolia } from 'wagmi/chains'
-import { injected } from 'wagmi/connectors'
 import { type Chain } from 'viem'
 
 export const anvil = {
@@ -10,12 +10,13 @@ export const anvil = {
   rpcUrls: { default: { http: ['http://localhost:8545'] } },
 } as const satisfies Chain
 
-export const config = createConfig({
-  chains: [anvil, baseSepolia],
-  connectors: [injected()],
+export const config = getDefaultConfig({
+  appName: 'IndexSpace',
+  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? '',
+  chains: [baseSepolia, anvil],
   transports: {
-    [anvil.id]: http('http://localhost:8545'),
     [baseSepolia.id]: http(),
+    [anvil.id]: http('http://localhost:8545'),
   },
   ssr: true,
 })

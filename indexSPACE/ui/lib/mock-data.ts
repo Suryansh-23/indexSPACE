@@ -70,6 +70,9 @@ function buildVault(idx: typeof FORECAST_INDICES[number], index: number): Vault 
     curatorState: isLive ? ('armed' as const) : ('idle' as const),
     simulatorState: isLive ? ('off' as const) : ('on' as const),
     usdc: isLive ? parseFloat((baseNav * 50000).toFixed(2)) : 0,
+    idleUsdc: isLive ? parseFloat((baseNav * 42000).toFixed(2)) : 0,
+    fsExposure: isLive ? parseFloat((baseNav * 8000).toFixed(2)) : 0,
+    claimableCount: 0,
     constituents,
     navHistory: genNavHistory(baseNav, 120),
   }

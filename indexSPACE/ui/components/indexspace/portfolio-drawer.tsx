@@ -1,11 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAccount } from 'wagmi'
 import { cn } from '@/lib/utils'
 import { X } from 'lucide-react'
 import type { ActivityEntry } from '@/lib/types'
 import { ACTIVITY } from '@/lib/mock-data'
+import { getVaultRequests, getVault } from '@/lib/indexspace-api'
+
+const LIVE_VAULTS = [
+  { id: 'ai-acceleration',    label: 'VAULT 01', name: 'AI ACCELERATION',    color: '#0071BB' },
+  { id: 'crypto-reflexivity', label: 'VAULT 02', name: 'CRYPTO REFLEXIVITY', color: '#F05A24' },
+]
 
 type PortfolioTab = 'portfolio' | 'requests' | 'activity'
 
@@ -18,6 +24,37 @@ interface PortfolioDrawerProps {
 export function PortfolioDrawer({ open, onClose, walletConnected }: PortfolioDrawerProps) {
   const { address, chain } = useAccount()
   const [tab, setTab] = useState<PortfolioTab>('portfolio')
+  const [liveActivity, setLiveActivity] = useState<ActivityEntry[]>([])
+
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+
+    async function fetchActivity() {
+      const all: ActivityEntry[] = []
+      for (const vc of LIVE_VAULTS) {
+        const rows = (await getVaultRequests(vc.id)) as any[]
+        for (const r of rows) {
+          all.push({
+            id: String(r.id),
+            ts: r.created_at ?? new Date().toISOString(),
+            type: r.kind === 'subscribe' ? 'subscribe' : 'redeem',
+            vault: vc.label,
+            amount: r.kind === 'subscribe'
+              ? `${parseFloat(r.asset_amount ?? '0').toFixed(2)} USDC`
+              : `${parseFloat(r.share_amount ?? '0').toFixed(4)} shrs`,
+            state: r.status,
+            user: r.controller ? `${r.controller.slice(0, 6)}...${r.controller.slice(-4)}` : undefined,
+          })
+        }
+      }
+      all.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime())
+      if (!cancelled) setLiveActivity(all.slice(0, 30))
+    }
+
+    fetchActivity()
+    return () => { cancelled = true }
+  }, [open])
 
   if (!open) return null
 
@@ -72,7 +109,7 @@ export function PortfolioDrawer({ open, onClose, walletConnected }: PortfolioDra
             <>
               {tab === 'portfolio' && <PortfolioContent />}
               {tab === 'requests'  && <RequestsContent />}
-              {tab === 'activity'  && <ActivityContent entries={ACTIVITY} />}
+              {tab === 'activity'  && <ActivityContent entries={liveActivity} />}
             </>
           )}
         </div>
@@ -128,55 +165,84 @@ function DisconnectedState() {
 // ── Portfolio tab ─────────────────────────────────────────────────────────────
 
 function PortfolioContent() {
-  const holdings = [
-    { label: 'VAULT 01', name: 'AI ACCELERATION',    shares: 482,  nav: 1.0847, value: 522.74,  color: '#0071BB' },
-    { label: 'VAULT 02', name: 'CRYPTO REFLEXIVITY', shares: 250,  nav: 0.9312, value: 232.80,  color: '#F05A24' },
-  ]
-  const total = holdings.reduce((s, h) => s + h.value, 0)
+  const { address } = useAccount()
+  type HoldingRow = { id: string; label: string; name: string; color: string; shares: number; nav: number; claimable: number }
+  const [holdings, setHoldings] = useState<HoldingRow[]>([])
+
+  useEffect(() => {
+    if (!address) return
+    let cancelled = false
+
+    async function load() {
+      const rows: HoldingRow[] = []
+      for (const vc of LIVE_VAULTS) {
+        const [requests, vaultData] = await Promise.all([
+          getVaultRequests(vc.id, address!),
+          getVault(vc.id),
+        ])
+        const nav = vaultData?.nav ?? 1
+        const raw = requests as any[]
+        const subShares = raw
+          .filter((r) => r.kind === 'subscribe' && ['claimable', 'claimed'].includes(r.status))
+          .reduce((s, r) => s + parseFloat(r.share_amount ?? '0'), 0)
+        const rdmShares = raw
+          .filter((r) => r.kind === 'redeem' && ['claimable', 'claimed'].includes(r.status))
+          .reduce((s, r) => s + parseFloat(r.share_amount ?? '0'), 0)
+        const claimable = raw.filter((r) => r.status === 'claimable').length
+        rows.push({ ...vc, shares: Math.max(0, subShares - rdmShares), nav, claimable })
+      }
+      if (!cancelled) setHoldings(rows)
+    }
+
+    load()
+    return () => { cancelled = true }
+  }, [address])
+
+  const total = holdings.reduce((s, h) => s + h.shares * h.nav, 0)
+  const totalClaimable = holdings.reduce((s, h) => s + h.claimable, 0)
 
   return (
     <div>
-      {/* Total value block */}
       <div className="px-5 py-4 border-b border-ix-border">
         <div className="text-[8px] font-mono tracking-[0.22em] text-ix-text-faint uppercase mb-1.5">TOTAL VAULT VALUE</div>
         <div className="text-[28px] font-mono tabular text-ix-text font-medium leading-none">${total.toFixed(2)}</div>
         <div className="text-[9px] font-mono text-ix-text-muted mt-1 tracking-wider">≈ USDC / BASE SEPOLIA</div>
       </div>
 
-      {/* Holdings */}
       <div className="px-5 pt-4">
         <div className="text-[8px] font-mono tracking-[0.22em] text-ix-text-faint uppercase mb-3">VAULT SHARES</div>
         {holdings.map((h) => (
-          <div key={h.label} className="py-3.5 border-b border-ix-border-dim">
+          <div key={h.id} className="py-3.5 border-b border-ix-border-dim">
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2">
                 <div className="w-[3px] h-4 shrink-0" style={{ backgroundColor: h.color }} />
                 <span className="text-[12px] font-mono text-ix-text font-medium">{h.label}</span>
               </div>
-              <span className="text-[13px] font-mono tabular text-ix-text">${h.value.toFixed(2)}</span>
+              <span className="text-[13px] font-mono tabular text-ix-text">${(h.shares * h.nav).toFixed(2)}</span>
             </div>
             <div className="flex items-center justify-between pl-[11px]">
               <span className="text-[10px] font-mono text-ix-text-muted">{h.name}</span>
-              <span className="text-[9px] font-mono tabular text-ix-text-faint">{h.shares} shrs @ {h.nav.toFixed(4)}</span>
+              <span className="text-[9px] font-mono tabular text-ix-text-faint">
+                {h.shares > 0 ? `${h.shares.toFixed(4)} shrs @ ${h.nav.toFixed(4)}` : '— shares'}
+              </span>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Wallet balance */}
       <div className="px-5 py-4 border-t border-ix-border">
         <div className="text-[8px] font-mono tracking-[0.22em] text-ix-text-faint uppercase mb-3">WALLET</div>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-mono text-ix-text-muted">USDC balance</span>
-          <span className="text-[13px] font-mono tabular text-ix-text">4,267.33</span>
-        </div>
-        <div className="flex items-center justify-between mb-2">
           <span className="text-[10px] font-mono text-ix-text-muted">claimable requests</span>
-          <span className="text-[13px] font-mono tabular text-ix-orange">1</span>
+          <span className={cn('text-[13px] font-mono tabular', totalClaimable > 0 ? 'text-ix-orange' : 'text-ix-text-faint')}>
+            {totalClaimable}
+          </span>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-mono text-ix-text-muted">address</span>
-          <span className="text-[9px] font-mono text-ix-text-faint">0x4f2a...8c1d</span>
+          <span className="text-[9px] font-mono text-ix-text-faint">
+            {address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '—'}
+          </span>
         </div>
       </div>
     </div>
@@ -186,44 +252,73 @@ function PortfolioContent() {
 // ── Requests tab ──────────────────────────────────────────────────────────────
 
 function RequestsContent() {
-  const requests = [
-    { id: 'REQ-0041', vault: 'VAULT 01', type: 'SUB', amount: '1,000 USDC', state: 'claim_ready', ts: '2m ago' },
-    { id: 'REQ-0040', vault: 'VAULT 02', type: 'RDM', amount: '250 shares',  state: 'pending',    ts: '15m ago' },
-    { id: 'REQ-0038', vault: 'VAULT 01', type: 'SUB', amount: '500 USDC',    state: 'claimed',    ts: '2h ago' },
-  ]
+  const { address } = useAccount()
+  const [requests, setRequests] = useState<any[]>([])
+
+  useEffect(() => {
+    if (!address) return
+    let cancelled = false
+
+    async function load() {
+      const all: any[] = []
+      for (const vc of LIVE_VAULTS) {
+        const rows = (await getVaultRequests(vc.id, address!)) as any[]
+        for (const r of rows) all.push({ ...r, vaultLabel: vc.label })
+      }
+      all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      if (!cancelled) setRequests(all.slice(0, 20))
+    }
+
+    load()
+    return () => { cancelled = true }
+  }, [address])
 
   const stateConfig: Record<string, { color: string; label: string }> = {
-    claim_ready: { color: 'text-ix-orange', label: 'CLAIMABLE' },
-    pending:     { color: 'text-ix-blue',   label: 'PENDING' },
-    claimed:     { color: 'text-ix-green',  label: 'CLAIMED' },
-    failed:      { color: 'text-ix-red',    label: 'FAILED' },
+    claimable:  { color: 'text-ix-orange', label: 'CLAIMABLE' },
+    pending:    { color: 'text-ix-blue',   label: 'PENDING' },
+    executing:  { color: 'text-ix-yellow', label: 'EXECUTING' },
+    claimed:    { color: 'text-ix-green',  label: 'CLAIMED' },
+    failed:     { color: 'text-ix-red',    label: 'FAILED' },
+  }
+
+  if (requests.length === 0) {
+    return (
+      <div className="px-5 pt-8 text-[9px] font-mono text-ix-text-faint text-center tracking-wider">
+        {address ? 'NO REQUESTS FOUND' : 'CONNECT WALLET TO VIEW REQUESTS'}
+      </div>
+    )
   }
 
   return (
     <div className="px-5 pt-4">
       <div className="text-[8px] font-mono tracking-[0.22em] text-ix-text-faint uppercase mb-3">ASYNC REQUESTS</div>
       {requests.map((r) => {
-        const sc = stateConfig[r.state]
+        const sc = stateConfig[r.status]
+        const typeTag = r.kind === 'subscribe' ? 'SUB' : 'RDM'
+        const amount = r.kind === 'subscribe'
+          ? `${parseFloat(r.asset_amount ?? '0').toFixed(2)} USDC`
+          : `${parseFloat(r.share_amount ?? '0').toFixed(4)} shrs`
+        const relTime = getRelTime(r.created_at)
+
         return (
           <div key={r.id} className="py-3.5 border-b border-ix-border-dim">
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-2">
                 <span className={cn('text-[8px] font-mono px-1.5 py-0.5 leading-none',
-                  r.type === 'SUB' ? 'bg-ix-blue text-ix-shell' :
-                  r.type === 'RDM' ? 'bg-ix-orange text-ix-shell' : 'bg-ix-text-faint text-ix-shell'
-                )}>{r.type}</span>
-                <span className="text-[10px] font-mono text-ix-text-faint tabular">{r.id}</span>
+                  typeTag === 'SUB' ? 'bg-ix-blue text-ix-shell' : 'bg-ix-orange text-ix-shell'
+                )}>{typeTag}</span>
+                <span className="text-[10px] font-mono text-ix-text-faint tabular">#{r.id}</span>
               </div>
-              <span className={cn('text-[9px] font-mono uppercase tracking-wider', sc?.color)}>
-                {sc?.label ?? r.state}
+              <span className={cn('text-[9px] font-mono uppercase tracking-wider', sc?.color ?? 'text-ix-text-faint')}>
+                {sc?.label ?? r.status}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-mono text-ix-text">{r.vault}</span>
-                <span className="text-[10px] font-mono tabular text-ix-text-muted">{r.amount}</span>
+                <span className="text-[11px] font-mono text-ix-text">{r.vaultLabel}</span>
+                <span className="text-[10px] font-mono tabular text-ix-text-muted">{amount}</span>
               </div>
-              <span className="text-[8px] font-mono text-ix-text-faint">{r.ts}</span>
+              <span className="text-[8px] font-mono text-ix-text-faint">{relTime}</span>
             </div>
           </div>
         )
@@ -250,6 +345,14 @@ function ActivityContent({ entries }: { entries: ActivityEntry[] }) {
     claim:     { tag: 'CLM', bg: 'bg-ix-green' },
     curator:   { tag: 'CUR', bg: 'bg-ix-yellow' },
     system:    { tag: 'SIM', bg: 'bg-ix-text-faint' },
+  }
+
+  if (entries.length === 0) {
+    return (
+      <div className="px-5 pt-8 text-[9px] font-mono text-ix-text-faint text-center tracking-wider">
+        NO ACTIVITY YET
+      </div>
+    )
   }
 
   return (

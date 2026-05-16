@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useAccount, useChainId, useWriteContract, useWaitForTransactionReceipt, useConnect } from 'wagmi'
-import { injected } from 'wagmi/connectors'
+import { useAccount, useChainId, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { useConnectModal } from '@rainbow-me/rainbowkit'
 import { parseUnits } from 'viem'
 import type { Address } from 'viem'
 import { cn } from '@/lib/utils'
@@ -32,8 +32,8 @@ interface TradeDrawerProps {
 }
 
 const STEP_COLORS: Record<TradeStep, string> = {
-  'connect wallet':    '#4E4A42',
-  'approve usdc':      '#4E4A42',
+  'connect wallet':    '#0071BB',
+  'approve usdc':      '#0071BB',
   'request':           '#0071BB',
   'curator executing': '#FFC700',
   'claim ready':       '#F05A24',
@@ -49,11 +49,21 @@ const STEP_LABELS_SHORT: Record<TradeStep, string> = {
   'claimed':           '06 CLAIMED',
 }
 
+const STEP_HINTS: Record<TradeStep, string> = {
+  'connect wallet':    'Connect your wallet to continue',
+  'approve usdc':      'Authorize USDC spend for the vault',
+  'request':           'Submit on-chain deposit request',
+  'curator executing': 'Curator is processing your request',
+  'claim ready':       'Your shares are ready to claim',
+  'claimed':           'Position successfully opened',
+}
+
 export function TradeDrawer({ vault, walletConnected }: TradeDrawerProps) {
   const { address } = useAccount()
   const chainId = useChainId()
-  const { connect } = useConnect()
+  const { openConnectModal } = useConnectModal()
 
+  const [mounted, setMounted] = useState(false)
   const [mode, setMode] = useState<TradeMode>('subscribe')
   const [amount, setAmount] = useState('')
   const [step, setStep] = useState<TradeStep>('connect wallet')
@@ -68,6 +78,11 @@ export function TradeDrawer({ vault, walletConnected }: TradeDrawerProps) {
   const usdcEstimate   = usdcAmount > 0 ? (usdcAmount * vault.nav).toFixed(2) : '—'
   const currentStepIdx = TRADE_STEPS.indexOf(step)
   const loading = isSending || isConfirming
+  const effectiveWalletConnected = mounted && walletConnected
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Advance to next step after tx confirms
   useEffect(() => {
@@ -84,12 +99,12 @@ export function TradeDrawer({ vault, walletConnected }: TradeDrawerProps) {
 
   // Sync step with wallet connection state
   useEffect(() => {
-    if (walletConnected && step === 'connect wallet') {
+    if (effectiveWalletConnected && step === 'connect wallet') {
       setStep('approve usdc')
-    } else if (!walletConnected) {
+    } else if (!effectiveWalletConnected) {
       setStep('connect wallet')
     }
-  }, [walletConnected, step])
+  }, [effectiveWalletConnected, step])
 
   // Poll backend for curator completion when in executing state
   const pollCurator = useCallback(async () => {
@@ -111,7 +126,7 @@ export function TradeDrawer({ vault, walletConnected }: TradeDrawerProps) {
   }, [step, pollCurator])
 
   function resetFlow() {
-    setStep(walletConnected ? 'approve usdc' : 'connect wallet')
+    setStep(effectiveWalletConnected ? 'approve usdc' : 'connect wallet')
     setAmount('')
     setError(null)
     resetWrite()
@@ -121,7 +136,8 @@ export function TradeDrawer({ vault, walletConnected }: TradeDrawerProps) {
     setError(null)
     try {
       if (step === 'connect wallet') {
-        connect({ connector: injected() })
+        console.log('[wallet/trade] opening RainbowKit modal — chainId:', chainId)
+        openConnectModal?.()
         return
       }
 
@@ -295,29 +311,81 @@ export function TradeDrawer({ vault, walletConnected }: TradeDrawerProps) {
 
       {/* ── Request lifecycle ─────────────────────────────────────────────── */}
       {isLive && (
-        <div className="px-4 py-3.5 border-b border-ix-border">
-          <span className="text-[8px] font-mono tracking-[0.22em] text-ix-text-faint uppercase block mb-3">REQUEST STATE</span>
-          <div className="flex flex-col gap-0">
+        <div className="border-b border-ix-border">
+          {/* Section header + progress bar */}
+          <div className="px-4 pt-3.5 pb-2">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[8px] font-mono tracking-[0.22em] text-ix-text-faint uppercase">REQUEST STATE</span>
+              <span className="text-[8px] font-mono tabular text-ix-text-faint">
+                {currentStepIdx + 1} / {TRADE_STEPS.length}
+              </span>
+            </div>
+            {/* Segmented progress bar */}
+            <div className="flex gap-[2px]">
+              {TRADE_STEPS.map((s, i) => {
+                const done   = i < currentStepIdx
+                const active = s === step
+                return (
+                  <div
+                    key={s}
+                    className="flex-1 h-[2px] transition-colors duration-300"
+                    style={{
+                      backgroundColor: done
+                        ? '#1E9E5A'
+                        : active
+                          ? STEP_COLORS[s]
+                          : '#2A2823',
+                    }}
+                  />
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Steps */}
+          <div className="flex flex-col pb-1">
             {TRADE_STEPS.map((s, i) => {
               const done   = i < currentStepIdx
               const active = s === step
               const color  = STEP_COLORS[s]
+              const [num, ...labelParts] = STEP_LABELS_SHORT[s].split(' ')
+              const label = labelParts.join(' ')
 
               return (
-                <div key={s} className="flex items-center gap-2.5 py-[5px] relative">
-                  {i < TRADE_STEPS.length - 1 && (
+                <div
+                  key={s}
+                  className={cn(
+                    'relative flex items-start gap-3 px-4 py-[7px] transition-colors',
+                    active ? 'bg-ix-panel-warm' : ''
+                  )}
+                >
+                  {/* Left accent bar for active */}
+                  {active && (
                     <div
-                      className="absolute left-[8px] top-[18px] w-px h-[calc(100%-2px)]"
-                      style={{ backgroundColor: done ? '#1E9E5A' : '#2A2823' }}
+                      className="absolute left-0 top-0 bottom-0 w-[2px]"
+                      style={{ backgroundColor: color }}
                     />
                   )}
+
+                  {/* Connector line */}
+                  {i < TRADE_STEPS.length - 1 && (
+                    <div
+                      className="absolute left-[19px] top-[22px] w-px"
+                      style={{
+                        bottom: '-7px',
+                        backgroundColor: done ? '#1E9E5A' : '#2A2823',
+                      }}
+                    />
+                  )}
+
+                  {/* Step indicator */}
                   <div
                     className={cn(
-                      'w-[10px] h-[10px] shrink-0 flex items-center justify-center relative z-10 border',
+                      'w-[10px] h-[10px] mt-[1px] shrink-0 flex items-center justify-center relative z-10 border transition-colors',
                       done   ? 'bg-ix-green border-ix-green' :
-                      active ? 'border-current' : 'border-ix-border bg-ix-shell'
+                      active ? 'border-current bg-ix-shell' : 'border-ix-border bg-ix-shell'
                     )}
-                    style={active ? { borderColor: color } : {}}
+                    style={active && !done ? { borderColor: color } : {}}
                   >
                     {done && <span className="text-ix-shell" style={{ fontSize: 7, lineHeight: 1 }}>✓</span>}
                     {active && s === 'curator executing' && (
@@ -327,12 +395,29 @@ export function TradeDrawer({ vault, walletConnected }: TradeDrawerProps) {
                       <div className="w-[4px] h-[4px]" style={{ backgroundColor: color }} />
                     )}
                   </div>
-                  <span
-                    className="text-[10px] font-mono tracking-wider"
-                    style={{ color: done ? '#1E9E5A' : active ? color : '#4E4A42' }}
-                  >
-                    {STEP_LABELS_SHORT[s]}
-                  </span>
+
+                  {/* Label */}
+                  <div className="flex flex-col gap-[2px] min-w-0">
+                    <div className="flex items-baseline gap-[5px]">
+                      <span
+                        className="text-[8px] font-mono tabular leading-none"
+                        style={{ color: done ? '#1E9E5A' : active ? color : '#2A2823' }}
+                      >
+                        {num}
+                      </span>
+                      <span
+                        className="text-[10px] font-mono tracking-[0.14em] leading-none"
+                        style={{ color: done ? '#1E9E5A' : active ? color : '#4E4A42' }}
+                      >
+                        {label}
+                      </span>
+                    </div>
+                    {active && (
+                      <span className="text-[8px] font-mono text-ix-text-faint leading-snug mt-[2px]">
+                        {STEP_HINTS[s]}
+                      </span>
+                    )}
+                  </div>
                 </div>
               )
             })}

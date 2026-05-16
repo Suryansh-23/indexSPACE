@@ -48,6 +48,9 @@ export interface Vault {
   curatorState: CuratorState
   simulatorState: SimulatorState
   usdc: number
+  idleUsdc: number
+  fsExposure: number
+  claimableCount: number
   constituents: Constituent[]
   navHistory: NavPoint[]
 }
