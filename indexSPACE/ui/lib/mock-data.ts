@@ -79,14 +79,15 @@ const _vaults = FORECAST_INDICES.map((idx, i) => buildVault(idx, i))
 
 export const VAULTS: Vault[] = _vaults
 
+// Static timestamps — avoids server/client hydration mismatch from Date.now() at module load
 export const ACTIVITY: ActivityEntry[] = [
-  { id: 'act-001', ts: new Date(Date.now() - 2 * 60 * 1000).toISOString(), type: 'curator', vault: 'VAULT 02', state: 'executing' },
-  { id: 'act-002', ts: new Date(Date.now() - 4 * 60 * 1000).toISOString(), type: 'claim', vault: 'VAULT 01', amount: '512 USDC', state: 'complete', user: '0x4f2a...8c1d' },
-  { id: 'act-003', ts: new Date(Date.now() - 8 * 60 * 1000).toISOString(), type: 'subscribe', vault: 'VAULT 01', amount: '1,000 USDC', state: 'claim_ready', user: '0x8b3e...2f9a' },
-  { id: 'act-004', ts: new Date(Date.now() - 15 * 60 * 1000).toISOString(), type: 'redeem', vault: 'VAULT 02', amount: '250 shares', state: 'pending', user: '0x1c7d...5e0b' },
-  { id: 'act-005', ts: new Date(Date.now() - 22 * 60 * 1000).toISOString(), type: 'curator', vault: 'VAULT 01', state: 'complete' },
-  { id: 'act-006', ts: new Date(Date.now() - 35 * 60 * 1000).toISOString(), type: 'subscribe', vault: 'VAULT 02', amount: '750 USDC', state: 'claimed', user: '0x9a1b...3c4d' },
-  { id: 'act-007', ts: new Date(Date.now() - 47 * 60 * 1000).toISOString(), type: 'system', vault: 'SYSTEM', state: 'info' },
+  { id: 'act-001', ts: '2026-05-16T10:58:00.000Z', type: 'curator', vault: 'VAULT 02', state: 'executing' },
+  { id: 'act-002', ts: '2026-05-16T10:56:00.000Z', type: 'claim', vault: 'VAULT 01', amount: '512 USDC', state: 'complete', user: '0x4f2a...8c1d' },
+  { id: 'act-003', ts: '2026-05-16T10:52:00.000Z', type: 'subscribe', vault: 'VAULT 01', amount: '1,000 USDC', state: 'claim_ready', user: '0x8b3e...2f9a' },
+  { id: 'act-004', ts: '2026-05-16T10:45:00.000Z', type: 'redeem', vault: 'VAULT 02', amount: '250 shares', state: 'pending', user: '0x1c7d...5e0b' },
+  { id: 'act-005', ts: '2026-05-16T10:38:00.000Z', type: 'curator', vault: 'VAULT 01', state: 'complete' },
+  { id: 'act-006', ts: '2026-05-16T10:25:00.000Z', type: 'subscribe', vault: 'VAULT 02', amount: '750 USDC', state: 'claimed', user: '0x9a1b...3c4d' },
+  { id: 'act-007', ts: '2026-05-16T10:13:00.000Z', type: 'system', vault: 'SYSTEM', state: 'info' },
 ]
 
 export const TRADE_STEPS = [

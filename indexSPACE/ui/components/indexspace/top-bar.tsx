@@ -3,7 +3,7 @@
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
 import { injected } from 'wagmi/connectors'
 import { cn } from '@/lib/utils'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface TopBarProps {
   networkOk: boolean
@@ -15,10 +15,19 @@ export function TopBar({ networkOk, onOpenPortfolio }: TopBarProps) {
   const { connect, isPending } = useConnect()
   const { disconnect } = useDisconnect()
   const [noWallet, setNoWallet] = useState(false)
+  const [timeStr, setTimeStr] = useState('')
+  const [dateStr, setDateStr] = useState('')
 
-  const now = new Date()
-  const timeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
-  const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()
+  useEffect(() => {
+    function tick() {
+      const now = new Date()
+      setTimeStr(now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+      setDateStr(now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase())
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [])
 
   const shortAddress = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : null
 
