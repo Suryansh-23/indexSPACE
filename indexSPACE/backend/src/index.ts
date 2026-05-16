@@ -14,6 +14,13 @@ import type { Address } from "viem";
 
 const config = loadConfig();
 const db = createDb(process.env.DB_PATH ?? "data/indexspace.db");
+
+function getLastCandleNav(database: typeof db, vaultId: string): number {
+  const row = database.query(
+    "SELECT close FROM index_candles WHERE vault_id = ? ORDER BY bucket_ts DESC LIMIT 1",
+  ).get(vaultId) as { close: string } | null;
+  return row ? parseFloat(row.close) : 1.0;
+}
 const mockVault = new MockVault(db, INDICES);
 const curator = new Curator(db);
 const simulator = new Simulator(mockVault);
@@ -266,7 +273,7 @@ if (config.mockVault) {
     for (const idx of INDICES) {
       const totalShares = mockVault.getTotalShares(idx.id);
       const usdcBalance = mockVault.getVaultUsdcBalance(idx.id);
-      const nav = totalShares > 0 ? usdcBalance / totalShares : 1;
+      const nav = totalShares > 0 ? usdcBalance / totalShares : getLastCandleNav(db, idx.id);
       appendCurrentCandle(db, idx.id, nav, totalShares);
     }
   }, Math.max(config.pollIntervalMs, 15000));
@@ -283,7 +290,7 @@ if (config.mockVault) {
     for (const idx of INDICES) {
       const totalShares = mockVault.getTotalShares(idx.id);
       const usdcBalance = mockVault.getVaultUsdcBalance(idx.id);
-      const nav = totalShares > 0 ? usdcBalance / totalShares : 1;
+      const nav = totalShares > 0 ? usdcBalance / totalShares : getLastCandleNav(db, idx.id);
       appendCurrentCandle(db, idx.id, nav, totalShares);
     }
   }, Math.max(config.pollIntervalMs, 15000));

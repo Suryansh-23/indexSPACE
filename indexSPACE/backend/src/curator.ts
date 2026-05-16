@@ -276,7 +276,7 @@ export class Curator {
 
   private getUsdcBalance(vaultId: string): number {
     const row = this.db.query(
-      "SELECT COALESCE(SUM(CAST(asset_amount AS REAL)), 0) - COALESCE((SELECT SUM(CAST(asset_amount AS REAL)) FROM requests WHERE vault_id = ? AND kind = 'redeem' AND status IN ('claimable','claimed')), 0) AS total FROM requests WHERE vault_id = ? AND kind = 'subscribe'",
+      "SELECT COALESCE(SUM(CAST(asset_amount AS REAL)), 0) - COALESCE((SELECT SUM(CAST(asset_amount AS REAL)) FROM requests WHERE vault_id = ? AND kind = 'redeem' AND status IN ('claimable','claimed')), 0) AS total FROM requests WHERE vault_id = ? AND kind = 'subscribe' AND status IN ('claimable', 'claimed')",
     ).get(vaultId, vaultId) as { total: number } | undefined;
     return row?.total ?? 0;
   }
