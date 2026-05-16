@@ -9,6 +9,7 @@ import { RealIndexer } from "./indexer.ts";
 import { computeSubscribeQuote, computeRedeemQuote } from "./quotes.ts";
 import { Curator } from "./curator.ts";
 import { Simulator } from "./simulator.ts";
+import { seedCandleHistory, appendCurrentCandle } from "./candles.ts";
 import type { Address } from "viem";
 
 const config = loadConfig();
@@ -27,6 +28,11 @@ const realVaultAddresses = config.chainId === 31337
   : { "ai-acceleration": BASE_SEPOLIA_AI_VAULT as Address, "crypto-reflexivity": BASE_SEPOLIA_CRYPTO_VAULT as Address };
 
 const realIndexer = config.mockVault ? null : new RealIndexer(db, config, realVaultAddresses);
+
+// Seed artificial price history for all vaults on startup (no-op if already seeded)
+for (const idx of INDICES) {
+  seedCandleHistory(db, idx.id);
+}
 
 const app = new Hono();
 app.use("*", cors());
@@ -104,10 +110,16 @@ app.get("/api/vaults/:vaultId/positions", (c) => {
 
 app.get("/api/vaults/:vaultId/candles", (c) => {
   const vaultId = c.req.param("vaultId");
+  type CandleRow = { bucket_ts: string; close: string; share_supply: string };
   const rows = db.query(
-    "SELECT * FROM index_candles WHERE vault_id = ? ORDER BY bucket_ts ASC LIMIT 500",
-  ).all(vaultId);
-  return c.json(rows);
+    "SELECT bucket_ts, close, share_supply FROM index_candles WHERE vault_id = ? ORDER BY bucket_ts ASC LIMIT 2200",
+  ).all(vaultId) as CandleRow[];
+  const navPoints = rows.map((r) => ({
+    ts: r.bucket_ts,
+    nav: parseFloat(r.close),
+    shares: parseFloat(r.share_supply),
+  }));
+  return c.json(navPoints);
 });
 
 app.post("/api/vaults/:vaultId/quote-subscribe", async (c) => {
@@ -251,6 +263,12 @@ if (config.mockVault) {
 
   setInterval(async () => {
     await curator.tick();
+    for (const idx of INDICES) {
+      const totalShares = mockVault.getTotalShares(idx.id);
+      const usdcBalance = mockVault.getVaultUsdcBalance(idx.id);
+      const nav = totalShares > 0 ? usdcBalance / totalShares : 1;
+      appendCurrentCandle(db, idx.id, nav, totalShares);
+    }
   }, Math.max(config.pollIntervalMs, 15000));
 
   simulator.start();
@@ -262,6 +280,12 @@ if (config.mockVault) {
 
   setInterval(async () => {
     await curator.tick();
+    for (const idx of INDICES) {
+      const totalShares = mockVault.getTotalShares(idx.id);
+      const usdcBalance = mockVault.getVaultUsdcBalance(idx.id);
+      const nav = totalShares > 0 ? usdcBalance / totalShares : 1;
+      appendCurrentCandle(db, idx.id, nav, totalShares);
+    }
   }, Math.max(config.pollIntervalMs, 15000));
 }
 
