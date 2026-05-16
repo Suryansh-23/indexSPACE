@@ -1,5 +1,9 @@
 import type { Database } from "bun:sqlite";
-import { FORECAST_INDICES, ANVIL_AI_VAULT, ANVIL_CRYPTO_VAULT, ANVIL_CHAIN_ID } from "@indexspace/shared";
+import {
+  FORECAST_INDICES,
+  ANVIL_AI_VAULT, ANVIL_CRYPTO_VAULT, ANVIL_CHAIN_ID,
+  BASE_SEPOLIA_AI_VAULT, BASE_SEPOLIA_CRYPTO_VAULT,
+} from "@indexspace/shared";
 import type { IndexConstituent, Orientation } from "@indexspace/shared";
 import { getDefaultStrategy, tryFsBuy, tryFsSell } from "./sdk.ts";
 import type { Address } from "viem";
@@ -13,15 +17,22 @@ const FULFILL_ABI = parseAbi([
   "function pendingRedeemRequest(uint256 requestId, address controller) view returns (uint256, uint256)",
 ]);
 
-const VAULT_ADDRESSES: Record<string, Address> = {
-  "ai-acceleration": ANVIL_AI_VAULT as Address,
-  "crypto-reflexivity": ANVIL_CRYPTO_VAULT as Address,
+const VAULT_ADDRESSES: Record<number, Record<string, Address>> = {
+  [ANVIL_CHAIN_ID]: {
+    "ai-acceleration": ANVIL_AI_VAULT as Address,
+    "crypto-reflexivity": ANVIL_CRYPTO_VAULT as Address,
+  },
+  84532: {
+    "ai-acceleration": BASE_SEPOLIA_AI_VAULT as Address,
+    "crypto-reflexivity": BASE_SEPOLIA_CRYPTO_VAULT as Address,
+  },
 };
 
 export class Curator {
   private db: Database;
   private walletClient: ReturnType<typeof createWalletClient> | null = null;
   private curatorAccount: Address | null = null;
+  private chainId: number = ANVIL_CHAIN_ID;
 
   constructor(db: Database) {
     this.db = db;
@@ -30,7 +41,8 @@ export class Curator {
   configureRpc(rpcUrl: string, curatorPrivateKey?: string, chainId?: number) {
     if (!curatorPrivateKey) return;
 
-    const chain = chainId === ANVIL_CHAIN_ID ? anvil : baseSepolia;
+    this.chainId = chainId ?? ANVIL_CHAIN_ID;
+    const chain = this.chainId === ANVIL_CHAIN_ID ? anvil : baseSepolia;
     this.walletClient = createWalletClient({ chain, transport: http(rpcUrl) });
     this.curatorAccount = (curatorPrivateKey.startsWith("0x")
       ? curatorPrivateKey
@@ -197,7 +209,7 @@ export class Curator {
   private async tryFulfillDeposit(vaultId: string, controller: Address, shares: number) {
     if (!this.walletClient || !this.curatorAccount) return;
 
-    const vaultAddress = VAULT_ADDRESSES[vaultId];
+    const vaultAddress = VAULT_ADDRESSES[this.chainId]?.[vaultId];
     if (!vaultAddress) return;
 
     try {
@@ -216,7 +228,7 @@ export class Curator {
   private async tryFulfillRedeem(vaultId: string, controller: Address, assets: number) {
     if (!this.walletClient || !this.curatorAccount) return;
 
-    const vaultAddress = VAULT_ADDRESSES[vaultId];
+    const vaultAddress = VAULT_ADDRESSES[this.chainId]?.[vaultId];
     if (!vaultAddress) return;
 
     try {

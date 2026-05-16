@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serve } from "bun";
-import { loadConfig, INDICES, LIVE_VAULTS, PREVIEW_INDICES, ANVIL_AI_VAULT, ANVIL_CRYPTO_VAULT } from "./config.ts";
+import { loadConfig, INDICES, LIVE_VAULTS, PREVIEW_INDICES, ANVIL_AI_VAULT, ANVIL_CRYPTO_VAULT, BASE_SEPOLIA_AI_VAULT, BASE_SEPOLIA_CRYPTO_VAULT } from "./config.ts";
 import { createDb } from "./db.ts";
 import { getFsClient } from "./sdk.ts";
 import { MockVault } from "./mock-vault.ts";
@@ -22,10 +22,11 @@ if (!config.mockVault) {
   curator.configureRpc(config.rpcUrl, config.curatorPrivateKey, config.chainId);
 }
 
-const realIndexer = config.mockVault ? null : new RealIndexer(db, config, {
-  "ai-acceleration": ANVIL_AI_VAULT as Address,
-  "crypto-reflexivity": ANVIL_CRYPTO_VAULT as Address,
-});
+const realVaultAddresses = config.chainId === 31337
+  ? { "ai-acceleration": ANVIL_AI_VAULT as Address, "crypto-reflexivity": ANVIL_CRYPTO_VAULT as Address }
+  : { "ai-acceleration": BASE_SEPOLIA_AI_VAULT as Address, "crypto-reflexivity": BASE_SEPOLIA_CRYPTO_VAULT as Address };
+
+const realIndexer = config.mockVault ? null : new RealIndexer(db, config, realVaultAddresses);
 
 const app = new Hono();
 app.use("*", cors());
