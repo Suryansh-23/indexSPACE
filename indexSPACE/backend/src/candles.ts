@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 
-const CANDLE_SEED_VERSION = 2;
+const CANDLE_SEED_VERSION = 4;
 const MIN5_MS = 5 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -10,10 +10,27 @@ const SEED_TOTAL_DAYS = 90;
 const SEED_HOURS_HOURLY = (SEED_TOTAL_DAYS - SEED_RECENT_DAYS) * 24;
 const SEED_5MIN_BUCKETS = SEED_RECENT_DAYS * 24 * 12;
 
+// NAV baseline ~100 (index-style, not near-par). Test deposits of $1–$10 USDC
+// are <0.001% of the seeded pool at these scales, so they cause no visible NAV spike.
+const NAV_MEAN = 100.0;
+const NAV_FLOOR = 82.0;
+const NAV_CEIL = 140.0;
+const NAV_STEP_VOL_HOURLY = 0.18;      // ≈0.18% relative vol per hour
+const NAV_STEP_VOL_5MIN = NAV_STEP_VOL_HOURLY / Math.sqrt(12);
+
 const VAULT_START_NAV: Record<string, number> = {
-  "ai-acceleration": 0.94,
-  "crypto-reflexivity": 1.03,
+  "ai-acceleration":  94.0,   // starts below benchmark, trending up
+  "crypto-reflexivity": 103.0, // starts slightly above par
 };
+
+// 1 million shares each: a $1 test deposit at NAV≈100 adds 10,000 shares = 1% dilution max
+const VAULT_TARGET_SHARES: Record<string, number> = {
+  "ai-acceleration":  1_000_000,
+  "crypto-reflexivity": 1_000_000,
+};
+
+// Fake genesis controller — never a real user address
+const GENESIS_CONTROLLER = "0x0000000000000000000000000000000000000001";
 
 function floorTo5Min(ts: number): number {
   return Math.floor(ts / MIN5_MS) * MIN5_MS;
@@ -40,6 +57,26 @@ function hashSeed(str: string): number {
   return h >>> 0;
 }
 
+// Smoothstep growth with small noise — simulates cumulative subscription activity.
+function forwardShareSupply(
+  totalSteps: number,
+  targetShares: number,
+  rng: () => number,
+): number[] {
+  const startShares = Math.round(targetShares * 0.07); // ~7% of target at t=0
+  const out = new Array<number>(totalSteps + 1);
+  out[0] = startShares;
+  for (let i = 1; i <= totalSteps; i++) {
+    const t = i / totalSteps;
+    // Smoothstep (S-curve): slow→fast→slow
+    const smooth = t * t * (3 - 2 * t);
+    const trend = startShares + (targetShares - startShares) * smooth;
+    const noise = (rng() - 0.5) * targetShares * 0.015;
+    out[i] = Math.max(startShares, Math.round(trend + noise));
+  }
+  return out;
+}
+
 // Forward Ornstein-Uhlenbeck walk. mean-reverting by construction.
 function forwardWalk(
   startNav: number,
@@ -55,7 +92,7 @@ function forwardWalk(
     const prev = navs[i - 1]!;
     const drift = theta * (mean - prev);
     const shock = (rng() - 0.5) * 2 * stepVol;
-    navs[i] = Math.max(0.82, Math.min(1.40, prev + drift + shock));
+    navs[i] = Math.max(NAV_FLOOR, Math.min(NAV_CEIL, prev + drift + shock));
   }
   return navs;
 }
@@ -71,29 +108,36 @@ export function seedCandleHistory(db: Database, vaultId: string): void {
   // Version mismatch — clear stale data and reseed
   db.run("DELETE FROM index_candles WHERE vault_id = ?", [vaultId]);
 
-  const startNav = VAULT_START_NAV[vaultId] ?? 1.0;
-  const mean = 1.0;
+  const startNav = VAULT_START_NAV[vaultId] ?? NAV_MEAN;
+  const targetShares = VAULT_TARGET_SHARES[vaultId] ?? 1_000_000;
+  const totalSteps = SEED_HOURS_HOURLY + SEED_5MIN_BUCKETS;
 
-  // Hourly walk: theta=0.004 per hour, vol=0.0018 per hour
+  // Hourly walk: theta=0.004 per hour, mean-reverting to NAV_MEAN
   const hourlyNavs = forwardWalk(
     startNav,
     SEED_HOURS_HOURLY,
-    mean,
+    NAV_MEAN,
     0.004,
-    0.0018,
+    NAV_STEP_VOL_HOURLY,
     makeLcgRand(hashSeed(`${vaultId}:hourly`)),
   );
 
   // 5-min walk: bridge from where hourly walk ends
-  // Scale theta and vol from hourly → 5-min (1/12 of an hour)
   const bridgeNav = hourlyNavs[hourlyNavs.length - 1]!;
   const fiveMinNavs = forwardWalk(
     bridgeNav,
     SEED_5MIN_BUCKETS,
-    mean,
+    NAV_MEAN,
     0.004 / 12,
-    0.0018 / Math.sqrt(12),
+    NAV_STEP_VOL_5MIN,
     makeLcgRand(hashSeed(`${vaultId}:5min`)),
+  );
+
+  // Single continuous share supply walk over all seeded steps
+  const shareSupplies = forwardShareSupply(
+    totalSteps,
+    targetShares,
+    makeLcgRand(hashSeed(`${vaultId}:shares`)),
   );
 
   const now = Date.now();
@@ -115,7 +159,7 @@ export function seedCandleHistory(db: Database, vaultId: string): void {
       const spread = Math.abs(c - o);
       const hi = (Math.max(o, c) * (1 + spread * 0.4 + 0.0003)).toFixed(6);
       const lo = (Math.min(o, c) * (1 - spread * 0.4 - 0.0003)).toFixed(6);
-      insert.run(vaultId, bucketTs, o.toFixed(6), hi, lo, c.toFixed(6), c.toFixed(6), '0');
+      insert.run(vaultId, bucketTs, o.toFixed(6), hi, lo, c.toFixed(6), c.toFixed(6), String(shareSupplies[i]!));
     }
 
     // 5-min candles: j-th bucket starts at recentBoundaryTs + j * MIN5_MS
@@ -126,11 +170,27 @@ export function seedCandleHistory(db: Database, vaultId: string): void {
       const spread = Math.abs(c - o);
       const hi = (Math.max(o, c) * (1 + spread * 0.5 + 0.0002)).toFixed(6);
       const lo = (Math.min(o, c) * (1 - spread * 0.5 - 0.0002)).toFixed(6);
-      insert.run(vaultId, bucketTs, o.toFixed(6), hi, lo, c.toFixed(6), c.toFixed(6), '0');
+      insert.run(vaultId, bucketTs, o.toFixed(6), hi, lo, c.toFixed(6), c.toFixed(6), String(shareSupplies[SEED_HOURS_HOURLY + j]!));
     }
   });
 
   insertMany();
+
+  // Seed a genesis subscription so the live NAV (from requests table) starts exactly
+  // where the seeded candle history ends. Without this, the first real test deposit
+  // would have no counterpart shares, which inflates NAV massively.
+  const lastSeedNav = fiveMinNavs[fiveMinNavs.length - 1]!;
+  // asset_amount in USDC micro-units (6 decimals). NAV × shares gives the right ratio.
+  const genesisAssets = Math.round(lastSeedNav * targetShares);
+
+  db.run("DELETE FROM requests WHERE vault_id = ? AND controller = ?", [vaultId, GENESIS_CONTROLLER]);
+  db.run(
+    `INSERT INTO requests
+       (chain_id, vault_id, internal_request_id, controller, owner,
+        kind, status, asset_amount, share_amount, created_at, updated_at)
+     VALUES (0, ?, 0, ?, ?, 'subscribe', 'claimed', ?, ?, datetime('now'), datetime('now'))`,
+    [vaultId, GENESIS_CONTROLLER, GENESIS_CONTROLLER, String(genesisAssets), String(targetShares)],
+  );
 
   db.run(
     "INSERT OR REPLACE INTO simulator_state (key, value_json, updated_at) VALUES (?, ?, datetime('now'))",

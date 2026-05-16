@@ -4,7 +4,7 @@ export interface AppConfig {
   port: number;
   host: string;
   fsUsername: string | undefined;
-  fsPassword: string | undefined;
+  fsAccessToken: string | undefined;
   curatorPrivateKey: string | undefined;
   fsApiUrl: string;
   rpcUrl: string;
@@ -13,6 +13,9 @@ export interface AppConfig {
   pollIntervalMs: number;
   confirmations: number;
   reorgBuffer: number;
+  runLogEnabled: boolean;
+  runLogPath: string;
+  fsTraceEnabled: boolean;
 }
 
 export function loadConfig(): AppConfig {
@@ -20,7 +23,7 @@ export function loadConfig(): AppConfig {
     port: parseInt(process.env.PORT || "8787", 10),
     host: process.env.HOST || "0.0.0.0",
     fsUsername: process.env.FS_USERNAME,
-    fsPassword: process.env.FS_PASSWORD,
+    fsAccessToken: process.env.FS_ACCESS_TOKEN,
     curatorPrivateKey: process.env.CURATOR_PRIVATE_KEY,
     fsApiUrl: process.env.FS_API_URL || "https://fs-engine-api-dev.onrender.com",
     rpcUrl: process.env.RPC_URL || "http://localhost:8545",
@@ -29,6 +32,9 @@ export function loadConfig(): AppConfig {
     pollIntervalMs: parseInt(process.env.POLL_INTERVAL_MS || "10000", 10),
     confirmations: parseInt(process.env.CONFIRMATIONS || "3", 10),
     reorgBuffer: parseInt(process.env.REORG_BUFFER || "20", 10),
+    runLogEnabled: process.env.RUN_LOG_ENABLED === "true",
+    runLogPath: process.env.RUN_LOG_PATH || "run.log",
+    fsTraceEnabled: process.env.FS_TRACE_ENABLED === "true",
   };
 }
 

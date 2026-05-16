@@ -2,24 +2,54 @@ import { FSClient } from "@functionspace/core";
 import { buy as fsBuy, sell as fsSell, queryMarketState, validateBeliefVector } from "@functionspace/core";
 import { generateGaussian, generateRange, generateLeftSkew, generateRightSkew } from "@functionspace/core";
 import type { ConstituentStrategy, Orientation } from "@indexspace/shared";
+import { logError, logRuntime } from "./logger.ts";
 
 export interface VaultClient {
   client: FSClient;
   vaultId: string;
-  fsUsername: string;
+  fsUsername?: string;
 }
 
-let _fsClient: FSClient | null = null;
+// USDC uses 6 decimal places on-chain. All collateral values coming in from the
+// curator are in those micro-units (e.g. 1_000_000 = $1.00). The FS API expects
+// real dollar amounts, so every buy must divide by this scale before sending.
+const USDC_SCALE = 1e6;
 
-export function getFsClient(apiUrl: string, username?: string, password?: string): FSClient | null {
+let _fsClient: FSClient | null = null;
+let _fsTraceEnabled = false;
+
+export function getFsClient(
+  apiUrl: string,
+  options?: {
+    username?: string;
+    accessToken?: string;
+  },
+): FSClient | null {
   if (_fsClient) return _fsClient;
-  if (!username || !password) return null;
-  _fsClient = new FSClient({ baseUrl: apiUrl, username, password });
+  const accessToken = options?.accessToken?.trim();
+  const username = options?.username?.trim();
+
+  if (accessToken) {
+    _fsClient = new FSClient({ baseUrl: apiUrl });
+    _fsClient.setToken(accessToken);
+    if (username) {
+      _fsClient.setStoredUsername(username);
+    }
+    logRuntime("fs.auth", "Configured FunctionSpace client with access token", {
+      username: username || null,
+    });
+    return _fsClient;
+  }
+
   return _fsClient;
 }
 
 export function resetFsClient(): void {
   _fsClient = null;
+}
+
+export function setFsTraceEnabled(enabled: boolean): void {
+  _fsTraceEnabled = enabled;
 }
 
 export function getDefaultStrategy(
@@ -61,6 +91,9 @@ async function getMarketBounds(marketId: number): Promise<MarketBounds | null> {
   if (cached && Date.now() < cached.expiresAt) return cached.data;
 
   try {
+    if (_fsTraceEnabled) {
+      logRuntime("fs.market_state", "Querying FunctionSpace market state", { marketId });
+    }
     const state = await queryMarketState(_fsClient, marketId);
     const data: MarketBounds = {
       numBuckets: state.config.numBuckets,
@@ -68,9 +101,12 @@ async function getMarketBounds(marketId: number): Promise<MarketBounds | null> {
       upperBound: state.config.upperBound,
     };
     _marketBoundsCache.set(marketId, { data, expiresAt: Date.now() + MARKET_CACHE_TTL_MS });
+    if (_fsTraceEnabled) {
+      logRuntime("fs.market_state", "Loaded FunctionSpace market state", { marketId, ...data });
+    }
     return data;
   } catch (err) {
-    console.error(`Failed to query market state for market ${marketId}:`, err);
+    logError("fs.market_state", `Failed to query market state for market ${marketId}`, err, { marketId });
     return null;
   }
 }
@@ -113,7 +149,10 @@ export async function tryFsBuy(
   strategy: ConstituentStrategy,
 ): Promise<FsBuyResult | null> {
   try {
-    if (!_fsClient) return null;
+    if (!_fsClient) {
+      logRuntime("fs.buy", "Skipping FunctionSpace buy because client is not configured", { marketId, collateral }, "warn");
+      return null;
+    }
 
     const bounds = await getMarketBounds(marketId);
     if (!bounds) return null;
@@ -122,11 +161,34 @@ export async function tryFsBuy(
     const belief = buildBeliefVector(numBuckets, lowerBound, upperBound, strategy);
 
     validateBeliefVector(belief, numBuckets);
+    const collateralDollars = collateral / USDC_SCALE;
+    if (collateralDollars > 500) {
+      logRuntime("fs.buy", "collateral exceeds $500 — possible unit mismatch, skipping", { marketId, collateral, collateralDollars }, "warn");
+      return null;
+    }
+    if (_fsTraceEnabled) {
+      logRuntime("fs.buy", "Submitting FunctionSpace buy", {
+        marketId,
+        collateralMicros: collateral,
+        collateralDollars,
+        numBuckets,
+        strategy,
+      });
+    }
 
-    const result = await fsBuy(_fsClient, marketId, belief, Math.floor(collateral * 1e6), numBuckets);
+    const result = await fsBuy(_fsClient, marketId, belief, collateralDollars, numBuckets);
+    logRuntime("fs.buy", "FunctionSpace buy succeeded", {
+      marketId,
+      collateralDollars,
+      positionId: result.positionId,
+    });
     return { positionId: result.positionId, marketId };
   } catch (err) {
-    console.error(`FS buy failed for market ${marketId}:`, err);
+    logError("fs.buy", `FunctionSpace buy failed for market ${marketId}`, err, {
+      marketId,
+      collateral,
+      strategy,
+    });
     return null;
   }
 }
@@ -136,11 +198,21 @@ export async function tryFsSell(
   marketId: number,
 ): Promise<boolean> {
   try {
-    if (!_fsClient) return false;
+    if (!_fsClient) {
+      logRuntime("fs.sell", "Skipping FunctionSpace sell because client is not configured", { marketId, positionId }, "warn");
+      return false;
+    }
+    if (_fsTraceEnabled) {
+      logRuntime("fs.sell", "Submitting FunctionSpace sell", { marketId, positionId });
+    }
     await fsSell(_fsClient, positionId, marketId);
+    logRuntime("fs.sell", "FunctionSpace sell succeeded", { marketId, positionId });
     return true;
   } catch (err) {
-    console.error(`FS sell failed for position ${positionId}:`, err);
+    logError("fs.sell", `FunctionSpace sell failed for position ${positionId}`, err, {
+      marketId,
+      positionId,
+    });
     return false;
   }
 }

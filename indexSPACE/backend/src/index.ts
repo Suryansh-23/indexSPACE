@@ -11,20 +11,89 @@ import { Curator } from "./curator.ts";
 import { Simulator } from "./simulator.ts";
 import { seedCandleHistory, appendCurrentCandle } from "./candles.ts";
 import type { Address } from "viem";
+import { configureRunLogger, logError, logRuntime } from "./logger.ts";
+import { setFsTraceEnabled } from "./sdk.ts";
 
 const config = loadConfig();
+configureRunLogger(config.runLogEnabled, config.runLogPath);
+setFsTraceEnabled(config.fsTraceEnabled);
 const db = createDb(process.env.DB_PATH ?? "data/indexspace.db");
 
-function getLastCandleNav(database: typeof db, vaultId: string): number {
-  const row = database.query(
-    "SELECT close FROM index_candles WHERE vault_id = ? ORDER BY bucket_ts DESC LIMIT 1",
-  ).get(vaultId) as { close: string } | null;
-  return row ? parseFloat(row.close) : 1.0;
+function getLastCandleState(vaultId: string) {
+  const row = db.query(
+    "SELECT close, share_supply FROM index_candles WHERE vault_id = ? ORDER BY bucket_ts DESC LIMIT 1",
+  ).get(vaultId) as { close: string; share_supply: string } | null;
+  if (!row) return null;
+  return {
+    nav: parseFloat(row.close),
+    shares: parseFloat(row.share_supply),
+  };
+}
+
+function getLastNonZeroCandleShares(vaultId: string): number {
+  const row = db.query(
+    "SELECT share_supply FROM index_candles WHERE vault_id = ? AND CAST(share_supply AS REAL) > 0 ORDER BY bucket_ts DESC LIMIT 1",
+  ).get(vaultId) as { share_supply: string } | null;
+  return row ? parseFloat(row.share_supply) : 0;
+}
+
+function getVaultSummary(vaultId: string) {
+  const isLive = LIVE_VAULTS.includes(vaultId as typeof LIVE_VAULTS[number]);
+  const totalShares = mockVault.getTotalShares(vaultId);
+  const usdcBalance = mockVault.getVaultUsdcBalance(vaultId);
+  const latestCandle = getLastCandleState(vaultId);
+  const maxCandleShares = db.query(
+    "SELECT MAX(CAST(share_supply AS REAL)) AS max_share_supply FROM index_candles WHERE vault_id = ?",
+  ).get(vaultId) as { max_share_supply: number | null } | null;
+  const openExposureRow = db.query(
+    "SELECT COALESCE(SUM(CAST(collateral AS REAL)), 0) AS total FROM fs_positions WHERE vault_id = ? AND status = 'open'",
+  ).get(vaultId) as { total: number } | null;
+  const claimableRow = db.query(
+    "SELECT COUNT(*) AS cnt FROM requests WHERE vault_id = ? AND status = 'claimable'",
+  ).get(vaultId) as { cnt: number } | null;
+  const activeRow = db.query(
+    "SELECT COUNT(*) AS cnt FROM requests WHERE vault_id = ? AND status IN ('pending', 'executing')",
+  ).get(vaultId) as { cnt: number } | null;
+  const navRows = db.query(
+    "SELECT bucket_ts, close FROM index_candles WHERE vault_id = ? ORDER BY bucket_ts ASC",
+  ).all(vaultId) as Array<{ bucket_ts: string; close: string }>;
+
+  const latestCandleNav = latestCandle?.nav ?? 1.0;
+  const latestCandleShares = latestCandle?.shares ?? 0;
+  const fallbackCandleShares = latestCandleShares > 0 ? latestCandleShares : getLastNonZeroCandleShares(vaultId);
+  const resolvedDisplayShares = totalShares > 0 ? totalShares : fallbackCandleShares;
+  const shareCapacity = Math.max(resolvedDisplayShares, maxCandleShares?.max_share_supply ?? 0, 1);
+  const navPerShare = totalShares > 0 ? usdcBalance / totalShares : latestCandleNav;
+  const openExposure = openExposureRow?.total ?? 0;
+  const idleUsdc = Math.max(0, usdcBalance - openExposure);
+  const claimableRequests = claimableRow?.cnt ?? 0;
+  const navCutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const navWindow = navRows.filter((row) => new Date(row.bucket_ts).getTime() >= navCutoff);
+  const navBase = navWindow.length > 0 ? parseFloat(navWindow[0]!.close) : latestCandleNav;
+  const navChange24h = navBase > 0 ? ((navPerShare - navBase) / navBase) * 100 : 0;
+  const curatorState = !isLive ? "idle" : (activeRow?.cnt ?? 0) > 0 ? "executing" : "armed";
+
+  return {
+    navPerShare,
+    totalShares,
+    displayShares: resolvedDisplayShares,
+    shareCapacity,
+    shareUtilizationPct: (resolvedDisplayShares / shareCapacity) * 100,
+    usdcBalance,
+    idleUsdc,
+    openExposure,
+    claimableRequests,
+    navChange24h,
+    curatorState,
+  };
 }
 const mockVault = new MockVault(db, INDICES);
 const curator = new Curator(db);
 const simulator = new Simulator(mockVault);
-const fsClient = getFsClient(config.fsApiUrl, config.fsUsername, config.fsPassword);
+const fsClient = getFsClient(config.fsApiUrl, {
+  username: config.fsUsername,
+  accessToken: config.fsAccessToken,
+});
 
 if (!config.mockVault) {
   curator.configureRpc(config.rpcUrl, config.curatorPrivateKey, config.chainId);
@@ -66,6 +135,7 @@ app.get("/api/vaults", (c) => {
     isLive: LIVE_VAULTS.includes(idx.id as typeof LIVE_VAULTS[number]),
     isPreview: PREVIEW_INDICES.includes(idx.id as typeof PREVIEW_INDICES[number]),
     constituentCount: idx.constituents.length,
+    metrics: getVaultSummary(idx.id),
   }));
   return c.json(vaults);
 });
@@ -75,16 +145,10 @@ app.get("/api/vaults/:vaultId", (c) => {
   const index = INDICES.find((i) => i.id === vaultId);
   if (!index) return c.json({ error: "vault not found" }, 404);
 
-  const totalShares = mockVault.getTotalShares(vaultId);
-  const usdcBalance = mockVault.getVaultUsdcBalance(vaultId);
-  const navPerShare = totalShares > 0 ? usdcBalance / totalShares : 1;
-
   return c.json({
     ...index,
     metrics: {
-      navPerShare: navPerShare.toFixed(18),
-      totalShares: totalShares.toFixed(18),
-      usdcBalance: usdcBalance.toFixed(6),
+      ...getVaultSummary(vaultId),
       curatorConfigured: fsClient !== null,
     },
   });
@@ -192,14 +256,18 @@ app.get("/internal/status", (c) => {
 });
 
 app.post("/internal/curator/tick", async (c) => {
+  logRuntime("http.internal", "Manual curator tick requested");
   const results = await curator.tick();
+  logRuntime("http.internal", "Manual curator tick completed", { processed: results.length, results });
   return c.json({ processed: results.length, results });
 });
 
 app.post("/internal/indexer/tick", async (c) => {
   if (realIndexer) {
+    logRuntime("http.internal", "Manual indexer tick requested");
     const events = await realIndexer.tick();
     const count = realIndexer.persistEvents(events);
+    logRuntime("http.internal", "Manual indexer tick completed", { events: events.length, indexed: count });
     return c.json({ indexed: count });
   }
 
@@ -273,33 +341,55 @@ if (config.mockVault) {
     for (const idx of INDICES) {
       const totalShares = mockVault.getTotalShares(idx.id);
       const usdcBalance = mockVault.getVaultUsdcBalance(idx.id);
-      const nav = totalShares > 0 ? usdcBalance / totalShares : getLastCandleNav(db, idx.id);
-      appendCurrentCandle(db, idx.id, nav, totalShares);
+      const lastCandle = getLastCandleState(idx.id);
+      const nav = totalShares > 0 ? usdcBalance / totalShares : lastCandle?.nav ?? 1.0;
+      const shareSupply = totalShares > 0 ? totalShares : lastCandle?.shares || getLastNonZeroCandleShares(idx.id);
+      appendCurrentCandle(db, idx.id, nav, shareSupply);
     }
   }, Math.max(config.pollIntervalMs, 15000));
 
   simulator.start();
 } else {
   setInterval(async () => {
-    const events = await realIndexer!.tick();
-    realIndexer!.persistEvents(events);
+    try {
+      const events = await realIndexer!.tick();
+      const persisted = realIndexer!.persistEvents(events);
+      if (events.length > 0 || persisted > 0) {
+        logRuntime("scheduler.indexer", "Background indexer tick completed", { events: events.length, persisted });
+      }
+    } catch (err) {
+      logError("scheduler.indexer", "Background indexer tick failed", err);
+    }
   }, config.pollIntervalMs);
 
   setInterval(async () => {
-    await curator.tick();
-    for (const idx of INDICES) {
-      const totalShares = mockVault.getTotalShares(idx.id);
-      const usdcBalance = mockVault.getVaultUsdcBalance(idx.id);
-      const nav = totalShares > 0 ? usdcBalance / totalShares : getLastCandleNav(db, idx.id);
-      appendCurrentCandle(db, idx.id, nav, totalShares);
+    try {
+      const results = await curator.tick();
+      if (results.length > 0) {
+        logRuntime("scheduler.curator", "Background curator tick completed", { processed: results.length, results });
+      }
+      for (const idx of INDICES) {
+        const totalShares = mockVault.getTotalShares(idx.id);
+        const usdcBalance = mockVault.getVaultUsdcBalance(idx.id);
+        const lastCandle = getLastCandleState(idx.id);
+        const nav = totalShares > 0 ? usdcBalance / totalShares : lastCandle?.nav ?? 1.0;
+        const shareSupply = totalShares > 0 ? totalShares : lastCandle?.shares || getLastNonZeroCandleShares(idx.id);
+        appendCurrentCandle(db, idx.id, nav, shareSupply);
+      }
+    } catch (err) {
+      logError("scheduler.curator", "Background curator tick failed", err);
     }
   }, Math.max(config.pollIntervalMs, 15000));
 }
 
-console.log(`IndexSpace backend starting on http://${config.host}:${config.port}`);
-console.log(`  Mock vault: ${config.mockVault}`);
-console.log(`  FS client: ${fsClient ? "configured" : "not configured"}`);
-console.log(`  Simulator: ${simulator.isEnabled() ? "enabled" : "disabled"}`);
+logRuntime("startup", `IndexSpace backend starting on http://${config.host}:${config.port}`, {
+  mockVault: config.mockVault,
+  fsClientConfigured: fsClient !== null,
+  simulatorEnabled: simulator.isEnabled(),
+  runLogEnabled: config.runLogEnabled,
+  runLogPath: config.runLogPath,
+  fsTraceEnabled: config.fsTraceEnabled,
+});
 
 serve({
   fetch: app.fetch,

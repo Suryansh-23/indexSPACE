@@ -60,12 +60,15 @@ export class MockVault {
     const index = this.indices.find((i) => i.id === vaultId);
     if (!index) return 0;
 
+    // Exclude share_amount='0' records: those are orphaned on-chain claims where
+    // the curator DB was wiped and lost the share assignment. Including them would
+    // inflate USDC balance without matching shares, spiking the NAV.
     const deposits = this.db.query(
-      "SELECT COALESCE(SUM(CAST(asset_amount AS REAL)), 0) AS total FROM requests WHERE vault_id = ? AND kind = 'subscribe' AND status IN ('claimable', 'claimed')",
+      "SELECT COALESCE(SUM(CAST(asset_amount AS REAL)), 0) AS total FROM requests WHERE vault_id = ? AND kind = 'subscribe' AND status IN ('claimable', 'claimed') AND CAST(share_amount AS REAL) > 0",
     ).get(vaultId) as { total: number } | undefined;
 
     const redemptions = this.db.query(
-      "SELECT COALESCE(SUM(CAST(asset_amount AS REAL)), 0) AS total FROM requests WHERE vault_id = ? AND kind = 'redeem' AND status IN ('claimable', 'claimed')",
+      "SELECT COALESCE(SUM(CAST(asset_amount AS REAL)), 0) AS total FROM requests WHERE vault_id = ? AND kind = 'redeem' AND status IN ('claimable', 'claimed') AND CAST(share_amount AS REAL) > 0",
     ).get(vaultId) as { total: number } | undefined;
 
     return (deposits?.total ?? 0) - (redemptions?.total ?? 0);
@@ -73,11 +76,11 @@ export class MockVault {
 
   getTotalShares(vaultId: string): number {
     const claimed = this.db.query(
-      "SELECT COALESCE(SUM(CAST(share_amount AS REAL)), 0) AS total FROM requests WHERE vault_id = ? AND kind = 'subscribe' AND status IN ('claimable', 'claimed')",
+      "SELECT COALESCE(SUM(CAST(share_amount AS REAL)), 0) AS total FROM requests WHERE vault_id = ? AND kind = 'subscribe' AND status IN ('claimable', 'claimed') AND CAST(share_amount AS REAL) > 0",
     ).get(vaultId) as { total: number } | undefined;
 
     const redeemed = this.db.query(
-      "SELECT COALESCE(SUM(CAST(share_amount AS REAL)), 0) AS total FROM requests WHERE vault_id = ? AND kind = 'redeem' AND status IN ('executing', 'claimable', 'claimed')",
+      "SELECT COALESCE(SUM(CAST(share_amount AS REAL)), 0) AS total FROM requests WHERE vault_id = ? AND kind = 'redeem' AND status IN ('claimable', 'claimed') AND CAST(share_amount AS REAL) > 0",
     ).get(vaultId) as { total: number } | undefined;
 
     return (claimed?.total ?? 0) - (redeemed?.total ?? 0);
