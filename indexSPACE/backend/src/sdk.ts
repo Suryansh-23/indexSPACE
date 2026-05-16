@@ -1,5 +1,6 @@
 import { FSClient } from "@functionspace/core";
-import { buy as fsBuy, sell as fsSell } from "@functionspace/core";
+import { buy as fsBuy, sell as fsSell, queryMarketState, validateBeliefVector } from "@functionspace/core";
+import { generateGaussian, generateRange, generateLeftSkew, generateRightSkew } from "@functionspace/core";
 import type { ConstituentStrategy, Orientation } from "@indexspace/shared";
 
 export interface VaultClient {
@@ -44,50 +45,61 @@ export function getDefaultStrategy(
   };
 }
 
+interface MarketBounds {
+  numBuckets: number;
+  lowerBound: number;
+  upperBound: number;
+}
+
+const _marketBoundsCache = new Map<number, { data: MarketBounds; expiresAt: number }>();
+const MARKET_CACHE_TTL_MS = 60_000;
+
+async function getMarketBounds(marketId: number): Promise<MarketBounds | null> {
+  if (!_fsClient) return null;
+
+  const cached = _marketBoundsCache.get(marketId);
+  if (cached && Date.now() < cached.expiresAt) return cached.data;
+
+  try {
+    const state = await queryMarketState(_fsClient, marketId);
+    const data: MarketBounds = {
+      numBuckets: state.config.numBuckets,
+      lowerBound: state.config.lowerBound,
+      upperBound: state.config.upperBound,
+    };
+    _marketBoundsCache.set(marketId, { data, expiresAt: Date.now() + MARKET_CACHE_TTL_MS });
+    return data;
+  } catch (err) {
+    console.error(`Failed to query market state for market ${marketId}:`, err);
+    return null;
+  }
+}
+
 export function buildBeliefVector(
   numBuckets: number,
+  lowerBound: number,
+  upperBound: number,
   strategy: ConstituentStrategy,
 ): number[] {
-  const len = numBuckets + 2;
-  const vec = new Array(len).fill(0);
+  const range = upperBound - lowerBound;
+  const center = lowerBound + strategy.centerNormalized * range;
+  const spread = strategy.widthNormalized * range;
 
-  const total = strategy.weight / 100;
-
-  if (strategy.shape === "gaussian") {
-    const centerIdx = Math.floor(strategy.centerNormalized * (len - 1));
-    const spread = Math.max(1, Math.floor(strategy.widthNormalized * len));
-    for (let i = 0; i < len; i++) {
-      const dist = Math.abs(i - centerIdx);
-      vec[i] = Math.exp(-((dist * dist) / (2 * spread * spread)));
+  switch (strategy.shape) {
+    case "gaussian":
+      return generateGaussian(center, spread, numBuckets, lowerBound, upperBound);
+    case "range": {
+      const lo = center - spread / 2;
+      const hi = center + spread / 2;
+      return generateRange(lo, hi, numBuckets, lowerBound, upperBound);
     }
-  } else if (strategy.shape === "range") {
-    const lo = Math.floor(Math.max(0, strategy.centerNormalized - strategy.widthNormalized) * (len - 1));
-    const hi = Math.ceil(Math.min(1, strategy.centerNormalized + strategy.widthNormalized) * (len - 1));
-    for (let i = lo; i <= hi; i++) {
-      vec[i] = 1;
-    }
-  } else if (strategy.shape === "right_skew") {
-    const peak = Math.floor(Math.min(0.9, strategy.centerNormalized) * (len - 1));
-    for (let i = 0; i < len; i++) {
-      const rel = (i - peak) / len;
-      vec[i] = rel <= 0 ? 1 + rel * 5 : Math.exp(-rel * 10);
-    }
-  } else if (strategy.shape === "left_skew") {
-    const peak = Math.floor(Math.max(0.1, strategy.centerNormalized) * (len - 1));
-    for (let i = 0; i < len; i++) {
-      const rel = (peak - i) / len;
-      vec[i] = rel <= 0 ? 1 + rel * 5 : Math.exp(-rel * 10);
-    }
+    case "right_skew":
+      return generateRightSkew(center, spread, numBuckets, lowerBound, upperBound);
+    case "left_skew":
+      return generateLeftSkew(center, spread, numBuckets, lowerBound, upperBound);
+    default:
+      return generateGaussian(center, spread, numBuckets, lowerBound, upperBound);
   }
-
-  const sum = vec.reduce((a, b) => a + b, 0);
-  if (sum > 0) {
-    for (let i = 0; i < len; i++) {
-      vec[i] = (vec[i] / sum) * total;
-    }
-  }
-
-  return vec;
 }
 
 export interface FsBuyResult {
@@ -102,8 +114,15 @@ export async function tryFsBuy(
 ): Promise<FsBuyResult | null> {
   try {
     if (!_fsClient) return null;
-    const numBuckets = 10;
-    const belief = buildBeliefVector(numBuckets, strategy);
+
+    const bounds = await getMarketBounds(marketId);
+    if (!bounds) return null;
+
+    const { numBuckets, lowerBound, upperBound } = bounds;
+    const belief = buildBeliefVector(numBuckets, lowerBound, upperBound, strategy);
+
+    validateBeliefVector(belief, numBuckets);
+
     const result = await fsBuy(_fsClient, marketId, belief, Math.floor(collateral * 1e6), numBuckets);
     return { positionId: result.positionId, marketId };
   } catch (err) {
