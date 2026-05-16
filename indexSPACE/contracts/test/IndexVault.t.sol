@@ -142,6 +142,9 @@ contract IndexVaultTest is Test {
 
         assertEq(usdc.balanceOf(user), 999 * DEPOSIT_AMOUNT + redeemAssets);
         assertEq(vault.balanceOf(user), DEPOSIT_AMOUNT - redeemShares);
+        // Redeemed shares must be burned: vault holds no shares, totalSupply reduced
+        assertEq(vault.balanceOf(address(vault)), 0);
+        assertEq(vault.totalSupply(), DEPOSIT_AMOUNT - redeemShares);
     }
 
     // --- Duplicate request rejection ---

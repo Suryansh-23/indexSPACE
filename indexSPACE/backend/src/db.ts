@@ -1,6 +1,11 @@
 import { Database } from "bun:sqlite";
+import { mkdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 
 export function createDb(path = ":memory:"): Database {
+  if (path !== ":memory:") {
+    mkdirSync(dirname(resolve(path)), { recursive: true });
+  }
   const db = new Database(path);
   db.exec("PRAGMA journal_mode = WAL");
   db.exec("PRAGMA foreign_keys = ON");
