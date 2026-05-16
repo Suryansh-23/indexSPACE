@@ -263,7 +263,13 @@ export class Curator {
 
   private computeNavPerShare(vaultId: string): number {
     const totalShares = this.getTotalShares(vaultId);
-    if (totalShares === 0) return 1;
+    if (totalShares === 0) {
+      // Seed starting NAV from last candle so live trading continues where history left off
+      const row = this.db.query(
+        "SELECT close FROM index_candles WHERE vault_id = ? ORDER BY bucket_ts DESC LIMIT 1",
+      ).get(vaultId) as { close: string } | null;
+      return row ? parseFloat(row.close) : 1.0;
+    }
     return this.getUsdcBalance(vaultId) / totalShares;
   }
 
