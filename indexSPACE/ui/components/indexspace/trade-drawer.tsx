@@ -1,24 +1,43 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useAccount, useChainId, useWriteContract, useWaitForTransactionReceipt, useConnect } from 'wagmi'
+import { injected } from 'wagmi/connectors'
+import { parseUnits } from 'viem'
+import type { Address } from 'viem'
 import { cn } from '@/lib/utils'
 import { ChevronRight, Loader } from 'lucide-react'
 import type { Vault, TradeMode } from '@/lib/types'
 import { TRADE_STEPS, type TradeStep } from '@/lib/mock-data'
+import { getVaultAddress, getUsdcAddress, getVaultAbi } from '@/lib/contracts'
+import vaultAbiJson from '@/lib/IndexVault.json'
+import { getVaultRequests } from '@/lib/indexspace-api'
+
+const ERC20_APPROVE_ABI = [
+  {
+    name: 'approve',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+] as const
 
 interface TradeDrawerProps {
   vault: Vault
   walletConnected: boolean
-  onConnectWallet: () => void
 }
 
 const STEP_COLORS: Record<TradeStep, string> = {
-  'connect wallet': '#4E4A42',
-  'approve usdc':   '#4E4A42',
-  'request':        '#0071BB',
+  'connect wallet':    '#4E4A42',
+  'approve usdc':      '#4E4A42',
+  'request':           '#0071BB',
   'curator executing': '#FFC700',
-  'claim ready':    '#F05A24',
-  'claimed':        '#1E9E5A',
+  'claim ready':       '#F05A24',
+  'claimed':           '#1E9E5A',
 }
 
 const STEP_LABELS_SHORT: Record<TradeStep, string> = {
@@ -30,41 +49,145 @@ const STEP_LABELS_SHORT: Record<TradeStep, string> = {
   'claimed':           '06 CLAIMED',
 }
 
-export function TradeDrawer({ vault, walletConnected, onConnectWallet }: TradeDrawerProps) {
+export function TradeDrawer({ vault, walletConnected }: TradeDrawerProps) {
+  const { address } = useAccount()
+  const chainId = useChainId()
+  const { connect } = useConnect()
+
   const [mode, setMode] = useState<TradeMode>('subscribe')
   const [amount, setAmount] = useState('')
   const [step, setStep] = useState<TradeStep>('connect wallet')
-  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const { writeContract, data: txHash, isPending: isSending, reset: resetWrite } = useWriteContract()
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash: txHash })
 
   const isLive = vault.status === 'live'
   const usdcAmount = parseFloat(amount) || 0
   const sharesEstimate = usdcAmount > 0 ? (usdcAmount / vault.nav).toFixed(2) : '—'
   const usdcEstimate   = usdcAmount > 0 ? (usdcAmount * vault.nav).toFixed(2) : '—'
   const currentStepIdx = TRADE_STEPS.indexOf(step)
+  const loading = isSending || isConfirming
 
-  function advanceStep() {
-    if (!walletConnected) {
-      onConnectWallet()
-      setStep('approve usdc')
-      return
+  // Advance to next step after tx confirms
+  useEffect(() => {
+    if (!isConfirmed) return
+    if (step === 'approve usdc') {
+      setStep('request')
+    } else if (step === 'request') {
+      setStep('curator executing')
+    } else if (step === 'claim ready') {
+      setStep('claimed')
     }
-    setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
-      const next = TRADE_STEPS[currentStepIdx + 1]
-      if (next) setStep(next)
-    }, 1200)
-  }
+    resetWrite()
+  }, [isConfirmed, step, resetWrite])
+
+  // Sync step with wallet connection state
+  useEffect(() => {
+    if (walletConnected && step === 'connect wallet') {
+      setStep('approve usdc')
+    } else if (!walletConnected) {
+      setStep('connect wallet')
+    }
+  }, [walletConnected, step])
+
+  // Poll backend for curator completion when in executing state
+  const pollCurator = useCallback(async () => {
+    if (!address) return
+    try {
+      const rows = await getVaultRequests(vault.id, address)
+      const claimable = rows.find((r) => r.status === 'claimable')
+      if (claimable) setStep('claim ready')
+    } catch {
+      // polling failure is non-fatal
+    }
+  }, [vault.id, address])
+
+  useEffect(() => {
+    if (step !== 'curator executing') return
+    const id = setInterval(pollCurator, 8000)
+    pollCurator()
+    return () => clearInterval(id)
+  }, [step, pollCurator])
 
   function resetFlow() {
     setStep(walletConnected ? 'approve usdc' : 'connect wallet')
     setAmount('')
+    setError(null)
+    resetWrite()
+  }
+
+  async function handleAction() {
+    setError(null)
+    try {
+      if (step === 'connect wallet') {
+        connect({ connector: injected() })
+        return
+      }
+
+      const vaultAddress = getVaultAddress(vault.id, chainId)
+      if (!vaultAddress) throw new Error('Vault not deployed on this network')
+
+      if (step === 'approve usdc') {
+        const usdcAddress = getUsdcAddress(chainId)
+        if (!usdcAddress) throw new Error('USDC not available on this network')
+        const approveAmt = mode === 'subscribe'
+          ? parseUnits(usdcAmount.toString(), 6)
+          : parseUnits((usdcAmount * vault.nav * 1.01).toFixed(6), 6)
+        writeContract({
+          address: usdcAddress,
+          abi: ERC20_APPROVE_ABI,
+          functionName: 'approve',
+          args: [vaultAddress, approveAmt],
+          account: address as Address,
+        })
+        return
+      }
+
+      if (step === 'request') {
+        if (!address) return
+        if (mode === 'subscribe') {
+          writeContract({
+            address: vaultAddress,
+            abi: vaultAbiJson.abi as any,
+            functionName: 'requestDeposit',
+            args: [parseUnits(usdcAmount.toString(), 6), address, address],
+            account: address,
+          })
+        } else {
+          writeContract({
+            address: vaultAddress,
+            abi: vaultAbiJson.abi as any,
+            functionName: 'requestRedeem',
+            args: [parseUnits(usdcAmount.toString(), 18), address, address],
+            account: address,
+          })
+        }
+        return
+      }
+
+      if (step === 'claim ready') {
+        if (!address) return
+        const fn = mode === 'subscribe' ? 'claimDeposit' : 'claimRedeem'
+        writeContract({
+          address: vaultAddress,
+          abi: vaultAbiJson.abi as any,
+          functionName: fn,
+          args: [address, address],
+          account: address,
+        })
+        return
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
   }
 
   const canAdvance =
     step !== 'claimed' &&
     step !== 'curator executing' &&
-    (step === 'connect wallet' || (usdcAmount > 0 && !loading))
+    !loading &&
+    (step === 'connect wallet' || step === 'approve usdc' || usdcAmount > 0)
 
   const actionLabel: Record<TradeStep, string> = {
     'connect wallet':    'CONNECT WALLET',
@@ -76,14 +199,14 @@ export function TradeDrawer({ vault, walletConnected, onConnectWallet }: TradeDr
   }
 
   const actionColor: Partial<Record<TradeStep, string>> = {
-    'connect wallet': 'bg-ix-blue hover:bg-ix-blue-dim text-ix-shell',
-    'approve usdc':   'bg-ix-blue hover:bg-ix-blue-dim text-ix-shell',
-    'request':        mode === 'subscribe'
-                        ? 'bg-ix-blue hover:bg-ix-blue-dim text-ix-shell'
-                        : 'bg-ix-orange hover:opacity-90 text-ix-shell',
+    'connect wallet':    'bg-ix-blue hover:bg-ix-blue-dim text-ix-shell',
+    'approve usdc':      'bg-ix-blue hover:bg-ix-blue-dim text-ix-shell',
+    'request':           mode === 'subscribe'
+                           ? 'bg-ix-blue hover:bg-ix-blue-dim text-ix-shell'
+                           : 'bg-ix-orange hover:opacity-90 text-ix-shell',
     'curator executing': 'bg-ix-panel text-ix-text-faint cursor-not-allowed',
-    'claim ready':    'bg-ix-orange hover:opacity-90 text-ix-shell',
-    'claimed':        'bg-ix-panel text-ix-text-faint cursor-not-allowed',
+    'claim ready':       'bg-ix-orange hover:opacity-90 text-ix-shell',
+    'claimed':           'bg-ix-panel text-ix-text-faint cursor-not-allowed',
   }
 
   return (
@@ -148,7 +271,8 @@ export function TradeDrawer({ vault, walletConnected, onConnectWallet }: TradeDr
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0.00"
               min="0"
-              className="flex-1 bg-transparent px-3 py-3 text-[22px] font-mono tabular text-ix-text placeholder:text-ix-text-faint outline-none w-0"
+              disabled={step === 'curator executing' || step === 'claim ready' || step === 'claimed'}
+              className="flex-1 bg-transparent px-3 py-3 text-[22px] font-mono tabular text-ix-text placeholder:text-ix-text-faint outline-none w-0 disabled:opacity-40"
             />
             <span className="px-3 text-[9px] font-mono text-ix-text-faint uppercase tracking-widest shrink-0 border-l border-ix-border py-3">
               {mode === 'subscribe' ? 'USDC' : 'SHR'}
@@ -166,7 +290,6 @@ export function TradeDrawer({ vault, walletConnected, onConnectWallet }: TradeDr
             ? <QuoteRow label="EST. SHARES" value={sharesEstimate} accent="text-ix-text" />
             : <QuoteRow label="EST. USDC OUT" value={usdcEstimate} accent="text-ix-text" />}
           <QuoteRow label="EXEC WINDOW" value="~15 min" />
-          <QuoteRow label="REQUEST ID"  value={usdcAmount > 0 ? 'REQ-0042' : '—'} dim />
         </div>
       )}
 
@@ -182,15 +305,12 @@ export function TradeDrawer({ vault, walletConnected, onConnectWallet }: TradeDr
 
               return (
                 <div key={s} className="flex items-center gap-2.5 py-[5px] relative">
-                  {/* Connector line */}
                   {i < TRADE_STEPS.length - 1 && (
                     <div
                       className="absolute left-[8px] top-[18px] w-px h-[calc(100%-2px)]"
                       style={{ backgroundColor: done ? '#1E9E5A' : '#2A2823' }}
                     />
                   )}
-
-                  {/* LED node */}
                   <div
                     className={cn(
                       'w-[10px] h-[10px] shrink-0 flex items-center justify-center relative z-10 border',
@@ -207,13 +327,9 @@ export function TradeDrawer({ vault, walletConnected, onConnectWallet }: TradeDr
                       <div className="w-[4px] h-[4px]" style={{ backgroundColor: color }} />
                     )}
                   </div>
-
-                  {/* Step label */}
                   <span
-                    className={cn('text-[10px] font-mono tracking-wider')}
-                    style={{
-                      color: done ? '#1E9E5A' : active ? color : '#4E4A42',
-                    }}
+                    className="text-[10px] font-mono tracking-wider"
+                    style={{ color: done ? '#1E9E5A' : active ? color : '#4E4A42' }}
                   >
                     {STEP_LABELS_SHORT[s]}
                   </span>
@@ -224,6 +340,13 @@ export function TradeDrawer({ vault, walletConnected, onConnectWallet }: TradeDr
         </div>
       )}
 
+      {/* ── Error display ─────────────────────────────────────────────────── */}
+      {error && (
+        <div className="px-4 py-2 border-b border-ix-border">
+          <p className="text-[9px] font-mono text-ix-red leading-relaxed break-all">{error}</p>
+        </div>
+      )}
+
       <div className="flex-1" />
 
       {/* ── Action button ─────────────────────────────────────────────────── */}
@@ -231,11 +354,11 @@ export function TradeDrawer({ vault, walletConnected, onConnectWallet }: TradeDr
         {isLive ? (
           <>
             <button
-              onClick={advanceStep}
-              disabled={!canAdvance || loading}
+              onClick={handleAction}
+              disabled={!canAdvance}
               className={cn(
                 'w-full py-3.5 text-[11px] font-mono uppercase tracking-[0.18em] transition-colors flex items-center justify-center gap-2',
-                canAdvance && !loading
+                canAdvance
                   ? actionColor[step] ?? 'bg-ix-blue text-ix-shell'
                   : 'bg-ix-panel text-ix-text-faint cursor-not-allowed'
               )}

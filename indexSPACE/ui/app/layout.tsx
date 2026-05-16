@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google'
 import '@/styles/globals.css'
-import { ThemeProvider } from '@/components/theme-provider'
+import { Providers } from '@/components/providers'
 
 const ibmPlexSans = IBM_Plex_Sans({
   subsets: ['latin'],
@@ -32,9 +32,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${ibmPlexSans.variable} ${ibmPlexMono.variable} bg-ix-shell`}>
       <body className="font-sans antialiased bg-ix-shell text-ix-text">
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+        <Providers>
           {children}
-        </ThemeProvider>
+        </Providers>
       </body>
     </html>
   )

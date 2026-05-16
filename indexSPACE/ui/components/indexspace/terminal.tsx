@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useAccount } from 'wagmi'
 import { TopBar } from './top-bar'
 import { VaultRail } from './vault-rail'
 import { VaultDetail } from './vault-detail'
@@ -15,10 +16,10 @@ interface TerminalProps {
 }
 
 export function Terminal({ initialVaultId }: TerminalProps) {
-  const [selectedId, setSelectedId]     = useState(initialVaultId ?? VAULTS[0]!.id)
-  const [walletConnected, setWallet]    = useState(false)
-  const [portfolioOpen, setPortfolio]   = useState(false)
+  const [selectedId, setSelectedId] = useState(initialVaultId ?? VAULTS[0]!.id)
+  const [portfolioOpen, setPortfolio] = useState(false)
 
+  const { isConnected } = useAccount()
   const vault = VAULTS.find((v) => v.id === selectedId) ?? VAULTS[0]!
 
   return (
@@ -27,8 +28,6 @@ export function Terminal({ initialVaultId }: TerminalProps) {
       {/* Top system bar */}
       <TopBar
         networkOk
-        walletConnected={walletConnected}
-        onConnectWallet={() => setWallet((p) => !p)}
         onOpenPortfolio={() => setPortfolio(true)}
       />
 
@@ -53,8 +52,7 @@ export function Terminal({ initialVaultId }: TerminalProps) {
         {/* Right: trade drawer */}
         <TradeDrawer
           vault={vault}
-          walletConnected={walletConnected}
-          onConnectWallet={() => setWallet(true)}
+          walletConnected={isConnected}
         />
       </div>
 
@@ -65,7 +63,7 @@ export function Terminal({ initialVaultId }: TerminalProps) {
       <PortfolioDrawer
         open={portfolioOpen}
         onClose={() => setPortfolio(false)}
-        walletConnected={walletConnected}
+        walletConnected={isConnected}
       />
     </div>
   )

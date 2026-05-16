@@ -1,18 +1,32 @@
 'use client'
 
+import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { injected } from 'wagmi/connectors'
 import { cn } from '@/lib/utils'
 
 interface TopBarProps {
   networkOk: boolean
-  walletConnected: boolean
-  onConnectWallet: () => void
   onOpenPortfolio: () => void
 }
 
-export function TopBar({ networkOk, walletConnected, onConnectWallet, onOpenPortfolio }: TopBarProps) {
+export function TopBar({ networkOk, onOpenPortfolio }: TopBarProps) {
+  const { address, isConnected } = useAccount()
+  const { connect } = useConnect()
+  const { disconnect } = useDisconnect()
+
   const now = new Date()
   const timeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
   const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()
+
+  const shortAddress = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : null
+
+  function handleWalletClick() {
+    if (isConnected) {
+      disconnect()
+    } else {
+      connect({ connector: injected() })
+    }
+  }
 
   return (
     <header className="h-11 bg-ix-shell border-b border-ix-border flex items-stretch shrink-0">
@@ -84,18 +98,18 @@ export function TopBar({ networkOk, walletConnected, onConnectWallet, onOpenPort
 
         {/* Wallet */}
         <button
-          onClick={onConnectWallet}
+          onClick={handleWalletClick}
           className={cn(
             'flex items-center gap-2.5 px-5 border-l border-ix-border text-[10px] font-mono uppercase tracking-widest transition-colors',
-            walletConnected
+            isConnected
               ? 'text-ix-green hover:bg-ix-panel'
               : 'text-ix-shell bg-ix-blue hover:bg-ix-blue-dim'
           )}
         >
-          <span className={cn('w-1.5 h-1.5 shrink-0', walletConnected ? 'bg-ix-green' : 'bg-[#005fa3]',
-            walletConnected && 'led-pulse'
+          <span className={cn('w-1.5 h-1.5 shrink-0', isConnected ? 'bg-ix-green' : 'bg-[#005fa3]',
+            isConnected && 'led-pulse'
           )} />
-          {walletConnected ? '0x4f2a...8c1d' : 'CONNECT WALLET'}
+          {isConnected && shortAddress ? shortAddress : 'CONNECT WALLET'}
         </button>
       </div>
     </header>

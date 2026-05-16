@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useAccount } from 'wagmi'
 import { cn } from '@/lib/utils'
 import { X } from 'lucide-react'
 import type { ActivityEntry } from '@/lib/types'
@@ -15,6 +16,7 @@ interface PortfolioDrawerProps {
 }
 
 export function PortfolioDrawer({ open, onClose, walletConnected }: PortfolioDrawerProps) {
+  const { address, chain } = useAccount()
   const [tab, setTab] = useState<PortfolioTab>('portfolio')
 
   if (!open) return null
@@ -34,7 +36,9 @@ export function PortfolioDrawer({ open, onClose, walletConnected }: PortfolioDra
               ACCOUNT CONSOLE
             </div>
             <div className="text-[8px] font-mono text-ix-text-faint tracking-[0.2em] mt-[3px]">
-              {walletConnected ? '0x4f2a...8c1d  /  BASE SEPOLIA' : 'NO WALLET CONNECTED'}
+              {walletConnected && address
+                ? `${address.slice(0, 6)}...${address.slice(-4)}  /  ${chain?.name?.toUpperCase() ?? 'UNKNOWN'}`
+                : 'NO WALLET CONNECTED'}
             </div>
           </div>
           <button onClick={onClose} className="text-ix-text-faint hover:text-ix-text transition-colors">
