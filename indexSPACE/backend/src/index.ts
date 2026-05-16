@@ -12,14 +12,14 @@ import { Simulator } from "./simulator.ts";
 import type { Address } from "viem";
 
 const config = loadConfig();
-const db = createDb();
+const db = createDb(process.env.DB_PATH ?? "data/indexspace.db");
 const mockVault = new MockVault(db, INDICES);
 const curator = new Curator(db);
 const simulator = new Simulator(mockVault);
 const fsClient = getFsClient(config.fsApiUrl, config.fsUsername, config.fsPassword);
 
 if (!config.mockVault) {
-  curator.configureRpc(config.rpcUrl, config.curatorPrivateKey);
+  curator.configureRpc(config.rpcUrl, config.curatorPrivateKey, config.chainId);
 }
 
 const realIndexer = config.mockVault ? null : new RealIndexer(db, config, {

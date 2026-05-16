@@ -1,7 +1,8 @@
 import { createPublicClient, http, parseAbiItem, type Address } from "viem";
-import { anvil } from "viem/chains";
+import { anvil, baseSepolia } from "viem/chains";
 import type { Database } from "bun:sqlite";
 import type { AppConfig } from "./config.ts";
+import { ANVIL_CHAIN_ID } from "@indexspace/shared";
 
 
 const VAULT_ABI = [
@@ -30,8 +31,9 @@ export class RealIndexer {
   private vaultAddresses: Map<string, Address>;
 
   constructor(db: Database, config: AppConfig, vaultAddresses: Record<string, Address>) {
+    const chain = config.chainId === ANVIL_CHAIN_ID ? anvil : baseSepolia;
     this.client = createPublicClient({
-      chain: anvil,
+      chain,
       transport: http(config.rpcUrl),
     });
     this.db = db;

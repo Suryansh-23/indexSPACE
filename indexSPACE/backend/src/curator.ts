@@ -1,10 +1,10 @@
 import type { Database } from "bun:sqlite";
-import { FORECAST_INDICES, ANVIL_AI_VAULT, ANVIL_CRYPTO_VAULT } from "@indexspace/shared";
+import { FORECAST_INDICES, ANVIL_AI_VAULT, ANVIL_CRYPTO_VAULT, ANVIL_CHAIN_ID } from "@indexspace/shared";
 import type { IndexConstituent, Orientation } from "@indexspace/shared";
 import { getDefaultStrategy, tryFsBuy, tryFsSell } from "./sdk.ts";
 import type { Address } from "viem";
-import { createWalletClient, http, parseAbi } from "viem";
-import { anvil } from "viem/chains";
+import { createWalletClient, http, parseAbi, parseUnits } from "viem";
+import { anvil, baseSepolia } from "viem/chains";
 
 const FULFILL_ABI = parseAbi([
   "function fulfillDeposit(address controller, uint256 shares) external",
@@ -27,19 +27,18 @@ export class Curator {
     this.db = db;
   }
 
-  configureRpc(rpcUrl: string, curatorPrivateKey?: string) {
+  configureRpc(rpcUrl: string, curatorPrivateKey?: string, chainId?: number) {
     if (!curatorPrivateKey) return;
 
-    this.walletClient = createWalletClient({ chain: anvil, transport: http(rpcUrl) });
+    const chain = chainId === ANVIL_CHAIN_ID ? anvil : baseSepolia;
+    this.walletClient = createWalletClient({ chain, transport: http(rpcUrl) });
     this.curatorAccount = (curatorPrivateKey.startsWith("0x")
       ? curatorPrivateKey
       : `0x${curatorPrivateKey}`) as Address;
   }
 
   async processPendingRequests(): Promise<string[]> {
-    const pending = this.db.query(
-      "SELECT * FROM requests WHERE status = 'pending' ORDER BY created_at ASC LIMIT 5",
-    ).all() as Array<{
+    type PendingRow = {
       id: number;
       vault_id: string;
       kind: string;
@@ -48,7 +47,21 @@ export class Curator {
       asset_amount: string;
       share_amount: string;
       internal_request_id: number;
-    }>;
+    };
+
+    const pending = this.db.query(
+      "SELECT * FROM requests WHERE status = 'pending' ORDER BY created_at ASC LIMIT 5",
+    ).all() as PendingRow[];
+
+    if (pending.length === 0) return [];
+
+    // Claim all selected rows atomically before processing to prevent concurrent double-execution.
+    const ids = pending.map((r) => r.id);
+    this.db.run(
+      `UPDATE requests SET status = 'executing', updated_at = datetime('now')
+       WHERE id IN (${ids.map(() => "?").join(",")}) AND status = 'pending'`,
+      ids,
+    );
 
     const results: string[] = [];
 
@@ -80,11 +93,6 @@ export class Curator {
   }): Promise<string> {
     const index = FORECAST_INDICES.find((i) => i.id === req.vault_id);
     if (!index) throw new Error(`unknown vault: ${req.vault_id}`);
-
-    this.db.run(
-      "UPDATE requests SET status = 'executing', updated_at = datetime('now') WHERE id = ?",
-      [req.id],
-    );
 
     const assets = parseFloat(req.asset_amount);
     const sharePrice = this.computeNavPerShare(req.vault_id);
@@ -119,11 +127,6 @@ export class Curator {
   }): Promise<string> {
     const index = FORECAST_INDICES.find((i) => i.id === req.vault_id);
     if (!index) throw new Error(`unknown vault: ${req.vault_id}`);
-
-    this.db.run(
-      "UPDATE requests SET status = 'executing', updated_at = datetime('now') WHERE id = ?",
-      [req.id],
-    );
 
     const shares = parseFloat(req.share_amount);
     const totalShares = this.getTotalShares(req.vault_id);
@@ -202,7 +205,7 @@ export class Curator {
         address: vaultAddress,
         abi: FULFILL_ABI,
         functionName: "fulfillDeposit",
-        args: [controller, BigInt(Math.floor(shares * 1e18))],
+        args: [controller, parseUnits(shares.toFixed(18), 18)],
         account: this.curatorAccount,
       } as any);
     } catch (err) {
@@ -221,7 +224,7 @@ export class Curator {
         address: vaultAddress,
         abi: FULFILL_ABI,
         functionName: "fulfillRedeem",
-        args: [controller, BigInt(Math.floor(assets * 1e6))],
+        args: [controller, parseUnits(assets.toFixed(6), 6)],
         account: this.curatorAccount,
       } as any);
     } catch (err) {
