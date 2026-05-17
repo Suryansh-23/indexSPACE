@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useAccount, useChainId, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { useAccount, useChainId, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi'
 import { useConnectModal } from '@rainbow-me/rainbowkit'
 import { parseUnits } from 'viem'
 import type { Address } from 'viem'
@@ -9,11 +9,11 @@ import { cn } from '@/lib/utils'
 import { ChevronRight, Loader } from 'lucide-react'
 import type { Vault, TradeMode } from '@/lib/types'
 import { TRADE_STEPS, type TradeStep } from '@/lib/mock-data'
-import { getVaultAddress, getUsdcAddress, getVaultAbi } from '@/lib/contracts'
+import { getVaultAddress } from '@/lib/contracts'
 import vaultAbiJson from '@/lib/IndexVault.json'
-import { getVaultRequests } from '@/lib/indexspace-api'
+import { getVaultRequests, quoteSubscribe, quoteRedeem } from '@/lib/indexspace-api'
 
-const ERC20_APPROVE_ABI = [
+const ERC20_ABI = [
   {
     name: 'approve',
     type: 'function',
@@ -23,6 +23,23 @@ const ERC20_APPROVE_ABI = [
       { name: 'amount', type: 'uint256' },
     ],
     outputs: [{ name: '', type: 'bool' }],
+  },
+  {
+    name: 'allowance',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'balanceOf',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
   },
 ] as const
 
@@ -68,17 +85,138 @@ export function TradeDrawer({ vault, walletConnected }: TradeDrawerProps) {
   const [amount, setAmount] = useState('')
   const [step, setStep] = useState<TradeStep>('connect wallet')
   const [error, setError] = useState<string | null>(null)
+  const [quote, setQuote] = useState<{ estimatedOut: string; navPerShare: string } | null>(null)
 
   const { writeContract, data: txHash, isPending: isSending, reset: resetWrite } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash: txHash })
 
   const isLive = vault.status === 'live'
   const usdcAmount = parseFloat(amount) || 0
-  const sharesEstimate = usdcAmount > 0 ? (usdcAmount / vault.nav).toFixed(2) : '—'
-  const usdcEstimate   = usdcAmount > 0 ? (usdcAmount * vault.nav).toFixed(2) : '—'
   const currentStepIdx = TRADE_STEPS.indexOf(step)
   const loading = isSending || isConfirming
   const effectiveWalletConnected = mounted && walletConnected
+
+  // Resolved addresses (stable per chainId — safe to use in hooks)
+  const vaultAddress = getVaultAddress(vault.id, chainId)
+  const { data: vaultAsset } = useReadContract({
+    address: vaultAddress ?? undefined,
+    abi: vaultAbiJson.abi as any,
+    functionName: 'asset',
+    query: {
+      enabled: !!vaultAddress && mode === 'subscribe',
+      staleTime: 0,
+    },
+  })
+  const assetAddress = vaultAsset as Address | undefined
+
+  // ── On-chain reads for state hydration ─────────────────────────────────
+  // Enabled at approve and request steps so that a returning user gets
+  // redirected to the correct step if an active request already exists.
+  const readEnabled = !!address && !!vaultAddress && (step === 'approve usdc' || step === 'request')
+
+  const { data: pendingDeposit, isFetching: isFetchingPendDep } = useReadContract({
+    address: vaultAddress ?? undefined,
+    abi: vaultAbiJson.abi as any,
+    functionName: 'pendingDepositRequest',
+    args: address ? [0n, address] : undefined,
+    query: { enabled: readEnabled, staleTime: 0 },
+  })
+  const { data: claimableDeposit, isFetching: isFetchingClaimDep } = useReadContract({
+    address: vaultAddress ?? undefined,
+    abi: vaultAbiJson.abi as any,
+    functionName: 'claimableDepositRequest',
+    args: address ? [0n, address] : undefined,
+    query: { enabled: readEnabled, staleTime: 0 },
+  })
+  const { data: pendingRedeem, isFetching: isFetchingPendRed } = useReadContract({
+    address: vaultAddress ?? undefined,
+    abi: vaultAbiJson.abi as any,
+    functionName: 'pendingRedeemRequest',
+    args: address ? [0n, address] : undefined,
+    query: { enabled: readEnabled, staleTime: 0 },
+  })
+  const { data: claimableRedeem, isFetching: isFetchingClaimRed } = useReadContract({
+    address: vaultAddress ?? undefined,
+    abi: vaultAbiJson.abi as any,
+    functionName: 'claimableRedeemRequest',
+    args: address ? [0n, address] : undefined,
+    query: { enabled: readEnabled, staleTime: 0 },
+  })
+
+  // Authoritative status check — reads the raw Request struct directly.
+  // The 4 ERC-7540 reads infer status from amounts; if shares/assets are 0
+  // (e.g. from a prior curator bug), they miss a stuck Claimable request and
+  // allow requestDeposit to be sent even though it would revert with ActiveRequest().
+  const { data: vaultRequest, isFetching: isFetchingVaultRequest } = useReadContract({
+    address: vaultAddress ?? undefined,
+    abi: vaultAbiJson.abi as any,
+    functionName: 'requests',
+    args: address ? [address] : undefined,
+    query: { enabled: readEnabled, staleTime: 0 },
+  })
+
+  const hydrationDone =
+    pendingDeposit !== undefined &&
+    claimableDeposit !== undefined &&
+    pendingRedeem !== undefined &&
+    claimableRedeem !== undefined &&
+    vaultRequest !== undefined
+
+  const readsStillLoading =
+    readEnabled && (isFetchingPendDep || isFetchingClaimDep || isFetchingPendRed || isFetchingClaimRed || isFetchingVaultRequest)
+
+  // USDC allowance — subscribe only; stays live at 'request' so a redirect fires
+  // if allowance is 0 (consumed by prior session) before the user hits submit
+  const { data: currentAllowance, isFetching: isFetchingAllowance } = useReadContract({
+    address: assetAddress,
+    abi: ERC20_ABI,
+    functionName: 'allowance',
+    args: address && vaultAddress ? [address, vaultAddress] : undefined,
+    query: {
+      enabled: !!address && !!assetAddress && !!vaultAddress && (step === 'approve usdc' || step === 'request') && usdcAmount > 0 && mode === 'subscribe',
+      staleTime: 0,
+    },
+  })
+
+  // Vault share balance — checked at the redeem request step to surface an early error
+  const { data: shareBalance } = useReadContract({
+    address: vaultAddress ?? undefined,
+    abi: vaultAbiJson.abi as any,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address && !!vaultAddress && mode === 'redeem' && step === 'request',
+      staleTime: 0,
+    },
+  })
+
+  const shareBalanceBigInt = shareBalance as bigint | undefined
+  const insufficientShares =
+    mode === 'redeem' &&
+    step === 'request' &&
+    shareBalanceBigInt !== undefined &&
+    usdcAmount > 0 &&
+    shareBalanceBigInt < parseUnits(usdcAmount.toString(), 18)
+
+  // USDC balance — checked at the subscribe request step; safeTransferFrom reverts if balance < amount
+  const { data: usdcBalance } = useReadContract({
+    address: assetAddress,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address && !!assetAddress && mode === 'subscribe' && step === 'request',
+      staleTime: 0,
+    },
+  })
+
+  const usdcBalanceBigInt = usdcBalance as bigint | undefined
+  const insufficientUsdc =
+    mode === 'subscribe' &&
+    step === 'request' &&
+    usdcBalanceBigInt !== undefined &&
+    usdcAmount > 0 &&
+    usdcBalanceBigInt < parseUnits(usdcAmount.toString(), 6)
 
   useEffect(() => {
     setMounted(true)
@@ -100,11 +238,54 @@ export function TradeDrawer({ vault, walletConnected }: TradeDrawerProps) {
   // Sync step with wallet connection state
   useEffect(() => {
     if (effectiveWalletConnected && step === 'connect wallet') {
-      setStep('approve usdc')
+      setStep(mode === 'subscribe' ? 'approve usdc' : 'request')
     } else if (!effectiveWalletConnected) {
       setStep('connect wallet')
     }
-  }, [effectiveWalletConnected, step])
+  }, [effectiveWalletConnected, step, mode])
+
+  // Hydrate step from on-chain state using the raw Request struct.
+  // RequestKind:   0=None, 1=Deposit, 2=Redeem
+  // RequestStatus: 0=None, 1=Pending, 2=Claimable
+  // Checking status directly avoids the edge case where shares/assets are 0
+  // (stuck Claimable from old decimal bug) — amount-based checks would miss it.
+  useEffect(() => {
+    if (!vaultRequest) return
+    const req = vaultRequest as readonly [number, number, bigint, bigint, bigint]
+    const kind = req[0]
+    const status = req[1]
+
+    if (status === 2) { // Claimable
+      setMode(kind === 1 ? 'subscribe' : 'redeem')
+      setStep('claim ready')
+    } else if (status === 1) { // Pending
+      setMode(kind === 1 ? 'subscribe' : 'redeem')
+      setStep('curator executing')
+    }
+  }, [vaultRequest])
+
+  // Skip approve step if USDC is already sufficiently approved (subscribe only).
+  // Guarded by hydrationDone + isFetchingAllowance so stale cached allowance
+  // cannot fire the skip before fresh on-chain data has settled.
+  useEffect(() => {
+    if (step !== 'approve usdc' || usdcAmount <= 0 || currentAllowance == null) return
+    if (!hydrationDone || readsStillLoading || isFetchingAllowance) return
+    if ((currentAllowance as bigint) >= parseUnits(usdcAmount.toString(), 6)) {
+      setStep('request')
+    }
+  }, [currentAllowance, step, usdcAmount, hydrationDone, readsStillLoading, isFetchingAllowance])
+
+  // At the request step, verify allowance is still sufficient before allowing submit.
+  // Redirects back to approve if allowance is 0 (consumed by a prior requestDeposit)
+  // or if the user changed the amount after approving. Prevents the MetaMask
+  // "exceeding max txn gas limit" revert from safeTransferFrom failing on-chain.
+  useEffect(() => {
+    if (step !== 'request' || mode !== 'subscribe' || usdcAmount <= 0 || currentAllowance == null) return
+    if (isFetchingAllowance) return
+    if ((currentAllowance as bigint) < parseUnits(usdcAmount.toString(), 6)) {
+      setStep('approve usdc')
+    }
+  }, [currentAllowance, step, mode, usdcAmount, isFetchingAllowance])
 
   // Poll backend for curator completion when in executing state
   const pollCurator = useCallback(async () => {
@@ -112,7 +293,10 @@ export function TradeDrawer({ vault, walletConnected }: TradeDrawerProps) {
     try {
       const rows = await getVaultRequests(vault.id, address)
       const claimable = rows.find((r) => r.status === 'claimable')
-      if (claimable) setStep('claim ready')
+      if (claimable) {
+        setMode(claimable.kind === 'subscribe' ? 'subscribe' : 'redeem')
+        setStep('claim ready')
+      }
     } catch {
       // polling failure is non-fatal
     }
@@ -125,34 +309,65 @@ export function TradeDrawer({ vault, walletConnected }: TradeDrawerProps) {
     return () => clearInterval(id)
   }, [step, pollCurator])
 
-  function resetFlow() {
-    setStep(effectiveWalletConnected ? 'approve usdc' : 'connect wallet')
+  // Fetch quote from backend with debounce
+  useEffect(() => {
+    if (usdcAmount <= 0) { setQuote(null); return }
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      try {
+        if (mode === 'subscribe') {
+          const q = await quoteSubscribe(vault.id, usdcAmount)
+          if (!cancelled) setQuote({
+            estimatedOut: parseFloat(q.estimatedShares).toFixed(2),
+            navPerShare: parseFloat(q.navPerShare).toFixed(4),
+          })
+        } else {
+          const q = await quoteRedeem(vault.id, usdcAmount)
+          if (!cancelled) setQuote({
+            estimatedOut: parseFloat(q.estimatedAssets).toFixed(2),
+            navPerShare: parseFloat(q.navPerShare).toFixed(4),
+          })
+        }
+      } catch {
+        // backend unavailable — fallback values already shown
+      }
+    }, 400)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [usdcAmount, mode, vault.id])
+
+  function resetFlowForMode(newMode: TradeMode) {
+    const initialStep: TradeStep = effectiveWalletConnected
+      ? (newMode === 'subscribe' ? 'approve usdc' : 'request')
+      : 'connect wallet'
+    setStep(initialStep)
     setAmount('')
+    setQuote(null)
     setError(null)
     resetWrite()
+  }
+
+  function resetFlow() {
+    resetFlowForMode(mode)
   }
 
   async function handleAction() {
     setError(null)
     try {
       if (step === 'connect wallet') {
-        console.log('[wallet/trade] opening RainbowKit modal — chainId:', chainId)
         openConnectModal?.()
         return
       }
 
-      const vaultAddress = getVaultAddress(vault.id, chainId)
       if (!vaultAddress) throw new Error('Vault not deployed on this network')
 
       if (step === 'approve usdc') {
-        const usdcAddress = getUsdcAddress(chainId)
-        if (!usdcAddress) throw new Error('USDC not available on this network')
+        if (!assetAddress) throw new Error('Vault asset address unavailable on this network')
         const approveAmt = mode === 'subscribe'
           ? parseUnits(usdcAmount.toString(), 6)
           : parseUnits((usdcAmount * vault.nav * 1.01).toFixed(6), 6)
         writeContract({
-          address: usdcAddress,
-          abi: ERC20_APPROVE_ABI,
+          address: assetAddress,
+          abi: ERC20_ABI,
           functionName: 'approve',
           args: [vaultAddress, approveAmt],
           account: address as Address,
@@ -203,7 +418,10 @@ export function TradeDrawer({ vault, walletConnected }: TradeDrawerProps) {
     step !== 'claimed' &&
     step !== 'curator executing' &&
     !loading &&
-    (step === 'connect wallet' || step === 'approve usdc' || usdcAmount > 0)
+    !readsStillLoading &&
+    !insufficientShares &&
+    !insufficientUsdc &&
+    (step === 'connect wallet' || step === 'claim ready' || usdcAmount > 0)
 
   const actionLabel: Record<TradeStep, string> = {
     'connect wallet':    'CONNECT WALLET',
@@ -225,6 +443,16 @@ export function TradeDrawer({ vault, walletConnected }: TradeDrawerProps) {
     'claimed':           'bg-ix-panel text-ix-text-faint cursor-not-allowed',
   }
 
+  // Quote values — prefer backend response, fall back to local math
+  const estimateValue = quote
+    ? quote.estimatedOut
+    : usdcAmount > 0
+      ? mode === 'subscribe'
+        ? (usdcAmount / vault.nav).toFixed(2)
+        : (usdcAmount * vault.nav).toFixed(2)
+      : '—'
+  const navUsed = quote?.navPerShare ?? vault.nav.toFixed(4)
+
   return (
     <aside className="w-[264px] bg-ix-shell border-l border-ix-border flex flex-col shrink-0 overflow-y-auto">
 
@@ -239,7 +467,7 @@ export function TradeDrawer({ vault, walletConnected }: TradeDrawerProps) {
         {(['subscribe', 'redeem'] as TradeMode[]).map((m) => (
           <button
             key={m}
-            onClick={() => { setMode(m); resetFlow() }}
+            onClick={() => { setMode(m); resetFlowForMode(m) }}
             className={cn(
               'flex-1 py-2.5 text-[10px] font-mono uppercase tracking-[0.18em] border-r last:border-r-0 border-ix-border transition-colors',
               mode === m
@@ -301,10 +529,10 @@ export function TradeDrawer({ vault, walletConnected }: TradeDrawerProps) {
       {isLive && (
         <div className="px-4 py-3 border-b border-ix-border">
           <span className="text-[8px] font-mono tracking-[0.22em] text-ix-text-faint uppercase block mb-2">QUOTE PREVIEW</span>
-          <QuoteRow label="NAV USED" value={vault.nav.toFixed(4)} />
+          <QuoteRow label="NAV USED" value={navUsed} />
           {mode === 'subscribe'
-            ? <QuoteRow label="EST. SHARES" value={sharesEstimate} accent="text-ix-text" />
-            : <QuoteRow label="EST. USDC OUT" value={usdcEstimate} accent="text-ix-text" />}
+            ? <QuoteRow label="EST. SHARES" value={estimateValue} accent="text-ix-text" />
+            : <QuoteRow label="EST. USDC OUT" value={estimateValue} accent="text-ix-text" />}
           <QuoteRow label="EXEC WINDOW" value="~15 min" />
         </div>
       )}
@@ -426,9 +654,17 @@ export function TradeDrawer({ vault, walletConnected }: TradeDrawerProps) {
       )}
 
       {/* ── Error display ─────────────────────────────────────────────────── */}
-      {error && (
+      {(error || insufficientShares || insufficientUsdc) && (
         <div className="px-4 py-2 border-b border-ix-border">
-          <p className="text-[9px] font-mono text-ix-red leading-relaxed break-all">{error}</p>
+          {insufficientShares && (
+            <p className="text-[9px] font-mono text-ix-red leading-relaxed">Insufficient vault shares</p>
+          )}
+          {insufficientUsdc && (
+            <p className="text-[9px] font-mono text-ix-red leading-relaxed">Insufficient USDC balance</p>
+          )}
+          {error && (
+            <p className="text-[9px] font-mono text-ix-red leading-relaxed break-all">{error}</p>
+          )}
         </div>
       )}
 
@@ -471,11 +707,11 @@ export function TradeDrawer({ vault, walletConnected }: TradeDrawerProps) {
   )
 }
 
-function QuoteRow({ label, value, dim, accent }: { label: string; value: string; dim?: boolean; accent?: string }) {
+function QuoteRow({ label, value, accent }: { label: string; value: string; accent?: string }) {
   return (
     <div className="flex items-center justify-between py-1.5 border-b border-ix-border-dim last:border-b-0">
       <span className="text-[8px] font-mono tracking-[0.18em] text-ix-text-faint uppercase">{label}</span>
-      <span className={cn('text-[10px] font-mono tabular', dim ? 'text-ix-text-faint' : accent ?? 'text-ix-text-muted')}>
+      <span className={cn('text-[10px] font-mono tabular', accent ?? 'text-ix-text-muted')}>
         {value}
       </span>
     </div>
