@@ -11,8 +11,52 @@ import {
 } from 'recharts'
 import type { NavPoint, Vault } from '@/lib/types'
 import { cn } from '@/lib/utils'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { getVaultCandles } from '@/lib/indexspace-api'
+
+// ── Client-side OU walk — mirrors candles.ts parameters exactly ──────────────
+const NAV_MEAN = 100.0
+const NAV_FLOOR = 82.0
+const NAV_CEIL = 140.0
+const THETA_5MIN = 0.004 / 12
+const STEP_VOL_5MIN = 0.18 / Math.sqrt(12)
+const MIN5_MS = 5 * 60 * 1000
+
+function lcgRand(seed: number) {
+  let s = seed >>> 0
+  return () => {
+    s = (Math.imul(1664525, s) + 1013904223) >>> 0
+    return s / 0xffffffff
+  }
+}
+
+function hashStr(str: string): number {
+  let h = 2166136261
+  for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619)
+  return h >>> 0
+}
+
+// Generates synthetic 5-min candles from anchor (exclusive) up to the current
+// 5-min bucket. Seeded deterministically so the walk is stable across renders.
+// Called only when live API data is loaded — never applied to mock fallback data.
+function generateSyntheticForward(anchor: NavPoint, vaultId: string): NavPoint[] {
+  const anchorTs = new Date(anchor.ts).getTime()
+  const nowBucket = Math.floor(Date.now() / MIN5_MS) * MIN5_MS
+  if (anchorTs >= nowBucket) return []
+
+  const rng = lcgRand(hashStr(`${vaultId}:live:${anchorTs}`))
+  const points: NavPoint[] = []
+  let nav = anchor.nav
+
+  for (let ts = anchorTs + MIN5_MS; ts <= nowBucket; ts += MIN5_MS) {
+    const drift = THETA_5MIN * (NAV_MEAN - nav)
+    const shock = (rng() - 0.5) * 2 * STEP_VOL_5MIN
+    nav = Math.max(NAV_FLOOR, Math.min(NAV_CEIL, nav + drift + shock))
+    points.push({ ts: new Date(ts).toISOString(), nav: parseFloat(nav.toFixed(6)), shares: anchor.shares })
+  }
+
+  return points
+}
 
 type Range = '1H' | '6H' | '1D' | 'ALL'
 type ChartMode = 'NAV' | 'INDEX'
@@ -62,14 +106,29 @@ export function IndexChart({ vault }: IndexChartProps) {
 
   useEffect(() => {
     let cancelled = false
-    getVaultCandles(vault.id).then((candles) => {
+
+    async function fetchCandles() {
+      const candles = await getVaultCandles(vault.id)
       if (cancelled || !candles.length) return
       setLiveHistory(candles as NavPoint[])
-    })
-    return () => { cancelled = true }
+    }
+
+    fetchCandles()
+    const id = setInterval(fetchCandles, 30_000)
+    return () => { cancelled = true; clearInterval(id) }
   }, [vault.id])
 
-  const history = liveHistory ?? vault.navHistory
+  // Synthetic forward walk — only when live data is loaded, seeded by anchor ts
+  // so the walk is stable across re-renders. Real candles from polls naturally
+  // shift the anchor and reset the walk forward from the new real NAV.
+  const syntheticForward = useMemo(() => {
+    if (!liveHistory?.length) return []
+    const anchor = liveHistory[liveHistory.length - 1] as NavPoint
+    return generateSyntheticForward(anchor, vault.id)
+  }, [liveHistory, vault.id])
+
+  const realCandles = (liveHistory ?? vault.navHistory) as NavPoint[]
+  const history = liveHistory ? [...realCandles, ...syntheticForward] : realCandles
   const data = sliceHistory(history, range)
   const isUp = vault.navChange >= 0
   const isPreview = vault.status === 'preview'

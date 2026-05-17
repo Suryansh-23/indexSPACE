@@ -342,9 +342,14 @@ if (config.mockVault) {
       const totalShares = mockVault.getTotalShares(idx.id);
       const usdcBalance = mockVault.getVaultUsdcBalance(idx.id);
       const lastCandle = getLastCandleState(idx.id);
-      const nav = totalShares > 0 ? usdcBalance / totalShares : lastCandle?.nav ?? 1.0;
-      const shareSupply = totalShares > 0 ? totalShares : lastCandle?.shares || getLastNonZeroCandleShares(idx.id);
-      appendCurrentCandle(db, idx.id, nav, shareSupply);
+      const accountingNav = totalShares > 0 ? usdcBalance / totalShares : lastCandle?.nav ?? 100.0;
+      const lastClose = lastCandle?.nav ?? 0;
+      // Only persist a candle when a real trade has moved the NAV — keeps the DB
+      // as ground truth only. Synthetic fill between candles is handled client-side.
+      if (lastClose === 0 || Math.abs(accountingNav - lastClose) / lastClose > 0.0001) {
+        const shareSupply = totalShares > 0 ? totalShares : lastCandle?.shares || getLastNonZeroCandleShares(idx.id);
+        appendCurrentCandle(db, idx.id, accountingNav, shareSupply);
+      }
     }
   }, Math.max(config.pollIntervalMs, 15000));
 
@@ -372,9 +377,12 @@ if (config.mockVault) {
         const totalShares = mockVault.getTotalShares(idx.id);
         const usdcBalance = mockVault.getVaultUsdcBalance(idx.id);
         const lastCandle = getLastCandleState(idx.id);
-        const nav = totalShares > 0 ? usdcBalance / totalShares : lastCandle?.nav ?? 1.0;
-        const shareSupply = totalShares > 0 ? totalShares : lastCandle?.shares || getLastNonZeroCandleShares(idx.id);
-        appendCurrentCandle(db, idx.id, nav, shareSupply);
+        const accountingNav = totalShares > 0 ? usdcBalance / totalShares : lastCandle?.nav ?? 100.0;
+        const lastClose = lastCandle?.nav ?? 0;
+        if (lastClose === 0 || Math.abs(accountingNav - lastClose) / lastClose > 0.0001) {
+          const shareSupply = totalShares > 0 ? totalShares : lastCandle?.shares || getLastNonZeroCandleShares(idx.id);
+          appendCurrentCandle(db, idx.id, accountingNav, shareSupply);
+        }
       }
     } catch (err) {
       logError("scheduler.curator", "Background curator tick failed", err);

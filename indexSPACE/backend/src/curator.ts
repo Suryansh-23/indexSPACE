@@ -144,8 +144,6 @@ export class Curator {
     const positionIds: string[] = [];
     for (const constituent of index.constituents) {
       const strategy = getDefaultStrategy(constituent.weight, constituent.orientation as Orientation);
-      // assets is in USDC micro-units (6 decimals); collateral stays in micros here.
-      // sdk.ts / tryFsBuy normalises to dollars before sending to the FS API.
       const collateral = (assets * constituent.weight) / 100;
 
       const posId = await this.execFsBuy(req.id, req.vault_id, constituent, strategy, collateral);

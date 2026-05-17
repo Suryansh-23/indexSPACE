@@ -10,10 +10,6 @@ export interface VaultClient {
   fsUsername?: string;
 }
 
-// USDC uses 6 decimal places on-chain. All collateral values coming in from the
-// curator are in those micro-units (e.g. 1_000_000 = $1.00). The FS API expects
-// real dollar amounts, so every buy must divide by this scale before sending.
-const USDC_SCALE = 1e6;
 
 let _fsClient: FSClient | null = null;
 let _fsTraceEnabled = false;
@@ -161,15 +157,14 @@ export async function tryFsBuy(
     const belief = buildBeliefVector(numBuckets, lowerBound, upperBound, strategy);
 
     validateBeliefVector(belief, numBuckets);
-    const collateralDollars = collateral / USDC_SCALE;
+    const collateralDollars = collateral;
     if (collateralDollars > 500) {
-      logRuntime("fs.buy", "collateral exceeds $500 — possible unit mismatch, skipping", { marketId, collateral, collateralDollars }, "warn");
+      logRuntime("fs.buy", "collateral exceeds $500 — capped, skipping", { marketId, collateralDollars }, "warn");
       return null;
     }
     if (_fsTraceEnabled) {
       logRuntime("fs.buy", "Submitting FunctionSpace buy", {
         marketId,
-        collateralMicros: collateral,
         collateralDollars,
         numBuckets,
         strategy,

@@ -1,4 +1,4 @@
-import { createPublicClient, http, parseAbiItem, type Address } from "viem";
+import { createPublicClient, http, parseAbiItem, formatUnits, type Address } from "viem";
 import { anvil, baseSepolia } from "viem/chains";
 import type { Database } from "bun:sqlite";
 import type { AppConfig } from "./config.ts";
@@ -165,8 +165,8 @@ export class RealIndexer {
       controller: args.controller as Address,
       owner: args.owner as Address,
       kind,
-      assetAmount: kind === "subscribe" ? String(args.assets ?? "0") : "0",
-      shareAmount: kind === "redeem" ? String(args.shares ?? "0") : "0",
+      assetAmount: kind === "subscribe" ? formatUnits(BigInt(args.assets ?? 0n), 6) : "0",
+      shareAmount: kind === "redeem" ? formatUnits(BigInt(args.shares ?? 0n), 18) : "0",
       txHash: log.transactionHash ?? "0x0",
       logIndex: log.logIndex ?? 0,
       blockNumber: Number(log.blockNumber ?? 0),
@@ -183,8 +183,8 @@ export class RealIndexer {
       controller: args.controller as Address,
       owner: args.receiver as Address,
       kind,
-      assetAmount: kind === "redeem" ? String(args.assets ?? "0") : "0",
-      shareAmount: kind === "subscribe" ? String(args.shares ?? "0") : "0",
+      assetAmount: kind === "redeem" ? formatUnits(BigInt(args.assets ?? 0n), 6) : "0",
+      shareAmount: kind === "subscribe" ? formatUnits(BigInt(args.shares ?? 0n), 18) : "0",
       txHash: log.transactionHash ?? "0x0",
       logIndex: log.logIndex ?? 0,
       blockNumber: Number(log.blockNumber ?? 0),
