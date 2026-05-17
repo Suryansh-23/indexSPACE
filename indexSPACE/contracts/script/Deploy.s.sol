@@ -7,36 +7,52 @@ import { MockUSDC } from "../src/mocks/MockUSDC.sol";
 import { IndexVault } from "../src/IndexVault.sol";
 
 contract Deploy is Script {
+    uint256 internal constant BASE_SEPOLIA_CHAIN_ID = 84532;
+
     function run() external {
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address deployer = vm.addr(deployerKey);
         address curator = vm.envOr("CURATOR_ADDRESS", deployer);
+        uint256 chainId = block.chainid;
+
+        address assetAddress;
+        MockUSDC mockUsdc;
 
         vm.startBroadcast(deployerKey);
 
-        MockUSDC usdc = new MockUSDC();
+        if (chainId == BASE_SEPOLIA_CHAIN_ID) {
+            assetAddress = vm.envAddress("BASE_SEPOLIA_USDC");
+        } else {
+            mockUsdc = new MockUSDC();
+            assetAddress = address(mockUsdc);
+        }
 
         IndexVault aiVault = new IndexVault(
-            address(usdc),
+            assetAddress,
             curator,
             "AI Acceleration Vault Share",
             "aVLT"
         );
 
         IndexVault cryptoVault = new IndexVault(
-            address(usdc),
+            assetAddress,
             curator,
             "Crypto Reflexivity Vault Share",
             "cVLT"
         );
 
-        uint256 mintAmount = 1_000_000_000_000;
-        usdc.mint(deployer, mintAmount);
-        usdc.mint(curator, mintAmount);
+        if (chainId != BASE_SEPOLIA_CHAIN_ID) {
+            uint256 mintAmount = 1_000_000_000_000;
+            mockUsdc.mint(deployer, mintAmount);
+            mockUsdc.mint(curator, mintAmount);
+        }
 
         vm.stopBroadcast();
 
-        console.log("MOCK_USDC=%s", address(usdc));
+        if (chainId != BASE_SEPOLIA_CHAIN_ID) {
+            console.log("MOCK_USDC=%s", address(mockUsdc));
+        }
+        console.log("ASSET=%s", assetAddress);
         console.log("AI_ACCELERATION_VAULT=%s", address(aiVault));
         console.log("CRYPTO_REFLEXIVITY_VAULT=%s", address(cryptoVault));
         console.log("CURATOR=%s", curator);
